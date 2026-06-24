@@ -1,0 +1,34 @@
+services:
+  # 🛡️ 1. KATMAN: Siber Güvenlik Tarayıcısı (OWASP ZAP)
+  zap-proxy:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    container_name: zap-proxy
+    command: zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.disablekey=true -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
+    ports:
+      - "8085:8080"
+      - "8095:8090"
+    networks:
+      - automation-network
+
+  # 🚀 3. KATMAN: Test Motoru (Playwright + Keploy Eklentisi)
+  playwright-runner:
+    image: mcr.microsoft.com/playwright:v1.61.1-noble
+    container_name: playwright-runner
+    depends_on:
+      - zap-proxy
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    command: sh -c "npm install && npx playwright test"
+    networks:
+      - automation-network
+    environment:
+      - NODE_ENV=development
+      # Senin yaptığın o harika İngilizce değişkeni buraya gömüyoruz kanka!
+      - SECURITY_MODE=true 
+      - HTTP_PROXY=http://zap-proxy:8080
+      - HTTPS_PROXY=http://zap-proxy:8080
+
+networks:
+  automation-network:
+    driver: bridge
