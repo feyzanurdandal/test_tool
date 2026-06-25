@@ -4,6 +4,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const extPath = path.resolve(__dirname, 'keploy-extension');
+const TEST_MODE = process.env.TEST_MODE || 'UI';
+console.log(`***Playwright Altyapısı Başlatıldı | Aktif Mod: ${TEST_MODE}`);
 
 /**
  * Read environment variables from file.
@@ -38,12 +40,12 @@ export default defineConfig({
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     //BU KISIM YENİ PROBLEM ÇIKARSA BURAYA BAK*****************
     // Sadece ortamda GUVENLIK_MODU=true ise trafiği ZAP'a (8085 veya docker içindeki zap-proxy'ye) yönlendir
-    proxy: process.env.SECURITY_MODE === 'true' ? {
-      server: process.env.HTTP_PROXY || 'http://localhost:8085',
-    } : undefined, // Yoksa proxy kullanma, direkt internete çık!
+    proxy: TEST_MODE === 'SECURITY' ? {
+      server: process.env.ZAP_PROXY_URL || 'http://localhost:8085',
+    } : undefined,
 
     // Güvenlik modu aktifse sertifika hatalarını yoksay
-    ignoreHTTPSErrors: process.env.SECURITY_MODE === 'true',
+    ignoreHTTPSErrors: TEST_MODE === 'SECURITY',
     
     // 2. Tarayıcı Ayarları ve Port Tanımlamaları
     launchOptions: {

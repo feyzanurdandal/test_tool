@@ -1,16 +1,19 @@
 services:
-  # 🛡️ 1. KATMAN: Siber Güvenlik Tarayıcısı (OWASP ZAP)
+  # 🛡️ Siber Güvenlik Katmanı (ZAP Resmi Webswing Yapılandırması)
   zap-proxy:
     image: ghcr.io/zaproxy/zaproxy:stable
     container_name: zap-proxy
-    command: zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.disablekey=true -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
+    command: zap-webswing.sh
+    restart: always
     ports:
-      - "8085:8080"
-      - "8095:8090"
+      - "8082:8080" # 👈 Webswing Giriş Kapısı (Tarayıcıdan buraya gideceğiz)
+      - "8090:8090" # 👈 Gerçek Proxy Kapısı (Playwright buradan sızacak)
+    volumes:
+      - ./security-reports:/zap/wrk:rw
     networks:
       - automation-network
 
-  # 🚀 3. KATMAN: Test Motoru (Playwright + Keploy Eklentisi)
+  # 🚀 Ana Test Motoru (Playwright)
   playwright-runner:
     image: mcr.microsoft.com/playwright:v1.61.1-noble
     container_name: playwright-runner
@@ -19,15 +22,14 @@ services:
     volumes:
       - .:/workspace
     working_dir: /workspace
-    command: sh -c "npm install && npx playwright test"
+    # 💡 MÜHENDİSLİK HİLESİ: Playwright hemen koşup patlamasın diye testten önce 15 saniye uyutuyoruz (ZAP'ı açmana süre tanır)
+    command: sh -c "npm install && sleep 45 && npx playwright test"
     networks:
       - automation-network
     environment:
       - NODE_ENV=development
-      # Senin yaptığın o harika İngilizce değişkeni buraya gömüyoruz kanka!
-      - SECURITY_MODE=true 
-      - HTTP_PROXY=http://zap-proxy:8080
-      - HTTPS_PROXY=http://zap-proxy:8080
+      - TEST_MODE=${TEST_MODE:-UI}
+      - ZAP_PROXY_URL=http://zap-proxy:8090 # Dokümantasyonun emrettiği proxy portu!
 
 networks:
   automation-network:

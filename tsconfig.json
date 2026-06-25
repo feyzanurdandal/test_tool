@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16", // 👈 Hata veren CommonJS yerine Node16 yazarak eşitledik!
+    "moduleResolution": "Node16", // 👈 Burayla tam uyumlu oldu
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "tests/**/*", "pages/**/*"]
+}
