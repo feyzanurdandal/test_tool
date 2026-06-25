@@ -43,6 +43,7 @@ export default defineConfig({
     proxy: TEST_MODE === 'SECURITY' ? {
       server: process.env.ZAP_PROXY_URL || 'http://localhost:8085',
     } : undefined,
+    video: 'on',
 
     // Güvenlik modu aktifse sertifika hatalarını yoksay
     ignoreHTTPSErrors: TEST_MODE === 'SECURITY',
