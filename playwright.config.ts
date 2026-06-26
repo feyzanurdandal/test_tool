@@ -44,6 +44,7 @@ export default defineConfig({
       server: process.env.ZAP_PROXY_URL || 'http://localhost:8085',
     } : undefined,
     video: 'on',
+    screenshot: 'only-on-failure',
 
     // Güvenlik modu aktifse sertifika hatalarını yoksay
     ignoreHTTPSErrors: TEST_MODE === 'SECURITY',

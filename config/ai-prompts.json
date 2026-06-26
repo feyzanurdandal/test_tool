@@ -1,0 +1,23 @@
+
+{
+  "targetUrl": "https://www.dpu.edu.tr/",
+  "steps": [
+    { 
+      "type": "act", 
+      "instruction": "Focus and click on the input text field with placeholder 'Site içi arama' or name 'q'" 
+    },
+    { 
+      "type": "act", 
+      "instruction": "Type the text 'Yazılım Mühendisliği' into that active input search box" 
+    },
+    { 
+      "type": "act", 
+      "instruction": "Press the 'Enter' key on your keyboard to submit the search form" 
+    },
+    { 
+      "type": "extract", 
+      "instruction": "Verify if the text 'Arama Sonuçları' appears anywhere in the visible page headers or main content area", 
+      "field": "hasResults" 
+    }
+  ]
+}

@@ -17,6 +17,8 @@ services:
   playwright-runner:
     image: mcr.microsoft.com/playwright:v1.61.1-noble
     container_name: playwright-runner
+    privileged: true
+    shm_size: '2gb'
     depends_on:
       - zap-proxy
     volumes:
@@ -30,6 +32,7 @@ services:
       - NODE_ENV=development
       - TEST_MODE=${TEST_MODE:-UI}
       - ZAP_PROXY_URL=http://zap-proxy:8090 # Dokümantasyonun emrettiği proxy portu!
+      - CHROME_PATH=/ms-playwright/chromium-1228/chrome-linux64/chrome
 
 networks:
   automation-network:

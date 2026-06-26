@@ -4,10 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-  "test:ui": "cross-env TEST_MODE=UI docker compose -f docker-compose.test.yml down --remove-orphans && cross-env TEST_MODE=UI docker compose -f docker-compose.test.yml up --build",
-  "test:security": "cross-env TEST_MODE=SECURITY docker compose -f docker-compose.test.yml down --remove-orphans && cross-env TEST_MODE=SECURITY docker compose -f docker-compose.test.yml up --build",
-  "test:api": "cross-env TEST_MODE=API docker compose -f docker-compose.test.yml down --remove-orphans && cross-env TEST_MODE=API docker compose -f docker-compose.test.yml up --build",
-  "test:ui-watch": "cross-env TEST_MODE=UI npx playwright test --ui"
+    "test:ui": "cross-env TEST_MODE=UI docker compose -f docker-compose.test.yml down --remove-orphans && cross-env TEST_MODE=UI docker compose -f docker-compose.test.yml up --build",
+    "test:security": "cross-env TEST_MODE=SECURITY docker compose -f docker-compose.test.yml down --remove-orphans && cross-env TEST_MODE=SECURITY docker compose -f docker-compose.test.yml up --build",
+    "test:api": "cross-env TEST_MODE=API docker compose -f docker-compose.test.yml down --remove-orphans && cross-env TEST_MODE=API docker compose -f docker-compose.test.yml up --build",
+    "test:ui-watch": "cross-env TEST_MODE=UI npx playwright test --ui",
+    "test:ai": "cross-env TEST_MODE=AI docker compose -f docker-compose.test.yml down --remove-orphans && cross-env TEST_MODE=AI docker compose -f docker-compose.test.yml up --build",
+    "test:ai-local": "cross-env TEST_MODE=AI npx playwright test tests/ai-security.spec.ts",
+    "map-site": "npx tsx map-site.ts"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +19,12 @@
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.0.1",
+    "cross-env": "^10.1.0",
     "playwright-lighthouse": "^4.0.0"
+  },
+  "dependencies": {
+    "@browserbasehq/stagehand": "^3.6.0",
+    "playwright-core": "^1.61.1",
+    "zod": "^4.4.3"
   }
 }

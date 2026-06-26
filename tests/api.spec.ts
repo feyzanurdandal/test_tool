@@ -1,43 +1,48 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, request } from '@playwright/test';
+import { BASE_URL } from '../config/constants.js';
 
-// 💡 MÜHENDİSLİK DÜZELTMESİ: Node16 ortamı için tür dönüşümü (Type Casting) uyguladık
-const TEST_MODE = (process as any).env.TEST_MODE || 'UI';
+test.skip(
+process.env.TEST_MODE !== 'API',
+'API entegrasyon testleri sadece API modunda aktif olur.'
+);
 
-test.describe('Saf Backend API Test Katmanı', () => {
-  
-  test.beforeAll(async () => {
-    if (TEST_MODE !== 'API') {
-      test.skip(); // Mod API değilse bu dosyayı komple es geç kanka
-    }
-    console.log('🤖 API Modu Aktif: Saf Backend entegrasyon testleri başlatılıyor...');
-  });
+test('Backend API Entegrasyon ve Kontrol Testi', async () => {
+/* 🚨 [TODO]: CRITICAL ARCHITECTURAL NOTE 🚨
+Ham codegen çıktısı sadece tarayıcı etkileşimlerini kaydettiği için arka planda fırlatılan
+HTTP isteklerinin ham gövdesi (Request Body), tam URL'i ve Header detayları tespit edilememiştir.
 
-  test('GET /posts - Veri listeleme ve Şema Doğrulama', async ({ request }) => {
-    const response = await request.get('https://jsonplaceholder.typicode.com/posts/1');
-    expect(response.status()).toBe(200);
-    
-    const responseBody = await response.json();
-    console.log('📥 Gelen API Yanıtı:', responseBody);
+Ucu uydurma endpoint yazmamak adına buraya mimari bir TODO bırakılmıştır.
+Gerçek API uç noktasını entegre etmek için şu adımları izleyin:
+1. Tarayıcıda F12 Geliştirici Araçları -> Network (Ağ) sekmesini açın.
+2. Arama kutusuna basıldığında giden saf HTTP paketini yakalayın (Method, Payload, URL).
+3. Elde edilen verileri aşağıdaki şablona giydirerek testi tamamlayın.
+*/
 
-    expect(responseBody).toHaveProperty('id', 1);
-    expect(responseBody).toHaveProperty('userId');
-    expect(responseBody).toHaveProperty('title');
-  });
-
-  test('POST /posts - Yeni Veri Ekleme ve Durum Kontrolü', async ({ request }) => {
-    const response = await request.post('https://jsonplaceholder.typicode.com/posts', {
-      data: {
-        title: 'CTI Hub Test Başlığı',
-        body: 'Mühendislik test otomasyonu hatları tıkır tıkır çalışıyor.',
-        userId: 44
-      }
+// Kurumsal API Test Bağlamı (Context) Doğru Yapılandırması
+// Kurumsal API Test Bağlamı (Context) Doğru Yapılandırması
+    const apiContext = await request.newContext({
+        baseURL: BASE_URL,
+        extraHTTPHeaders: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Automation-Source': 'Playwright-API-Agent'
+        }
     });
 
-    expect(response.status()).toBe(201);
-    
-    const responseBody = await response.json();
-    console.log('📤 API Ekleme Sonucu:', responseBody);
+// Temsili Şablon İstek Yapısı (Gerçek endpoint analiz edildikten sonra güncellenmelidir)
+const response = await apiContext.get('/level1/frame', {
+    params: {
+        'query': 'test test test' 
+    }
+});
 
-    expect(responseBody.title).toBe('CTI Hub Test Başlığı');
-  });
+// Kurumsal API Assertion Katmanı
+expect(response.status()).toBeLessThan(500); 
+expect(response.ok()).toBeTruthy(); 
+
+const responseBody = await response.text();
+expect(responseBody.length).toBeGreaterThan(0);
+
+// İşlem bittikten sonra context'i temiz bir şekilde kapatıyoruz
+await apiContext.dispose();
 });

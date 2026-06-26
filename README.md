@@ -24,11 +24,7 @@ Canlı ortam testlerinde yerel ağ kısıtlamaları (`localhost`, `host.docker.i
 
 1. **Test Aracının İçinde Kalın:** Hedef canlı sitenin kodlarında hiçbir değişiklik yapmanıza gerek yoktur. Tüm işlemleri sadece bu `test-tool` klasörünün içinde yürüteceksiniz.
 
-2. Test-tool ana dizinindeyken terminalden testi başlatın. Örneğin:
-```
-npm run test:security
-```
-### 3- Playwright Codegen (Otomatik Kod Kaydedici) Çalıştırma
+### 2- Playwright Codegen (Otomatik Kod Kaydedici) Çalıştırma
 
 Bu özellik Docker'ın içinden değil, kendi yerel bilgisayarınızdan (Windows/Linux) bir tarayıcı fırlatarak çalışır. Siz yereldeki projenizin adresinde gezinirken test kodları otomatik olarak arkada üretilir.
 
@@ -47,7 +43,7 @@ Bu özellik Docker'ın içinden değil, kendi yerel bilgisayarınızdan (Windows
 4. Sitede normal bir kullanıcı gibi butonlara tıklayın, formları doldurun. Sağ taraftaki Inspector penceresinde kodların TypeScript formatında oluştuğunu göreceksiniz.
 5. İşlem bittiğinde Inspector penceresindeki **Copy** butonuna basarak oluşan ham kodları kopyalayın.
 
-### 4- Yapay Zeka ile 3 Katmanlı Mimari Ayrıştırması
+### 3- Yapay Zeka ile 3 Katmanlı Mimari Ayrıştırması
 
 Kopyaladığınız ham kodları, sistemi bozmadan **UI, GÜVENLİK ve API** katmanlarına kusursuzca bölebilmesi için herhangi bir yapay zekaya aşağıdaki prompt ile birlikte gönderin:
 
@@ -81,7 +77,7 @@ Kopyaladığınız ham kodları, sistemi bozmadan **UI, GÜVENLİK ve API** katm
 
 Yapay zekanın ürettiği bu kodları projenizdeki ilgili klasörlere (`pages/` ve `tests/`) kaydettikten sonra sistem artık kullanıma hazırdır!
 
-5. **Test Dosyasını Güncelleyin:** `tests/security.spec.ts` (veya `ui.spec.ts`) dosyanızı açın ve içerisindeki URL adresini doğrudan test etmek istediğiniz canlı sitenin internet adresiyle değiştirin:
+4. **Test Dosyasını Güncelleyin:** `tests/security.spec.ts` (veya `ui.spec.ts`) dosyanızı açın ve içerisindeki URL adresini doğrudan test etmek istediğiniz canlı sitenin internet adresiyle aynı olup olmadığını kontrol edin:
    ```typescript
    // Örnek: tests/security.spec.ts
    async gotoLogin() {
@@ -185,33 +181,39 @@ Bu özellik Docker'ın içinden değil, kendi yerel bilgisayarınızdan (Windows
 
 Kopyaladığınız ham kodları, sistemi bozmadan **UI, GÜVENLİK ve API** katmanlarına kusursuzca bölebilmesi için herhangi bir yapay zekaya aşağıdaki prompt ile birlikte gönderin:
 
-> "Elimde Playwright `codegen` aracından alınmış ham bir test kodu var. Bu kodu kurumsal **Page Object Model (POM)** ve **3 Farklı Test Klasörü (UI, GÜVENLİK, API)** mimarisine göre ayrıştırmanı istiyorum. Banatam olarak şu dosyaları ayrı ayrı üret:
-> 
-> 
-> **1. Sayfa Nesnesi Katmanı (`pages/` klasörü için):**
-> 
-> - Sadece element tanımlamalarını (`locator`) ve arayüz fonksiyonlarını içersin.
-> - Ortam değişkeni `process.env.TEST_MODE === 'API'` ise, buradaki tüm fonksiyonlar otomatik olarak erken dönüş (`return`) yaparak arayüz adımlarını es geçsin.
-> 
-> **2. Temel Fonksiyonel Arayüz Test Katmanı (`tests/ui.spec.ts` için):**
-> 
-> - Sadece arayüz senaryosunu barındırsın. Sayfa nesnesini çağırarak adımları yönetsin ve görsel doğrulamaları (`expect`) gerçekleştirsin.
-> - `process.env.TEST_MODE === 'API'` veya `SECURITY` ise bu dosya en başta `test.skip()` ile es geçilsin.
-> 
-> **3. Siber Güvenlik Test Katmanı (`tests/security.spec.ts` için):**
-> 
-> - Arayüz adımlarını koşturarak arkadaki OWASP ZAP Proxy'nin trafiği dinlemesini ve zafiyet taraması yapmasını sağlasın.
-> - Eğer `process.env.TEST_MODE === 'API'` ise bu test dosyası en başta `test.skip()` ile tamamen es geçilsin.
-> 
-> **4. Saf Backend API Test Katmanı (`tests/api.spec.ts` için):**
-> 
-> - Tarayıcıyı ve Sayfa Nesnesini ASLA kullanmasın. Playwright'ın saf `request` motorunu kullansın.
-> - Ham kodda yapılan işlemlerin (Örn: Bir formu doldurup göndermek) backend API uç noktasına doğrudan HTTP paketi atan saf backend entegrasyon test versiyonunu yazsın.
-> - Eğer `process.env.TEST_MODE !== 'API'` ise bu test dosyası en başta `test.skip()` ile es geçilsin.
-> 
-> **İşte Ham Codegen Çıktısı:**
-> [BURAYA CODEGEN'DEN GELEN HAM KODU YAPIŞTIR]"
-> 
+> "Elimde Playwright codegen aracından alınmış ham bir test senaryosu var. Bu kodu, kurumsal yazılım mimarilerine uygun, esnek, sürdürülebilir ve kurşun geçirmez bir Test & DAST (Siber Güvenlik) otomasyon altyapısına dönüştürmeni istiyorum.
+
+>Sistemi Page Object Model (POM), SOLID ve DRY prensiplerine tam uyumlu şekilde ayrıştırırken şu kurumsal standartlara kesinlikle sadık kalmalısın:
+>Üretilen tüm kodlar TypeScript strict mode ve Playwright Best Practices ile uyumlu olmalıdır.
+>Dosya isimlerini ayrı başlıklar altında vermeli, hiçbir kod bloğunu "..." veya "kodun devamı" diyerek yarım bırakmamalısın. Tüm dosyalar kopyala-yapıştır yapıldığında doğrudan çalışabilir olmalıdır.
+
+>TABAN SAYFA KATMANI (pages/BasePage.ts)
+>Tüm sayfa nesnelerinin türeyeceği bir abstract BasePage sınıfı oluştur.
+>Playwright'ın "page" nesnesi korumalı (protected) olarak burada tutulmalıdır.
+>İçerisinde isApiMode(), waitUntilLoaded(), takeScreenshot(), safeClick() gibi ortak yardımcı fonksiyonlar ve mod kontrolleri (API, UI, SECURITY) bulunmalıdır.
+
+>HEDEF SAYFA KATMANI (pages/TargetPage.ts)
+>BasePage sınıfından extend edilmelidir.
+>Locator stratejisinde öncelik sırasıyla Playwright'ın getByRole, getByLabel, getByPlaceholder, getByText ve data-testid motorları kullanılmalıdır. En son çare olarak CSS/XPath locator kullanılmalıdır.
+>Sayfa fonksiyonları, process.env.TEST_MODE === 'API' ise otomatik olarak erken dönüş (return) yaparak UI adımlarını işletmemelidir.
+
+>TEMEL FONKSİYONEL ARAYÜZ TEST KATMANI (tests/ui.spec.ts)
+>Sadece arayüz fonksiyonelliğini ve görsel doğrulamaları barındırmalıdır.
+>TEST_MODE değişkeni 'API' veya 'SECURITY' ise test.skip() ile en başta tamamen es geçilmelidir.
+
+>SİBER GÜVENLİK TEST KATMANI (tests/security.spec.ts)
+>UI adımlarını koşturarak arkadaki OWASP ZAP Proxy'nin trafiği dinlemesini (Passive Scan) sağlamalıdır.
+>TEST_MODE === 'API' ise test.skip() ile es geçilmelidir.
+>Profesyonel Yaklaşım: Test senaryosunun sonuna, ZAP REST API uç noktalarına bağlanarak aktif taramayı tetikleyen, High/Medium seviye bir zafiyet bulunursa testi otomatik olarak "fail" eden ve siber güvenlik raporunu artifacts/security/ klasörü altına html/json olarak kaydeden kurumsal bir otomasyon akışı/taslağı ekle.
+
+>SAF BACKEND API ENTEGRASYON KATMANI (tests/api.spec.ts)
+>Tarayıcıyı ve Sayfa Nesnelerini kesinlikle KULLANMAMALIDIR. Playwright'ın saf request motorunu kullanmalıdır.
+>TEST_MODE !== 'API' ise test.skip() ile es geçilmelidir.
+>KRİTİK KURAL: Ham browser (codegen) kodundan backend API uç noktasının gerçek adresi, istek tipi (GET/POST), Body formatı (JSON/Form-urlencoded) veya Header/Token gereksinimleri kesin olarak çıkarılamıyorsa, kesinlikle sahte/uydurma endpoint'ler yazma! Bunun yerine test fonksiyonunun içine açık bir TODO açıklaması koy, tarayıcı ağ trafiğinden (HAR/DevTools) bu endpoint'in nasıl elde edileceğini yorum satırıyla belirt ve şablon bir request.newContext() yapısı kur (Status code, Response schema validation ve JSON doğrulama adımları şablon olarak bulunmalıdır).
+
+>İşte İşlenecek Ham Codegen Çıktısı:
+>[BURAYA CODEGEN'DEN GELEN HAM KODU YAPIŞTIR]
+
 
 Yapay zekanın ürettiği bu kodları projenizdeki ilgili klasörlere (`pages/` ve `tests/`) kaydettikten sonra sistem artık kullanıma hazırdır!
 
