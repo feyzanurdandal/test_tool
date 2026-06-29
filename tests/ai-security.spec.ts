@@ -6,7 +6,7 @@ import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { STAGEHAND_API_KEY } from '../config/constants.js'; // Senin anahtarın burada
+import { STAGEHAND_API_KEY } from '../config/constants.js';
 
 test('Prompt-Driven v3 Stagehand Optimal Yapay Zeka Otomasyon Motoru', async () => {
     const __filename = fileURLToPath(import.meta.url);
@@ -14,7 +14,6 @@ test('Prompt-Driven v3 Stagehand Optimal Yapay Zeka Otomasyon Motoru', async () 
     const promptFilePath = path.resolve(__dirname, '../config/ai-prompts.json');
     const promptData = JSON.parse(fs.readFileSync(promptFilePath, 'utf-8'));
 
-    // Stagehand, bu anahtarı kullanarak OpenAI ile konuşacak
     process.env.OPENAI_API_KEY = STAGEHAND_API_KEY;
 
     const stagehand = new Stagehand({
@@ -37,14 +36,20 @@ test('Prompt-Driven v3 Stagehand Optimal Yapay Zeka Otomasyon Motoru', async () 
             try {
                 if (step.type === 'act') {
                     await stagehand.act(step.instruction, { page: pwPage });
+                    const isNavigationStep = step.instruction.toLowerCase().includes('enter') || 
+                                             step.instruction.toLowerCase().includes('click') || 
+                                             step.instruction.toLowerCase().includes('submit');
+                    if (isNavigationStep) {
+                        console.log("⏳ Sayfa geçişi için kısa duraklama (2sn)...");
+                        await pwPage.waitForTimeout(2000); 
+                    }
                 } else if (step.type === 'extract') {
                     const dynamicSchema = z.object({ [step.field]: z.boolean() });
-                    const result = await stagehand.extract(step.instruction, dynamicSchema, { page: pwPage });
-                    expect(result[step.field]).toBeTruthy();
+                    const response = await stagehand.extract(step.instruction, dynamicSchema, { page: pwPage });
+                    expect(response[step.field]).toBeTruthy();
                 }
             } catch (e) {
-                console.warn("Hata oldu, yedek ajan devreye giriyor...");
-                // Sadece OpenAI anahtarı ile çalışan, CUA modunda olmayan yedek ajan
+                console.warn("⚠️ Hata oldu, yedek ajan devreye giriyor...");
                 const agent = stagehand.agent({
                     mode: "dom", // CUA değil DOM modu (Sadece OpenAI ile çalışır)
                     model: "openai/gpt-4o" // Yedek olarak daha güçlü OpenAI modeli
