@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "instruction": "Press the 'Enter' key on your keyboard to submit the search form.",
+  "url": "https://www.dpu.edu.tr/",
+  "variableKeys": [],
+  "actions": [
+    {
+      "selector": "xpath=/html[1]/body[1]/div[2]/div[4]/div[7]/div[1]/div[3]/form[1]/input[2]",
+      "description": "Button to submit the search form",
+      "method": "press",
+      "arguments": [
+        "Enter"
+      ]
+    }
+  ],
+  "actionDescription": "Button to submit the search form",
+  "message": "Action [press] performed successfully on selector: xpath=/html[1]/body[1]/div[2]/div[4]/div[7]/div[1]/div[3]/form[1]/input[2]"
+}

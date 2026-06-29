@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "instruction": "Focus and click on the input text field with placeholder 'Site içi arama' or name 'q'.",
+  "url": "https://www.dpu.edu.tr/",
+  "variableKeys": [],
+  "actions": [
+    {
+      "selector": "xpath=/html[1]/body[1]/div[2]/div[4]/div[7]/div[1]/div[3]/form[1]",
+      "description": "input text field with placeholder 'Site içi arama'",
+      "method": "click",
+      "arguments": []
+    }
+  ],
+  "actionDescription": "input text field with placeholder 'Site içi arama'",
+  "message": "Action [click] performed successfully on selector: xpath=/html[1]/body[1]/div[2]/div[4]/div[7]/div[1]/div[3]/form[1]"
+}
