@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Yeni Test Senaryosu Oluştur</title>
+</head>
+<body style="background: #1e1e1e; color: #d4d4d4; font-family: 'Segoe UI', sans-serif; padding: 40px;">
+    <div style="max-width: 700px; margin: 0 auto; background: #252526; padding: 30px; border-radius: 12px; border: 1px solid #3e3e42; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+        <h1 style="color: #4caf50; margin-top: 0; border-bottom: 2px solid #3e3e42; padding-bottom: 10px;">➕ Yeni Test Senaryosu Oluştur</h1>
+        <p style="color: #858585; margin-bottom: 25px;">Kod bilmenize gerek yok kanka! Test adımlarını aşağıdan dinamik olarak ekleyebilirsiniz.</p>
+        
+        <form action="/api/scenarios/save" method="POST">
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px;">Test Senaryosu Adı:</label>
+                <input type="text" name="scenarioName" required style="width: 100%; padding: 10px; background: #1e1e1e; border: 1px solid #3e3e42; color: white; border-radius: 5px; box-sizing: border-box;">
+            </div>
+
+            <div id="stepsContainer">
+                <h3 style="color: #007acc; border-bottom: 1px solid #3e3e42; padding-bottom: 5px;">🤖 Test Adımları</h3>
+                <div class="step-block" style="background: #1e1e1e; padding: 15px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #007acc; position: relative;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="display:block; font-size:12px; margin-bottom:4px;">Aksiyon:</label>
+                            <select name="actionType[]" style="width:100%; padding:8px; background:#2d2d2d; color:white; border:1px solid #3e3e42; border-radius:4px;">
+                                <option value="navigate">Siteye Git (navigate)</option>
+                                <option value="click">Tıkla (click)</option>
+                                <option value="type">Yazı Yaz (type)</option>
+                                <option value="wait">Bekle (wait - ms)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12px; margin-bottom:4px;">Seçici (Selector / URL):</label>
+                            <input type="text" name="selector[]" placeholder="#username veya URL" style="width:100%; padding:8px; background:#2d2d2d; color:white; border:1px solid #3e3e42; border-radius:4px;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12px; margin-bottom:4px;">Değer / Süre (Value):</label>
+                            <input type="text" name="value[]" placeholder="veri veya süre" style="width:100%; padding:8px; background:#2d2d2d; color:white; border:1px solid #3e3e42; border-radius:4px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" onclick="addStepBlock()" style="background: #2d2d2d; color: #4caf50; border: 1px dashed #4caf50; width: 100%; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-bottom: 25px;">
+                ➕ YENİ ADIM EKLE
+            </button>
+
+            <button type="submit" style="background: #4caf50; color: white; border: none; width: 100%; padding: 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold;">
+                💾 Senaryoyu Sisteme Kaydet
+            </button>
+        </form>
+    </div>
+
+    <script>
+        function addStepBlock() {
+            const container = document.getElementById('stepsContainer');
+            const newBlock = document.createElement('div');
+            newBlock.className = 'step-block';
+            newBlock.style = "background: #1e1e1e; padding: 15px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #007acc; position: relative;";
+            newBlock.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display:block; font-size:12px; margin-bottom:4px;">Aksiyon:</label>
+                        <select name="actionType[]" style="width:100%; padding:8px; background:#2d2d2d; color:white; border:1px solid #3e3e42; border-radius:4px;">
+                            <option value="navigate">Siteye Git (navigate)</option>
+                            <option value="click">Tıkla (click)</option>
+                            <option value="type">Yazı Yaz (type)</option>
+                            <option value="wait">Bekle (wait - ms)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:12px; margin-bottom:4px;">Seçici (Selector / URL):</label>
+                        <input type="text" name="selector[]" style="width:100%; padding:8px; background:#2d2d2d; color:white; border:1px solid #3e3e42; border-radius:4px;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:12px; margin-bottom:4px;">Değer / Süre (Value):</label>
+                        <input type="text" name="value[]" style="width:100%; padding:8px; background:#2d2d2d; color:white; border:1px solid #3e3e42; border-radius:4px;">
+                    </div>
+                </div>
+                <button type="button" onclick="this.parentElement.remove()" style="position: absolute; right: -5px; top: -5px; background: #f44336; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 10px; font-weight: bold;">X</button>
+            `;
+            container.appendChild(newBlock);
+        }
+    </script>
+</body>
+</html>
