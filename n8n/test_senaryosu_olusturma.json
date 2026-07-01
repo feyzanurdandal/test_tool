@@ -1,0 +1,124 @@
+{
+  "name": "test senaryosu oluşturma",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// 1. Form Trigger nodundan gelen verileri yakalıyoruz\nconst formData = $('Form Trigger').first().json;\n\nconst scenarioName = formData.scenarioName;\nconst targetUrl = formData.targetUrl;\n\nconst steps = [];\n\n// 2. Dinamik olarak Adım 1'i inşa ediyoruz\nif (formData.step1_type && formData.step1_instruction) {\n    steps.push({\n        type: formData.step1_type,\n        instruction: formData.step1_instruction\n    });\n}\n\n// 3. Dinamik olarak Adım 2'yi inşa ediyoruz\nif (formData.step2_type && formData.step2_instruction) {\n    let step2Obj = {\n        type: formData.step2_type,\n        instruction: formData.step2_instruction\n    };\n    \n    // Eğer kullanıcı extract seçtiyse ve alan adı girdiyse ekle\n    if (formData.step2_field) {\n        step2Obj.field = formData.step2_field;\n    }\n    \n    steps.push(step2Obj);\n}\n\n// Oluşturulan temiz JSON metni\nconst finalJsonString = JSON.stringify({\n  targetUrl: targetUrl,\n  steps: steps\n}, null, 2);\n\n// 4. Node.js ile diske yazma katmanı (Mevcut güvenli kodumuz aynen kalıyor)\nconst fs = require('fs');\nconst path = require('path');\nconst targetFolder = 'C:/Users/feyza/Desktop/test-tool/scenarios';\nconst fullPath = path.join(targetFolder, `${scenarioName}.json`);\n\ntry {\n    if (!fs.existsSync(targetFolder)){\n        fs.mkdirSync(targetFolder, { recursive: true });\n    }\n\n    fs.writeFileSync(fullPath, finalJsonString, 'utf-8');\n    \n    return [{\n      json: {\n        status: \"Başarılı\",\n        message: `Form verisi başarıyla JSON senaryosuna dönüştürüldü ve kaydedildi!`,\n        scenario: `${scenarioName}.json`\n      }\n    }];\n\n} catch (writeError) {\n    return [{\n      json: {\n        status: \"Hata\",\n        message: writeError.message\n      }\n    }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        32
+      ],
+      "id": "ff0bde08-952f-4c68-af33-67d8388b1f1c",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "formTitle": "Test Senaryosu Oluşturucu",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Senaryo Adı",
+              "fieldName": "scenarioName",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Hedef Web Sitesi URL'si",
+              "fieldName": "targetUrl",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Adım 1 - Aksiyon Tipi",
+              "fieldType": "dropdown",
+              "fieldName": "step1_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act "
+                  },
+                  {
+                    "option": "observe"
+                  },
+                  {
+                    "option": "extract"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Adım 1 - Talimat (Instruction)",
+              "fieldName": "step1_instruction",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Adım 2 - Aksiyon Tipi",
+              "fieldType": "dropdown",
+              "fieldName": "step2_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "observe"
+                  },
+                  {
+                    "option": "extract"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Adım 2 - Talimat (Instruction)",
+              "fieldName": "step2_instruction"
+            },
+            {
+              "fieldLabel": "Adım 2 - Çıktı Alanı Adı (Sadece Extract ise)",
+              "fieldName": "step2_field"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        32
+      ],
+      "id": "e67193e7-aeac-4534-b2d0-e3cf505980bd",
+      "name": "Form Trigger",
+      "webhookId": "605c1c13-fb4a-4c19-8ec8-6505ca7f119d"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "054b457c-d48e-4cf1-b318-cd58e82c34f4",
+  "meta": {
+    "instanceId": "ccd5402a9151423bbb2ebf6b5173d0074df8f9e5c1158b8348041db7bb063468"
+  },
+  "nodeGroups": [],
+  "id": "g29o6cdVIEoNsosv",
+  "tags": []
+}

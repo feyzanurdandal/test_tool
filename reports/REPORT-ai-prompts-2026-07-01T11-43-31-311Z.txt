@@ -1,0 +1,152 @@
+✅ [BAŞARILI]
+
+[ÇIKTI]
+
+> test-tool@1.0.0 test:ai-local
+> playwright test tests/ai-security.spec.ts
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+
+Running 1 test using 1 worker
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+
+[1/1] [chromium] › tests\ai-security.spec.ts:11:1 › Prompt-Driven v3 Stagehand Optimal Yapay Zeka Otomasyon Motoru
+[chromium] › tests\ai-security.spec.ts:11:1 › Prompt-Driven v3 Stagehand Optimal Yapay Zeka Otomasyon Motoru
+[2026-07-01 14:43:12.007 +0300] INFO: Launching local browser
+    category: "init"
+
+
+[2026-07-01 14:43:16.168 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Focus and click on the input text field with placeholder 'Site içi arama' or name 'q'."
+    url: "https://www.dpu.edu.tr/"
+
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+[2026-07-01 14:43:18.282 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Type the text 'İletişim' into that active input search box."
+    url: "https://www.dpu.edu.tr/"
+
+
+[2026-07-01 14:43:18.386 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Press the 'Enter' key on your keyboard to submit the search form."
+    url: "https://www.dpu.edu.tr/"
+[2026-07-01 14:43:18.399 +0300] INFO: pressing key
+    category: "action"
+    key: "Enter"
+    xpath: "xpath=/html[1]/body[1]/div[2]/div[4]/div[7]/div[1]/div[3]/form[1]/input[2]"
+
+
+
+[2026-07-01 14:43:20.549 +0300] INFO: Starting extraction using a11y snapshot
+    category: "extraction"
+    instruction: "Verify if the text 'Arama Sonuçları' appears anywhere in the visible page headers."
+
+
+
+[2026-07-01 14:43:22.244 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "hasSearchResults": true
+      },
+      "usage": {
+        "inputTokens": 2007,
+        "outputTokens": 8,
+        "totalTokens": 2015,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+[2026-07-01 14:43:24.479 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "progress": "The extraction confirmed that the text 'Arama Sonuçları' is present in the headers.",
+        "completed": true
+      },
+      "usage": {
+        "inputTokens": 232,
+        "outputTokens": 27,
+        "totalTokens": 259,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+[2026-07-01 14:43:24.480 +0300] INFO: Extraction completed successfully
+    category: "extraction"
+    prompt_tokens: "2239"
+    completion_tokens: "35"
+    inference_time_ms: "3928"
+    result: "{\"hasSearchResults\":true}"
+[2026-07-01 14:43:24.521 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Look at the search results and click on the primary link for 'İletişim' or 'Birim İletişim Bilgileri'."
+    url: "https://bidb.dpu.edu.tr/index/arama?arama=%C4%B0leti%C5%9Fim"
+
+
+
+[2026-07-01 14:43:26.690 +0300] INFO: Starting extraction using a11y snapshot
+    category: "extraction"
+    instruction: "Scan the current page to verify if it contains a contact telephone number formatted like '+90 (274)' or general university phone details."
+
+
+
+[2026-07-01 14:43:28.394 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "phoneNumberFound": true
+      },
+      "usage": {
+        "inputTokens": 2014,
+        "outputTokens": 8,
+        "totalTokens": 2022,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+[2026-07-01 14:43:30.293 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "progress": "Contact telephone number formatted like '+90 (274)' has been identified on the current page.",
+        "completed": true
+      },
+      "usage": {
+        "inputTokens": 239,
+        "outputTokens": 26,
+        "totalTokens": 265,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+[2026-07-01 14:43:30.293 +0300] INFO: Extraction completed successfully
+    category: "extraction"
+    prompt_tokens: "2253"
+    completion_tokens: "34"
+    inference_time_ms: "3602"
+    result: "{\"phoneNumberFound\":true}"
+
+
+  1 passed (23.4s)

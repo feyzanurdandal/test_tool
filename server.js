@@ -1,45 +1,70 @@
 // server.js
 import express from 'express';
 import { exec } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
 
-// n8n'in güvenle tetikleyeceği endpoint
-app.post('/api/run-test', (req, res) => {
+// Klasördeki test senaryolarını listeleyen endpoint (n8n JavaScript nodu için)
+app.get('/api/list-scenarios', (req, res) => {
+    const targetFolder = 'C:/Users/feyza/Desktop/test-tool/scenarios';
+    try {
+        if (!fs.existsSync(targetFolder)) return res.json([]);
+        const files = fs.readdirSync(targetFolder);
+        const scenarios = files
+            .filter(file => path.extname(file).toLowerCase() === '.json')
+            .map(file => path.basename(file, '.json'));
+        res.json({ scenarios });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 🚀 n8n DÖNGÜSÜ İÇİN KRİTİK ENDPOINT: Test biter, çıktıları n8n'e teslim eder!
+app.post('/api/run-single-sync', (req, res) => {
     const { scenarioName } = req.body;
-    
+
     if (!scenarioName) {
-        return res.status(400).json({ error: "scenarioName gerekli!" });
+        return res.status(400).json({ error: "scenarioName gerekli kanka!" });
     }
 
-    // 💡 DEĞİŞİKLİK BURADA: cross-env komutunu tamamen kaldırdık, sadece düz npm script'ini çağırıyoruz
-    const command = `npm run test:ai-local`;
+    console.log(`🎬 [DÖNGÜ] ${scenarioName} testi başladı. n8n bekletiliyor...`);
     
-    // Çevre değişkenini (SCENARIO_NAME) doğrudan Node.js'in alt sürecine (env) enjekte ediyoruz
+    const command = `npm run test:ai-local`;
     const options = {
-        env: {
-            ...process.env,            // Bilgisayarın mevcut tüm ortam değişkenlerini koru
-            SCENARIO_NAME: scenarioName // Bizim dinamik senaryo adını araya ekle
-        }
+        env: { ...process.env, SCENARIO_NAME: scenarioName }
     };
 
-    console.log(`🎬 ${scenarioName} senaryosu için Playwright testi tetikleniyor...`);
-
-    // Testi güvenli options nesnesiyle ateşliyoruz
+    // exec ile testi koşturuyoruz
     exec(command, options, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`[HATA] Test çalıştırılamadı: ${error.message}`);
-            return;
-        }
-        console.log(`[BAŞARILI] Test çıktıları:\n${stdout}`);
-    });
+        // Test bittiğinde n8n'e verilecek çıktı paketini hazırlıyoruz
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const reportFolder = 'C:/Users/feyza/Desktop/test-tool/reports';
+        
+        // Klasör yoksa oluştur
+        if (!fs.existsSync(reportFolder)) fs.mkdirSync(reportFolder, { recursive: true });
 
-    res.json({ status: "Tetiklendi", message: `${scenarioName} testi arka planda başlatıldı.` });
+        const logContent = error 
+            ? `❌ [HATA] ${error.message}\n\n[DETAY]\n${stderr}` 
+            : `✅ [BAŞARILI]\n\n[ÇIKTI]\n${stdout}`;
+
+        // 1. Manuel Dosya Yedekleme: Sonuçları bilgisayara da TXT olarak yazalım kanka
+        fs.writeFileSync(path.join(reportFolder, `REPORT-${scenarioName}-${timestamp}.txt`), logContent, 'utf-8');
+
+        // 2. n8n'e Cevap Dönme: n8n bu JSON'ı alıp döngüde kullanacak
+        return res.json({
+            scenario: scenarioName,
+            status: error ? "BAŞARISIZ" : "BAŞARILI",
+            executionTime: timestamp,
+            terminalOutput: stdout || stderr
+        });
+    });
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Güvenli Test API Sunucusu http://localhost:${PORT} üzerinde aktif!`);
+    console.log(`🚀 Kurumsal Döngü Test API Sunucusu http://localhost:${PORT} üzerinde aktif!`);
 });
