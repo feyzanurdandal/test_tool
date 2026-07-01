@@ -11,7 +11,11 @@ import { STAGEHAND_API_KEY } from '../config/constants.js';
 test('Prompt-Driven v3 Stagehand Optimal Yapay Zeka Otomasyon Motoru', async () => {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
-    const promptFilePath = path.resolve(__dirname, '../config/ai-prompts.json');
+    // const promptFilePath = path.resolve(__dirname, '../config/ai-prompts.json');
+    // const promptData = JSON.parse(fs.readFileSync(promptFilePath, 'utf-8'));
+    // tests/ai-security.spec.ts dosyasının içi (Gelecek vizyonu)
+    const scenarioName = process.env.SCENARIO_NAME || 'ai-prompts'; // n8n'den gelen isim yoksa varsayılanı oku
+    const promptFilePath = path.resolve(__dirname, `../scenarios/${scenarioName}.json`);
     const promptData = JSON.parse(fs.readFileSync(promptFilePath, 'utf-8'));
 
     process.env.OPENAI_API_KEY = STAGEHAND_API_KEY;

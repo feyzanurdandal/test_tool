@@ -1,0 +1,14 @@
+{
+  "targetUrl": "https://www.dpu.edu.tr/",
+  "steps": [
+    {
+      "type": "act",
+      "instruction": "Focus and click on the input text field."
+    },
+    {
+      "type": "extract",
+      "instruction": "Verify if the text Arama Sonuçları appears.",
+      "field": "hasResults"
+    }
+  ]
+}

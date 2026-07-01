@@ -4,9 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test:ai": "cross-env TEST_MODE=AI docker compose -f docker-compose.test.yml down --remove-orphans && cross-env TEST_MODE=AI docker compose -f docker-compose.test.yml up --build",
-    "test:ai-local": "cross-env TEST_MODE=AI npx playwright test tests/ai-security.spec.ts",
-    "map-site": "npx tsx map-site.ts"
+    "test:ai-local": "playwright test tests/ai-security.spec.ts",
+    "n8n:start": "cross-env NODE_FUNCTION_ALLOW_BUILTIN=fs,path npx n8n@2.27.5 start"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +19,7 @@
   },
   "dependencies": {
     "@browserbasehq/stagehand": "^3.6.0",
+    "express": "^5.2.1",
     "playwright-core": "^1.61.1",
     "zod": "^4.4.3"
   }

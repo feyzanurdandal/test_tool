@@ -1,0 +1,101 @@
+{
+  "name": "test senaryosu çalıştırma",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7a899a81-9117-4093-a605-dbd42737fb8f",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ed0a15cd-6f8a-4e6e-aa63-b5488343fe95",
+              "name": "runScenarioName",
+              "value": "dpu-iletisim-testi",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "2d153cbd-99e9-4f14-bd63-80588f1e3ccd",
+      "name": "Çalıştırılacak Test"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/run-test",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "scenarioName",
+              "value": "={{ $json.runScenarioName }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "f513310b-ed15-4d45-94b5-b2e8c4a59f77",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Çalıştırılacak Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Çalıştırılacak Test": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "28b27456-cffd-4af7-abd0-6178ee765023",
+  "meta": {
+    "instanceId": "ccd5402a9151423bbb2ebf6b5173d0074df8f9e5c1158b8348041db7bb063468"
+  },
+  "nodeGroups": [],
+  "id": "NQ5MQ0ftlegLHRoU",
+  "tags": []
+}
