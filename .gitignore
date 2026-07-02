@@ -5,3 +5,10 @@ blob-report/
 playwright/.local-browsers/
 .env
 config/constants.ts
+
+# Cache klasörleri
+cache/
+src/cache/
+tests/cache/
+node_modules/
+.env

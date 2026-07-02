@@ -1,0 +1,43 @@
+{
+  "targetUrl": "https://www.dpu.edu.tr/",
+  "steps": [
+    {
+      "type": "act",
+      "instruction": "Look at the main navigation menu and click on the 'Haberler' or 'Duyurular' link."
+    },
+    {
+      "type": "observe",
+      "instruction": "Verify that the news list page has successfully loaded by checking if the page header contains 'Haber'."
+    },
+    {
+      "type": "act",
+      "instruction": "Find the very first news card or title link on the list and click on it."
+    },
+    {
+      "type": "observe",
+      "instruction": "Verify that the individual news detail page is opened by checking for a visible heading or back button."
+    },
+    {
+      "type": "extract",
+      "instruction": "Find the main title text of this current news article and extract it.",
+      "field": "newsTitle"
+    },
+    {
+      "type": "extract",
+      "instruction": "Find the date or timestamp on this news page and extract the text.",
+      "field": "newsDate"
+    },
+    {
+      "type": "act",
+      "instruction": "Scroll down to the middle of the page to read through the news content."
+    },
+    {
+      "type": "observe",
+      "instruction": "Verify that the text content of the news or description paragraphs are visible on the screen."
+    },
+    {
+      "type": "act",
+      "instruction": "Scroll completely to the bottom of the page to reach the footer."
+    }
+  ]
+}

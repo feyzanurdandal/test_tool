@@ -1,22 +1,124 @@
 {
-  "name": "test senaryosu oluşturma",
+  "name": "test_senaryosu_olusturma",
   "nodes": [
     {
       "parameters": {
-        "jsCode": "// 1. Form Trigger nodundan gelen verileri yakalıyoruz\nconst formData = $('Form Trigger').first().json;\n\nconst scenarioName = formData.scenarioName;\nconst targetUrl = formData.targetUrl;\n\nconst steps = [];\n\n// 2. Dinamik olarak Adım 1'i inşa ediyoruz\nif (formData.step1_type && formData.step1_instruction) {\n    steps.push({\n        type: formData.step1_type,\n        instruction: formData.step1_instruction\n    });\n}\n\n// 3. Dinamik olarak Adım 2'yi inşa ediyoruz\nif (formData.step2_type && formData.step2_instruction) {\n    let step2Obj = {\n        type: formData.step2_type,\n        instruction: formData.step2_instruction\n    };\n    \n    // Eğer kullanıcı extract seçtiyse ve alan adı girdiyse ekle\n    if (formData.step2_field) {\n        step2Obj.field = formData.step2_field;\n    }\n    \n    steps.push(step2Obj);\n}\n\n// Oluşturulan temiz JSON metni\nconst finalJsonString = JSON.stringify({\n  targetUrl: targetUrl,\n  steps: steps\n}, null, 2);\n\n// 4. Node.js ile diske yazma katmanı (Mevcut güvenli kodumuz aynen kalıyor)\nconst fs = require('fs');\nconst path = require('path');\nconst targetFolder = 'C:/Users/feyza/Desktop/test-tool/scenarios';\nconst fullPath = path.join(targetFolder, `${scenarioName}.json`);\n\ntry {\n    if (!fs.existsSync(targetFolder)){\n        fs.mkdirSync(targetFolder, { recursive: true });\n    }\n\n    fs.writeFileSync(fullPath, finalJsonString, 'utf-8');\n    \n    return [{\n      json: {\n        status: \"Başarılı\",\n        message: `Form verisi başarıyla JSON senaryosuna dönüştürüldü ve kaydedildi!`,\n        scenario: `${scenarioName}.json`\n      }\n    }];\n\n} catch (writeError) {\n    return [{\n      json: {\n        status: \"Hata\",\n        message: writeError.message\n      }\n    }];\n}"
+        "content": "Stagehand Metodları Nedir, Parametreleri Ne İşe Yarar?\nStagehand arkada AI kullandığı için geleneksel test araçları gibi çalışmaz. 3 temel silahı vardır:\n\n1- act (Aksiyon/Eylem)\nNe zaman kullanılır?: Sayfada bir etkileşim, hareket, tıklama, yazma veya yönlendirme olacağı zaman.\n\nParametresi: Sadece instruction (emir cümlesi) alır. Ekstra parametre istemez.\n\nÖrnek: \"Arama kutusuna Mühendislik yaz\", \"Giriş butonuna tıkla\".\n\n2- observe (Gözlemleme / Doğrulama)\nNe zaman kullanılır?: Sayfada bir elementin, yazının veya durumun var olup olmadığını kontrol etmek (assert) için kullanılır. Testin patlayıp patlamayacağını bu belirler.\n\nParametresi: Sadece instruction alır.\n\nÖrnek: \"Ekranda Hata Mesajı var mı kontrol et\", \"Giriş başarılı yazısını doğrula\".\n\n3- extract (Veri Çekme / Ayıklama)\nNe zaman kullanılır?: Sayfadan bir veriyi (örn: bir duyurunun başlığını, öğrenci numarasını, bir doğrulama kodunu veya senin örneğindeki gibi arama sonucunun durumunu) koparıp bir değişkene aktarmak ve test sürecinde o veriyi daha sonra kullanmak (veya rapora basmak) için kullanılır.\n\nParametresi: Hem instruction (neyi çekeceği) hem de bir field (veya variableName) alır. Bu parametre, çekilen verinin hangi isimle hafızaya kaydedileceğini belirler.\n\nÖrnek: \"Arama Sonuçları yazısını doğrula ve sonucu hasResults değişkenine kaydet\".",
+        "height": 624,
+        "width": 768,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -784,
+        -528
+      ],
+      "id": "1f40523d-2282-46c9-9de4-e6ca2226d18d",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bfb543fa-ec18-4be6-a3e2-587ac8d47082",
+              "leftValue": "={{ $json.continue_to_next[0] }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        464,
+        -128
+      ],
+      "id": "9b600784-1a6a-4aaf-9c5c-2fe7473ae9e9",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bfb543fa-ec18-4be6-a3e2-587ac8d47082",
+              "leftValue": "={{ $json.continue_to_next[0] }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        816,
+        -240
+      ],
+      "id": "bed06f6f-f437-4ca8-aebd-b3971064dc5e",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/scenarios/save",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1856,
+        -112
+      ],
+      "id": "3699ecb6-d925-45a9-9c7d-c4479d40fc02",
+      "name": "HTTP Request3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 🦾 Feyza'nın Tuvaline Özel (Form5, Form12, Form13) Uyumlu Hafıza İşleyici\nconst parsedSteps = [];\nlet scenarioName = \"isimsiz-senaryo\";\nlet targetUrl = \"\";\n\n// 1. En baştaki Form Trigger'dan ana bilgileri çekiyoruz\ntry {\n    const triggerData = $node[\"Form Trigger\"].json; \n    scenarioName = triggerData.scenarioName || scenarioName;\n    targetUrl = triggerData.targetUrl || targetUrl;\n} catch (e) {\n    console.log(\"Trigger okunamadı.\");\n}\n\n// 2. Hafızadaki formları isimlerine göre milimetrik tarayan fonksiyon\nfunction extractStepsFromForm(nodeName) {\n    try {\n        const formData = $node[nodeName].json;\n        if (!formData) return;\n\n        // Form alanlarını (1'den 50'ye kadar) tarıyoruz kanka\n        for (let i = 1; i <= 50; i++) {\n            const typeKey = `step${i}_type`;\n            const instrKey = `step${i}_instruction`;\n            const fieldKey = `step${i}_variable`;\n\n            // Eğer formun içindeki instruction (emir) alanı doldurulmuşsa içeri al kanka\n            if (formData[instrKey] && formData[instrKey].trim() !== \"\") {\n                const stepObject = {\n                    type: formData[typeKey] || \"act\",\n                    instruction: formData[instrKey].trim()\n                };\n\n                // Eğer extract adımıysa ve field girilmişse ekle\n                if (formData[fieldKey] && formData[fieldKey].trim() !== \"\") {\n                    stepObject.field = formData[fieldKey].trim();\n                }\n\n                parsedSteps.push(stepObject);\n            }\n        }\n    } catch (err) {\n        // Kullanıcı o form sayfasına hiç uğramadıysa (IF'ten saptıysa) hatayı yutuyoruz kanka\n    }\n}\n\n// 🚨 SENİN TUVALİNDEKİ GERÇEK İSİMLERLE EŞLEŞTİRME NOKTASI:\nextractStepsFromForm(\"Form 1\");  // İlk form sayfan\nextractStepsFromForm(\"Form 2\"); // İkinci form sayfan\nextractStepsFromForm(\"Form 3\"); // Üçüncü form sayfan\n\n// 3. Stagehand motorunun beklediği o pürüzsüz orijinal çıktı paketi\nreturn [{\n    json: {\n        scenarioName: scenarioName,\n        targetUrl: targetUrl,\n        steps: parsedSteps\n    }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        416,
-        32
+        1680,
+        -112
       ],
-      "id": "ff0bde08-952f-4c68-af33-67d8388b1f1c",
-      "name": "Code in JavaScript1"
+      "id": "1a1c4047-d4c4-4333-b701-bff6d248b888",
+      "name": "Code in JavaScript5"
     },
     {
       "parameters": {
-        "formTitle": "Test Senaryosu Oluşturucu",
+        "formTitle": "Test Senaryosu Oluşturma Formu",
         "formFields": {
           "values": [
             {
@@ -25,59 +127,9 @@
               "requiredField": true
             },
             {
-              "fieldLabel": "Hedef Web Sitesi URL'si",
+              "fieldLabel": "Test Edilecek Web Sitesi URL",
               "fieldName": "targetUrl",
               "requiredField": true
-            },
-            {
-              "fieldLabel": "Adım 1 - Aksiyon Tipi",
-              "fieldType": "dropdown",
-              "fieldName": "step1_type",
-              "fieldOptions": {
-                "values": [
-                  {
-                    "option": "act "
-                  },
-                  {
-                    "option": "observe"
-                  },
-                  {
-                    "option": "extract"
-                  }
-                ]
-              },
-              "requiredField": true
-            },
-            {
-              "fieldLabel": "Adım 1 - Talimat (Instruction)",
-              "fieldName": "step1_instruction",
-              "requiredField": true
-            },
-            {
-              "fieldLabel": "Adım 2 - Aksiyon Tipi",
-              "fieldType": "dropdown",
-              "fieldName": "step2_type",
-              "fieldOptions": {
-                "values": [
-                  {
-                    "option": "act"
-                  },
-                  {
-                    "option": "observe"
-                  },
-                  {
-                    "option": "extract"
-                  }
-                ]
-              }
-            },
-            {
-              "fieldLabel": "Adım 2 - Talimat (Instruction)",
-              "fieldName": "step2_instruction"
-            },
-            {
-              "fieldLabel": "Adım 2 - Çıktı Alanı Adı (Sadece Extract ise)",
-              "fieldName": "step2_field"
             }
           ]
         },
@@ -86,21 +138,655 @@
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.6,
       "position": [
-        208,
-        32
+        112,
+        -128
       ],
-      "id": "e67193e7-aeac-4534-b2d0-e3cf505980bd",
+      "id": "cb9fad8c-3914-42b8-968b-c0d5c7e8a09c",
       "name": "Form Trigger",
-      "webhookId": "605c1c13-fb4a-4c19-8ec8-6505ca7f119d"
+      "webhookId": "eb20683a-379b-41ed-ba65-9be7eb94e590"
+    },
+    {
+      "parameters": {
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "1.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step1_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "1.Talimat (İngilizce olması gerek)",
+              "fieldName": "step1_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step1_variable"
+            },
+            {
+              "fieldLabel": "2.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step2_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "2.Talimat (İngilizce olması gerek)",
+              "fieldName": "step2_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step2_variable"
+            },
+            {
+              "fieldLabel": "3.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step3_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "3.Talimat (İngilizce olması gerek)",
+              "fieldName": "step3_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step3_variable"
+            },
+            {
+              "fieldLabel": "Daha fazla test adımı ekleyecek misiniz? (Hayır ise boş bırakın)",
+              "fieldType": "checkbox",
+              "fieldName": "continue_to_next",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "true"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Submit"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        304,
+        -128
+      ],
+      "id": "5efbe35c-cbe1-4670-890c-b0e9970d41d2",
+      "name": "Form 1",
+      "webhookId": "e486f1d2-cbcc-412a-910c-52da0baaf276"
+    },
+    {
+      "parameters": {
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "4.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step4_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "4.Talimat (İngilizce olması gerek)",
+              "fieldName": "step4_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step4_variable"
+            },
+            {
+              "fieldLabel": "5.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step5_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "5.Talimat (İngilizce olması gerek)",
+              "fieldName": "step5_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step5_variable"
+            },
+            {
+              "fieldLabel": "6.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step6_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "6.Talimat (İngilizce olması gerek)",
+              "fieldName": "step6_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step6_variable"
+            },
+            {
+              "fieldLabel": "Daha fazla test adımı ekleyecek misiniz? (Hayır ise boş bırakın)",
+              "fieldType": "checkbox",
+              "fieldName": "continue_to_next",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "true"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Submit"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        656,
+        -240
+      ],
+      "id": "1dcf8052-53b4-4de3-a7f9-444b3e9d14a7",
+      "name": "Form 2",
+      "webhookId": "e486f1d2-cbcc-412a-910c-52da0baaf276"
+    },
+    {
+      "parameters": {
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "7.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step7_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "7.Talimat (İngilizce olması gerek)",
+              "fieldName": "step7_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step7_variable"
+            },
+            {
+              "fieldLabel": "8.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step8_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "8.Talimat (İngilizce olması gerek)",
+              "fieldName": "step8_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step8_variable"
+            },
+            {
+              "fieldLabel": "9.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step9_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "9.Talimat (İngilizce olması gerek)",
+              "fieldName": "step9_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step9_variable"
+            },
+            {
+              "fieldLabel": "Daha fazla test adımı ekleyecek misiniz? (Hayır ise boş bırakın)",
+              "fieldType": "checkbox",
+              "fieldName": "continue_to_next",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "true"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Submit"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        992,
+        -336
+      ],
+      "id": "a4cd19ae-793d-4c51-aa9b-4f3cd5706130",
+      "name": "Form 3",
+      "webhookId": "e486f1d2-cbcc-412a-910c-52da0baaf276"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bfb543fa-ec18-4be6-a3e2-587ac8d47082",
+              "leftValue": "={{ $json.continue_to_next[0] }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1136,
+        -336
+      ],
+      "id": "456fd9cd-dc27-4a1e-b4b0-0f995a0859e8",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bfb543fa-ec18-4be6-a3e2-587ac8d47082",
+              "leftValue": "={{ $json.continue_to_next[0] }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1488,
+        -448
+      ],
+      "id": "ed3f19ab-3203-41d4-a632-73d1209fa9ef",
+      "name": "If4"
+    },
+    {
+      "parameters": {
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "10.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step10_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "10.Talimat (İngilizce olması gerek)",
+              "fieldName": "step10_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step10_variable"
+            },
+            {
+              "fieldLabel": "11.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step11_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "11.Talimat (İngilizce olması gerek)",
+              "fieldName": "step11_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step11_variable"
+            },
+            {
+              "fieldLabel": "12.Test Adımı Türü",
+              "fieldType": "dropdown",
+              "fieldName": "step12_type",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "act"
+                  },
+                  {
+                    "option": "extract"
+                  },
+                  {
+                    "option": "observe"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "12.Talimat (İngilizce olması gerek)",
+              "fieldName": "step12_instruction"
+            },
+            {
+              "fieldLabel": "Değişken adı (sadece tür:extract seçilirse doldurulması gerekir)",
+              "fieldName": "step12_variable"
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Submit"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1328,
+        -448
+      ],
+      "id": "070d2db1-1515-4e96-acf4-627cdb7632b5",
+      "name": "Form 4",
+      "webhookId": "e486f1d2-cbcc-412a-910c-52da0baaf276"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        -464
+      ],
+      "id": "2fde720e-d33a-4f99-ab67-d65128182a74",
+      "name": "No Operation, do nothing"
     }
   ],
   "pinData": {},
   "connections": {
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Form 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Form 3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Form Trigger": {
       "main": [
         [
           {
-            "node": "Code in JavaScript1",
+            "node": "Form 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form 1": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form 2": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form 3": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Form 4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If4": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form 4": {
+      "main": [
+        [
+          {
+            "node": "If4",
             "type": "main",
             "index": 0
           }
@@ -114,7 +800,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "054b457c-d48e-4cf1-b318-cd58e82c34f4",
+  "versionId": "73750a85-b7e2-4ce4-b3b7-c6ddd6430eed",
   "meta": {
     "instanceId": "ccd5402a9151423bbb2ebf6b5173d0074df8f9e5c1158b8348041db7bb063468"
   },
