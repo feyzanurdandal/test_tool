@@ -4,7 +4,9 @@ import path from 'path';
 import { parseReportFile } from '../services/reportParser.js';
 
 const router = express.Router();
-const reportFolder = 'C:/Users/feyza/Desktop/test-tool/reports';
+
+// 🌍 HER BİLGİSAYARDA ÇALIŞAN DİNAMİK YOLLAR
+const reportFolder = path.join(process.cwd(), 'reports'); // Projenin içindeki /reports klasörünü otomatik bulur
 const viewPath = path.join(process.cwd(), 'views', 'reports-panel.html');
 
 router.get('/reports-panel', (req, res) => {
@@ -13,10 +15,17 @@ router.get('/reports-panel', (req, res) => {
 
     // 1. DURUM: DETAY SAYFASI GÖRÜNÜMÜ
     if (req.query.file) {
-        const filePath = path.join(reportFolder, req.query.file);
+        const fileName = req.query.file;
+
+        // 🛡️ SİBER GÜVENLİK DUVARI: Path Traversal (LFI) Engelleme
+        // Kullanıcı URL'ye ../.. yazarak sistem dosyalarını okumaya çalışırsa engelliyoruz
+        if (fileName.includes('/') || fileName.includes('\\') || !fileName.endsWith('.txt')) {
+            return res.status(403).send("<h3>🚨 Güvenlik İhlali: Geçersiz dosya adı </h3>");
+        }
+
+        const filePath = path.join(reportFolder, fileName);
         if (!fs.existsSync(filePath)) return res.send("<h3>❌ Rapor dosyası bulunamadı </h3>");
 
-        // Servisimizi çağırıp temiz nesneyi alıyoruz kanka
         const parsed = parseReportFile(filePath);
 
         const detailHtml = `
@@ -25,16 +34,16 @@ router.get('/reports-panel', (req, res) => {
             <div class="card ${parsed.cardClass}">
                 <div class="data-item"><strong> Senaryo Durumu:</strong> ${parsed.status}</div>
                 <div class="data-item"><strong> Özet & Süre:</strong> ${parsed.summary}</div>
-                <h3 style="margin-top: 20px; color: #555;"> Detaylı Rapor Metrikleri:</h3>
+                <h3 style="margin-top: 20px; color: #555;">🔍 Detaylı Rapor Metrikleri:</h3>
                 ${parsed.infoHeaderHtml}
             </div>
             
-            <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50; display: flex; align-items: center; gap: 8px;"> Yapay Zeka İşlem Adımları (İncelemek İçin Tıkla)</h3>
+            <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50; display: flex; align-items: center; gap: 8px;">🎬 Yapay Zeka İşlem Adımları (İncelemek İçin Tıkla)</h3>
             <div style="margin-bottom: 25px;">
                 ${parsed.stepsHtml || '<div style="color: #888; font-style: italic;">Adım detayları ayrıştırılamadı </div>'}
             </div>
             
-            <a href="http://localhost:5678/webhook/reports-viewer" class="btn-back"> Listeye Geri Dön</a>
+            <a href="http://localhost:5678/webhook/reports-viewer" class="btn-back">⬅️ Listeye Geri Dön</a>
         `;
 
         return res.send(baseLayout.replace('', detailHtml));
@@ -50,7 +59,7 @@ router.get('/reports-panel', (req, res) => {
 
     const listHtml = `
         <h2> Güncel Test Raporları Paneli</h2>
-        <p>Lütfen özetini görmek istediğiniz detaylı <code>.txt</code> raporunu seçin:</p>
+        <p>Lütfen özetini görmek istediğiniz detaylı <code>.txt</code> raporunu seçin: </p>
         <form action="http://localhost:5678/webhook/reports-viewer" method="GET">
             <select name="file">
                 ${optionsHtml}

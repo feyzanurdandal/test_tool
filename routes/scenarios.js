@@ -4,8 +4,8 @@ import fs from 'fs';
 import path from 'path';
 
 const router = express.Router();
-const targetFolder = 'C:/Users/feyza/Desktop/test-tool/scenarios';
-
+const targetFolder = path.join(process.cwd(), 'scenarios');
+const reportFolder = path.join(process.cwd(), 'reports');
 // 💾 1. Tam Uyumlu Stagehand Formatını Olduğu Gibi Diske Kaydeden Endpoint
 router.post('/save', (req, res) => {
     // n8n'den gelen paketimizi doğrudan yakalıyoruz kanka
