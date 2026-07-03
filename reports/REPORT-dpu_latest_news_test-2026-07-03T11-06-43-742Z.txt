@@ -1,0 +1,151 @@
+✅ [TEST SUCCESS] - dpu_latest_news_test
+=====================================
+
+> test-tool@1.0.0 test:ai-local
+> playwright test tests/ai-security.spec.ts
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+
+Running 1 test using 1 worker
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+
+[1/1] [chromium] › tests\ai-security.spec.ts:11:1 › Yapay Zeka Test Otomasyonu
+[chromium] › tests\ai-security.spec.ts:11:1 › Yapay Zeka Test Otomasyonu
+[2026-07-03 14:06:28.276 +0300] INFO: Launching local browser
+    category: "init"
+
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+[2026-07-03 14:06:31.447 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Look at the main navigation menu and click on the 'Haberler' or 'Duyurular' link."
+    url: "https://www.dpu.edu.tr/"
+
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+[2026-07-03 14:06:33.779 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Find the very first news card or title link on the list and click on it."
+    url: "https://www.dpu.edu.tr/"
+
+
+
+[2026-07-03 14:06:36.183 +0300] INFO: Starting extraction using a11y snapshot
+    category: "extraction"
+    instruction: "Find the main title text of this current news article and extract it."
+
+
+
+[2026-07-03 14:06:37.912 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "newsTitle": "DPÜ’de Mezuniyet Coşkusu"
+      },
+      "usage": {
+        "inputTokens": 4561,
+        "outputTokens": 15,
+        "totalTokens": 4576,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+*** [BAŞARIYLA AYIKLANDI] newsTitle -> DPÜ’de Mezuniyet Coşkusu
+
+[2026-07-03 14:06:39.020 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "progress": "Main title text extracted: 'DPÜ’de Mezuniyet Coşkusu'",
+        "completed": true
+      },
+      "usage": {
+        "inputTokens": 235,
+        "outputTokens": 25,
+        "totalTokens": 260,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+[2026-07-03 14:06:39.021 +0300] INFO: Extraction completed successfully
+    category: "extraction"
+    prompt_tokens: "4796"
+    completion_tokens: "40"
+    inference_time_ms: "2831"
+    result: "{\"newsTitle\":\"DPÜ’de Mezuniyet Coşkusu\"}"
+
+
+
+[2026-07-03 14:06:39.236 +0300] INFO: Starting extraction using a11y snapshot
+    category: "extraction"
+    instruction: "Find the date or timestamp on this news page and extract the text."
+
+
+
+[2026-07-03 14:06:41.211 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "newsDate": "30 Haziran 2026, Salı"
+      },
+      "usage": {
+        "inputTokens": 4567,
+        "outputTokens": 15,
+        "totalTokens": 4582,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+*** [BAŞARIYLA AYIKLANDI] newsDate -> 30 Haziran 2026, Salı
+
+[2026-07-03 14:06:42.330 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "progress": "Extracted date: 30 Haziran 2026, Salı.",
+        "completed": true
+      },
+      "usage": {
+        "inputTokens": 235,
+        "outputTokens": 23,
+        "totalTokens": 258,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+[2026-07-03 14:06:42.330 +0300] INFO: Extraction completed successfully
+    category: "extraction"
+    prompt_tokens: "4802"
+    completion_tokens: "38"
+    inference_time_ms: "3093"
+    result: "{\"newsDate\":\"30 Haziran 2026, Salı\"}"
+
+
+[2026-07-03 14:06:42.364 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Scroll down to the middle of the page to read through the news content."
+    url: "https://www.dpu.edu.tr/"
+
+
+[2026-07-03 14:06:42.439 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Scroll completely to the bottom of the page to reach the footer."
+    url: "https://www.dpu.edu.tr/"
+
+
+  1 passed (19.6s)
