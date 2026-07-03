@@ -56,7 +56,7 @@ router.get('/list', (req, res) => {
 // 🚀 3. Testi Tetikleyen ve Temiz .txt Raporu Basan Endpoint
 router.post('/run-single', (req, res) => {
     const { scenarioName } = req.body;
-    if (!scenarioName) return res.status(400).json({ error: "scenarioName gerekli kanka!" });
+    if (!scenarioName) return res.status(400).json({ error: "scenarioName gerekli " });
 
     const command = `npm run test:ai-local`;
     const options = { env: { ...process.env, SCENARIO_NAME: scenarioName } };
@@ -64,7 +64,6 @@ router.post('/run-single', (req, res) => {
     exec(command, options, (error, stdout, stderr) => {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         
-        // 🌍 GÖZDEN KAÇAN MUTLAK YOL BURADAYDI, TAMAMEN DİNAMİK YAPILDI:
         if (!fs.existsSync(reportFolder)) fs.mkdirSync(reportFolder, { recursive: true });
 
         const logContent = error 

@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { parseReportFile } from '../services/reportParser.js';
-import { CONSTANTS } from '../config/constants.js'; // constants dosyanı bağladık kanka
+import { CONSTANTS } from '../config/constants.js'; 
 
 const router = express.Router();
 
@@ -44,7 +44,7 @@ router.get('/reports-panel', (req, res) => {
             <a href="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" class="btn-back">⬅️ Listeye Geri Dön</a>
         `;
 
-        // 🎯 Boş metin yerine artık şablondaki etiketi tam hedef alıyoruz kanka!
+        
         return res.send(baseLayout.replace('', detailHtml));
     }
 

@@ -6,7 +6,7 @@ import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { CONSTANTS } from '../config/constants.js'; // 🎯 Yeni kurumsal import (Sona .js ekledik)
+import { CONSTANTS } from '../config/constants.js'; 
 
 test('Yapay Zeka Test Otomasyonu', async () => {
     const __filename = fileURLToPath(import.meta.url);
@@ -16,7 +16,7 @@ test('Yapay Zeka Test Otomasyonu', async () => {
     const promptFilePath = path.resolve(__dirname, `../scenarios/${scenarioName}.json`);
     const promptData = JSON.parse(fs.readFileSync(promptFilePath, 'utf-8'));
 
-    // 🎯 API Key artık doğrudan .env dosyasından, CONSTANTS nesnesi üzerinden besleniyor!
+    
     process.env.OPENAI_API_KEY = CONSTANTS.OPENAI_API_KEY;
 
     const stagehand = new Stagehand({

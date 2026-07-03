@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { CONSTANTS } from './config/constants.js'; // 🎯 Yapılandırma sabitlerimizi bağladık kanka
+import { CONSTANTS } from './config/constants.js'; 
 import scenarioRouter from './routes/scenarios.js';
 import reportRoutes from './routes/reports.js';
 
@@ -26,5 +26,5 @@ app.use('/api/scenarios', reportRoutes); // Raporlama altyapısı köprülendi
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.listen(CONSTANTS.PORT, () => {
-    console.log(`🚀 Kurumsal Mimari Sunucusu http://localhost:${CONSTANTS.PORT}/create üzerinde aktif!`);
+    console.log(`Sunucu http://localhost:${CONSTANTS.PORT}/create üzerinde aktif`);
 });
