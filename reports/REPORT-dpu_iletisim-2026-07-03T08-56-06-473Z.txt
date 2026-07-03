@@ -1,0 +1,38 @@
+❌ [TEST FAILED] - dpu_iletisim
+=====================================
+
+
+
+> test-tool@1.0.0 test:ai-local
+> playwright test tests/ai-security.spec.ts
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+
+Running 1 test using 1 worker
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+
+[1/1] [chromium] › tests\ai-security.spec.ts:80:1 › Yapay Zeka Test Otomasyonu
+[chromium] › tests\ai-security.spec.ts:80:1 › Yapay Zeka Test Otomasyonu
+[2026-07-03 11:56:05.079 +0300] INFO: Launching local browser
+    category: "init"
+
+
+  1) [chromium] › tests\ai-security.spec.ts:80:1 › Yapay Zeka Test Otomasyonu ──────────────────────
+
+    Error: page.goto: url: expected string, got undefined
+
+      102 |
+      103 |     try {
+    > 104 |         await pwPage.goto(promptData.targetUrl);
+          |                      ^
+      105 |
+      106 |         for (const step of promptData.steps) {
+      107 |             try {
+        at C:\Users\feyza\Desktop\test-tool\tests\ai-security.spec.ts:104:22
+
+    Error Context: test-results\ai-security-Yapay-Zeka-Test-Otomasyonu-chromium\error-context.md
+
+
+  1 failed
+    [chromium] › tests\ai-security.spec.ts:80:1 › Yapay Zeka Test Otomasyonu ───────────────────────

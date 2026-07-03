@@ -197,4 +197,102 @@ router.post('/run-single', (req, res) => {
     });
 });
 
+
+// 📂 Dinamik Rapor Listeleme ve Esnek Log Temizleme Arayüzü
+router.get('/reports-panel', (req, res) => {
+    const reportFolder = 'C:/Users/feyza/Desktop/test-tool/reports';
+    const viewPath = path.join(process.cwd(), 'views', 'reports-panel.html');
+    
+    if (!fs.existsSync(viewPath)) return res.send("<h3>❌ views/reports-panel.html dosyası bulunamadı kanka!</h3>");
+    const baseLayout = fs.readFileSync(viewPath, 'utf-8');
+
+    // 1. DURUM: DETAY SAYFASI GÖRÜNÜMÜ
+    if (req.query.file) {
+        const filePath = path.join(reportFolder, req.query.file);
+        if (!fs.existsSync(filePath)) return res.send("<h3>❌ Rapor dosyası bulunamadı kanka!</h3>");
+
+        const rawContent = fs.readFileSync(filePath, 'utf-8');
+
+        const isSuccess = rawContent.includes('✅ [TEST SUCCESS]');
+        const status = isSuccess ? "✅ BAŞARILI" : "❌ BAŞARISIZ";
+        const cardClass = isSuccess ? "success" : "error";
+        
+        const summaryMatch = rawContent.match(/\d+ passed \(.+\)/);
+        const summary = summaryMatch ? summaryMatch[0] : "Süre/Özet bilgisi alınamadı.";
+
+        // 🧠 ZENGİNLEŞTİRİLMİŞ METRİKLER (Regex Avcıları)
+        const urlMatch = rawContent.match(/Target URL\s*:\s*(.+)/i) || rawContent.match(/URL\s*->\s*(.+)/);
+        const modelMatch = rawContent.match(/Model\s*:\s*([\w-]+)/i) || rawContent.match(/LLM\s*:\s*([\w-]+)/i);
+        
+        // Hata ayıklama: Eğer test patladıysa logun içindeki ilk "Error:" satırını ve devamını yakalar
+        const errorMatch = rawContent.match(/(Error:[\s\S]{1,150})/i) || rawContent.match(/(Patladı:[\s\S]{1,150})/i);
+
+        let extractedDataHtml = "";
+
+        // 🎯 Sabit kurumsal metrikleri listenin başına şıkça ekliyoruz
+        if (urlMatch) extractedDataHtml += `<div class="data-item">🌐 <strong>Hedef URL:</strong> <a href="${urlMatch[1].trim()}" target="_blank">${urlMatch[1].trim()}</a></div>`;
+        if (modelMatch) extractedDataHtml += `<div class="data-item">🤖 <strong>Kullanılan LLM:</strong> <code>${modelMatch[1].trim()}</code></div>`;
+        
+        // Eğer test başarısızsa hata detayını kırmızı/uyarı tarzında enjekte edelim
+        if (!isSuccess && errorMatch) {
+            extractedDataHtml += `
+                <div class="data-item" style="background: #fff3f3; border: 1px solid #f5c6cb; padding: 10px; border-radius: 5px; color: #721c24; margin-top: 10px;">
+                    🚨 <strong>Kritik Hata Detayı:</strong> <br><pre style="margin: 5px 0; font-size: 13px; white-space: pre-wrap;">${errorMatch[1].trim()}...</pre>
+                </div>
+            `;
+        }
+
+        extractedDataHtml += `<hr style="border: 0; border-top: 1px dashed #ccc; margin: 15px 0;">`;
+
+        // 🔍 Dinamik olarak siber/QA verilerini toplama
+        const extractedMatches = [...rawContent.matchAll(/\*\*\* \[BAŞARIYLA AYIKLANDI\] (\w+) -> (.+)/g)];
+        
+        if (extractedMatches.length > 0) {
+            extractedMatches.forEach(match => {
+                extractedDataHtml += `<div class="data-item">🔹 <strong>${match[1]}:</strong> ${match[2]}</div>`;
+            });
+        } else {
+            extractedDataHtml += `<div style="color: #888; font-style: italic;">Bu test adımında ek bir veri ayıklanmadı.</div>`;
+        }
+
+        // Sadece Detay HTML içeriğini hazırlıyoruz
+        const detailHtml = `
+            <h2>📊 Test Sonuç Özeti</h2>
+            <hr>
+            <div class="card ${cardClass}">
+                <div class="data-item"><strong>📋 Senaryo Durumu:</strong> ${status}</div>
+                <div class="data-item"><strong>⏱️ Özet & Süre:</strong> ${summary}</div>
+                <h3 style="margin-top: 20px; color: #555;">🔍 Detaylı Rapor Metrikleri:</h3>
+                ${extractedDataHtml}
+            </div>
+            <br>
+            <a href="http://localhost:5678/webhook/reports-viewer" class="btn-back">⬅️ Listeye Geri Dön</a>
+        `;
+
+        // Ana şablonun içine basıyoruz
+        return res.send(baseLayout.replace('', detailHtml));
+    }
+
+    // 2. DURUM: GENEL LİSTELEME GÖRÜNÜMÜ
+    if (!fs.existsSync(reportFolder)) {
+        return res.send(baseLayout.replace('', "<h3>📂 Henüz hiç rapor oluşturulmamış kanka!</h3>"));
+    }
+
+    const files = fs.readdirSync(reportFolder).filter(f => f.endsWith('.txt'));
+    let optionsHtml = files.map(f => `<option value="${f}">${f}</option>`).join('');
+
+    const listHtml = `
+        <h2>📁 Güncel Test Raporları Paneli</h2>
+        <p>Lütfen özetini görmek istediğiniz detaylı <code>.txt</code> raporunu seçin kanka:</p>
+        <form action="http://localhost:5678/webhook/reports-viewer" method="GET">
+            <select name="file">
+                ${optionsHtml}
+            </select>
+            <button type="submit">🔍 Raporu Özetle</button>
+        </form>
+    `;
+
+    return res.send(baseLayout.replace('', listHtml));
+});
+
 export default router;
