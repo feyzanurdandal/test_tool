@@ -2,13 +2,14 @@ import express from 'express';
 import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { CONSTANTS } from '../config/constants.js';
 
 const router = express.Router();
-const targetFolder = path.join(process.cwd(), 'scenarios');
-const reportFolder = path.join(process.cwd(), 'reports');
+const targetFolder = path.join(process.cwd(), CONSTANTS.SCENARIOS_FOLDER);
+const reportFolder = path.join(process.cwd(), CONSTANTS.REPORTS_FOLDER);
+
 // 💾 1. Tam Uyumlu Stagehand Formatını Olduğu Gibi Diske Kaydeden Endpoint
 router.post('/save', (req, res) => {
-    // n8n'den gelen paketimizi doğrudan yakalıyoruz kanka
     const { scenarioName, targetUrl, steps } = req.body;
 
     if (!scenarioName || !targetUrl || !steps) {
@@ -16,7 +17,6 @@ router.post('/save', (req, res) => {
     }
 
     try {
-        // Tam senin attığın mimari yapıda JSON dosyasını paketliyoruz
         const jsonOutput = {
             targetUrl: targetUrl,
             steps: steps 
@@ -26,7 +26,6 @@ router.post('/save', (req, res) => {
             fs.mkdirSync(targetFolder, { recursive: true });
         }
 
-        // JSON dosyasını senaryo adıyla diske yazıyoruz
         fs.writeFileSync(
             path.join(targetFolder, `${scenarioName}.json`), 
             JSON.stringify(jsonOutput, null, 2), 
@@ -64,10 +63,10 @@ router.post('/run-single', (req, res) => {
 
     exec(command, options, (error, stdout, stderr) => {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const reportFolder = 'C:/Users/feyza/Desktop/test-tool/reports';
+        
+        // 🌍 GÖZDEN KAÇAN MUTLAK YOL BURADAYDI, TAMAMEN DİNAMİK YAPILDI:
         if (!fs.existsSync(reportFolder)) fs.mkdirSync(reportFolder, { recursive: true });
 
-        // Düz metin (.txt) olarak temiz hata ve başarı logları
         const logContent = error 
             ? `❌ [TEST FAILED] - ${scenarioName}\n=====================================\n${stderr}\n\n${stdout}` 
             : `✅ [TEST SUCCESS] - ${scenarioName}\n=====================================\n${stdout}`;

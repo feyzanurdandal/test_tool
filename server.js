@@ -1,12 +1,11 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { CONSTANTS } from './config/constants.js'; // 🎯 Yapılandırma sabitlerimizi bağladık kanka
 import scenarioRouter from './routes/scenarios.js';
-
 import reportRoutes from './routes/reports.js';
 
 const app = express();
-const PORT = 3000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,11 +18,13 @@ app.get('/create', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'create.html'));
 });
 
-// 🛣️ Tüm API İsteklerini Yeni Router'a Devrediyoruz
+// 🛣️ Modüler Rota Yönetimi
 app.use('/api/scenarios', scenarioRouter);
+app.use('/api/scenarios', reportRoutes); // Raporlama altyapısı köprülendi
 
-app.use('/api/scenarios', reportRoutes);
+// 🌍 Portu artık .env dosyasından (CONSTANTS üzerinden) dinamik okuyoruz!
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.listen(PORT, () => {
-    console.log(` Sunucu http://localhost:${PORT}/create üzerinde aktif `);
+app.listen(CONSTANTS.PORT, () => {
+    console.log(`🚀 Kurumsal Mimari Sunucusu http://localhost:${CONSTANTS.PORT}/create üzerinde aktif!`);
 });

@@ -2,11 +2,11 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { parseReportFile } from '../services/reportParser.js';
+import { CONSTANTS } from '../config/constants.js'; // constants dosyanı bağladık kanka
 
 const router = express.Router();
 
-// 🌍 HER BİLGİSAYARDA ÇALIŞAN DİNAMİK YOLLAR
-const reportFolder = path.join(process.cwd(), 'reports'); // Projenin içindeki /reports klasörünü otomatik bulur
+const reportFolder = path.join(process.cwd(), CONSTANTS.REPORTS_FOLDER);
 const viewPath = path.join(process.cwd(), 'views', 'reports-panel.html');
 
 router.get('/reports-panel', (req, res) => {
@@ -17,8 +17,6 @@ router.get('/reports-panel', (req, res) => {
     if (req.query.file) {
         const fileName = req.query.file;
 
-        // 🛡️ SİBER GÜVENLİK DUVARI: Path Traversal (LFI) Engelleme
-        // Kullanıcı URL'ye ../.. yazarak sistem dosyalarını okumaya çalışırsa engelliyoruz
         if (fileName.includes('/') || fileName.includes('\\') || !fileName.endsWith('.txt')) {
             return res.status(403).send("<h3>🚨 Güvenlik İhlali: Geçersiz dosya adı </h3>");
         }
@@ -43,9 +41,10 @@ router.get('/reports-panel', (req, res) => {
                 ${parsed.stepsHtml || '<div style="color: #888; font-style: italic;">Adım detayları ayrıştırılamadı </div>'}
             </div>
             
-            <a href="http://localhost:5678/webhook/reports-viewer" class="btn-back">⬅️ Listeye Geri Dön</a>
+            <a href="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" class="btn-back">⬅️ Listeye Geri Dön</a>
         `;
 
+        // 🎯 Boş metin yerine artık şablondaki etiketi tam hedef alıyoruz kanka!
         return res.send(baseLayout.replace('', detailHtml));
     }
 
@@ -60,7 +59,7 @@ router.get('/reports-panel', (req, res) => {
     const listHtml = `
         <h2> Güncel Test Raporları Paneli</h2>
         <p>Lütfen özetini görmek istediğiniz detaylı <code>.txt</code> raporunu seçin: </p>
-        <form action="http://localhost:5678/webhook/reports-viewer" method="GET">
+        <form action="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" method="GET">
             <select name="file">
                 ${optionsHtml}
             </select>
