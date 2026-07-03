@@ -1,14 +1,20 @@
+# Bağımlılıklar
 node_modules/
+
+# Gizli Çevre Değişkenleri (EN KRİTİK SATIR)
+.env
+
+# Playwright Test Çıktıları ve Raporları
 test-results/
 playwright-report/
 blob-report/
 playwright/.local-browsers/
-.env
-config/constants.ts
 
-# Cache klasörleri
+# Önbellek (Cache) Klasörleri
 cache/
 src/cache/
 tests/cache/
-node_modules/
-.env
+
+# İşletim Sistemi Kalıntıları
+.DS_Store
+Thumbs.db
