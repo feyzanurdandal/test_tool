@@ -20,21 +20,16 @@ Sistem, birbirine entegre çalışan yüksek performanslı ve modern bir teknolo
 ## Ön Gereksinimler (Sıfırdan Kurulum Rehberi)
 Bilgisayarınızda daha önce hiçbir yazılım aracı veya kodlama ortamı kurulu değilse, projeyi çalıştırabilmek için öncelikle aşağıdaki iki temel programı kurmanız gerekir.
 
-1. Node.js Kurulumu
-Node.js, bu projenin arka planda çalışmasını sağlayan ana motor sistemidir.
+1. Node.js Kurulumu:
+- Node.js, bu projenin arka planda çalışmasını sağlayan ana motor sistemidir.
+- Node.js Resmi Sitesi adresine gidin.
+- Ekranda görünen "LTS" (Uzun Süreli Destek) sürümünü bilgisayarınıza indirin.
+- İnen kurulum dosyasını açıp ileri (Next) adımlarını takip ederek standart bir program gibi bilgisayarınıza kurun.
 
-Node.js Resmi Sitesi adresine gidin.
-
-Ekranda görünen "LTS" (Uzun Süreli Destek) sürümünü bilgisayarınıza indirin.
-
-İnen kurulum dosyasını açıp ileri (Next) adımlarını takip ederek standart bir program gibi bilgisayarınıza kurun.
-
-2. Git Kurulumu
-Git, projenin kaynak kodlarını indirmenizi ve yönetmenizi sağlayan sistemdir.
-
-Git Resmi Sitesi adresine gidin.
-
-Bilgisayarınızın işletim sistemine uygun (Windows/Mac/Linux) olan kurulum dosyasını indirin ve kurun.
+2. Git Kurulumu:
+- Git, projenin kaynak kodlarını indirmenizi ve yönetmenizi sağlayan sistemdir.
+- Git Resmi Sitesi adresine gidin.
+- Bilgisayarınızın işletim sistemine uygun (Windows/Mac/Linux) olan kurulum dosyasını indirin ve kurun.
 
 ## Kurulum ve Konfigürasyon
 1. Proje Klasörünün Açılması ve Bağımlılıkların Kurulumu
