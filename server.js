@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { CONSTANTS } from './config/constants.js'; 
 import scenarioRouter from './routes/scenarios.js';
 import reportRoutes from './routes/reports.js';
+import db from './config/database.js';
 
 const app = express();
 

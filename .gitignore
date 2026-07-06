@@ -18,3 +18,7 @@ tests/cache/
 # İşletim Sistemi Kalıntıları
 .DS_Store
 Thumbs.db
+
+# SQLite Veri Tabanı Dosyası
+*.db
+*.db-journal

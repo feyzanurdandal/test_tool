@@ -1,8 +1,84 @@
+// import express from 'express';
+// import fs from 'fs';
+// import path from 'path';
+// import { parseReportFile } from '../services/reportParser.js';
+// import { CONSTANTS } from '../config/constants.js'; 
+
+// const router = express.Router();
+
+// const reportFolder = path.join(process.cwd(), CONSTANTS.REPORTS_FOLDER);
+// const viewPath = path.join(process.cwd(), 'views', 'reports-panel.html');
+
+// router.get('/reports-panel', (req, res) => {
+//     if (!fs.existsSync(viewPath)) return res.send("<h3>❌ views/reports-panel.html dosyası bulunamadı </h3>");
+//     const baseLayout = fs.readFileSync(viewPath, 'utf-8');
+
+//     // 1. DURUM: DETAY SAYFASI GÖRÜNÜMÜ
+//     if (req.query.file) {
+//         const fileName = req.query.file;
+
+//         if (fileName.includes('/') || fileName.includes('\\') || !fileName.endsWith('.txt')) {
+//             return res.status(403).send("<h3>🚨 Güvenlik İhlali: Geçersiz dosya adı </h3>");
+//         }
+
+//         const filePath = path.join(reportFolder, fileName);
+//         if (!fs.existsSync(filePath)) return res.send("<h3>❌ Rapor dosyası bulunamadı </h3>");
+
+//         const parsed = parseReportFile(filePath);
+
+//         const detailHtml = `
+//             <h2>📊 Test Sonuç Özeti</h2>
+//             <hr>
+//             <div class="card ${parsed.cardClass}">
+//                 <div class="data-item"><strong> Senaryo Durumu:</strong> ${parsed.status}</div>
+//                 <div class="data-item"><strong> Özet & Süre:</strong> ${parsed.summary}</div>
+//                 <h3 style="margin-top: 20px; color: #555;">🔍 Detaylı Rapor Metrikleri:</h3>
+//                 ${parsed.infoHeaderHtml}
+//             </div>
+            
+//             <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50; display: flex; align-items: center; gap: 8px;">🎬 Yapay Zeka İşlem Adımları (İncelemek İçin Tıkla)</h3>
+//             <div style="margin-bottom: 25px;">
+//                 ${parsed.stepsHtml || '<div style="color: #888; font-style: italic;">Adım detayları ayrıştırılamadı </div>'}
+//             </div>
+            
+//             <a href="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" class="btn-back">⬅️ Listeye Geri Dön</a>
+//         `;
+
+        
+//         return res.send(baseLayout.replace('', detailHtml));
+//     }
+
+//     // 2. DURUM: GENEL LİSTELEME GÖRÜNÜMÜ
+//     if (!fs.existsSync(reportFolder)) {
+//         return res.send(baseLayout.replace('', "<h3> Henüz hiç rapor oluşturulmamış </h3>"));
+//     }
+
+//     const files = fs.readdirSync(reportFolder).filter(f => f.endsWith('.txt'));
+//     let optionsHtml = files.map(f => `<option value="${f}">${f}</option>`).join('');
+
+//     const listHtml = `
+//         <h2> Güncel Test Raporları Paneli</h2>
+//         <p>Lütfen özetini görmek istediğiniz detaylı <code>.txt</code> raporunu seçin: </p>
+//         <form action="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" method="GET">
+//             <select name="file">
+//                 ${optionsHtml}
+//             </select>
+//             <button type="submit"> Raporu Özetle</button>
+//         </form>
+//     `;
+
+//     return res.send(baseLayout.replace('', listHtml));
+// });
+
+// export default router;
+
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { parseReportFile } from '../services/reportParser.js';
 import { CONSTANTS } from '../config/constants.js'; 
+import db from '../config/database.js'; // 📦 SQLite bağlantısını içeri alıyoruz
 
 const router = express.Router();
 
@@ -13,7 +89,7 @@ router.get('/reports-panel', (req, res) => {
     if (!fs.existsSync(viewPath)) return res.send("<h3>❌ views/reports-panel.html dosyası bulunamadı </h3>");
     const baseLayout = fs.readFileSync(viewPath, 'utf-8');
 
-    // 1. DURUM: DETAY SAYFASI GÖRÜNÜMÜ
+    // 1. DURUM: DETAY SAYFASI GÖRÜNÜMÜ (Tıklanan Spesifik Raporu Okuma)
     if (req.query.file) {
         const fileName = req.query.file;
 
@@ -43,31 +119,44 @@ router.get('/reports-panel', (req, res) => {
             
             <a href="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" class="btn-back">⬅️ Listeye Geri Dön</a>
         `;
-
         
         return res.send(baseLayout.replace('', detailHtml));
     }
 
-    // 2. DURUM: GENEL LİSTELEME GÖRÜNÜMÜ
-    if (!fs.existsSync(reportFolder)) {
-        return res.send(baseLayout.replace('', "<h3> Henüz hiç rapor oluşturulmamış </h3>"));
-    }
+    // 2. DURUM: GENEL LİSTELEME GÖRÜNÜMÜ (SQLite'dan Süper Hızlı Listeleme)
+    const selectQuery = `SELECT * FROM reports ORDER BY created_at DESC`;
 
-    const files = fs.readdirSync(reportFolder).filter(f => f.endsWith('.txt'));
-    let optionsHtml = files.map(f => `<option value="${f}">${f}</option>`).join('');
+    db.all(selectQuery, [], (err, rows) => {
+        if (err) {
+            console.error('🚨 Raporlar veri tabanından çekilirken hata oluştu:', err.message);
+            return res.status(500).send("<h3>❌ Veri tabanı hatası oluştu </h3>");
+        }
 
-    const listHtml = `
-        <h2> Güncel Test Raporları Paneli</h2>
-        <p>Lütfen özetini görmek istediğiniz detaylı <code>.txt</code> raporunu seçin: </p>
-        <form action="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" method="GET">
-            <select name="file">
-                ${optionsHtml}
-            </select>
-            <button type="submit"> Raporu Özetle</button>
-        </form>
-    `;
+        if (!rows || rows.length === 0) {
+            return res.send(baseLayout.replace('', "<h3> Henüz hiç rapor oluşturulmamış </h3>"));
+        }
 
-    return res.send(baseLayout.replace('', listHtml));
+        // Dropdown menüsü veya liste yapısı için seçenekleri veri tabanındaki kayıtlardan üretiyoruz
+        // Seçenek metninde hem senaryo adını hem de testin başarı durumunu göstererek şıklaştırdık kanka
+        let optionsHtml = rows.map(row => {
+            const statusIndicator = row.status === 'SUCCESS' ? '✅' : '❌';
+            return `<option value="${row.log_file_name}">${statusIndicator} ${row.scenario_name} (${row.target_url})</option>`;
+        }).join('');
+
+        const listHtml = `
+            <h2> Güncel Test Raporları Paneli</h2>
+            <p>Lütfen özetini görmek istediğiniz detaylı <code>.txt</code> raporunu seçin: </p>
+            <form action="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" method="GET">
+                <select name="file" style="padding: 10px; width: 100%; max-width: 500px; margin-bottom: 15px; border-radius: 4px;">
+                    ${optionsHtml}
+                </select>
+                <br>
+                <button type="submit"> Raporu Özetle</button>
+            </form>
+        `;
+
+        return res.send(baseLayout.replace('', listHtml));
+    });
 });
 
 export default router;
