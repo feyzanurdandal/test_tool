@@ -1,84 +1,9 @@
-// import express from 'express';
-// import fs from 'fs';
-// import path from 'path';
-// import { parseReportFile } from '../services/reportParser.js';
-// import { CONSTANTS } from '../config/constants.js'; 
-
-// const router = express.Router();
-
-// const reportFolder = path.join(process.cwd(), CONSTANTS.REPORTS_FOLDER);
-// const viewPath = path.join(process.cwd(), 'views', 'reports-panel.html');
-
-// router.get('/reports-panel', (req, res) => {
-//     if (!fs.existsSync(viewPath)) return res.send("<h3>❌ views/reports-panel.html dosyası bulunamadı </h3>");
-//     const baseLayout = fs.readFileSync(viewPath, 'utf-8');
-
-//     // 1. DURUM: DETAY SAYFASI GÖRÜNÜMÜ
-//     if (req.query.file) {
-//         const fileName = req.query.file;
-
-//         if (fileName.includes('/') || fileName.includes('\\') || !fileName.endsWith('.txt')) {
-//             return res.status(403).send("<h3>🚨 Güvenlik İhlali: Geçersiz dosya adı </h3>");
-//         }
-
-//         const filePath = path.join(reportFolder, fileName);
-//         if (!fs.existsSync(filePath)) return res.send("<h3>❌ Rapor dosyası bulunamadı </h3>");
-
-//         const parsed = parseReportFile(filePath);
-
-//         const detailHtml = `
-//             <h2>📊 Test Sonuç Özeti</h2>
-//             <hr>
-//             <div class="card ${parsed.cardClass}">
-//                 <div class="data-item"><strong> Senaryo Durumu:</strong> ${parsed.status}</div>
-//                 <div class="data-item"><strong> Özet & Süre:</strong> ${parsed.summary}</div>
-//                 <h3 style="margin-top: 20px; color: #555;">🔍 Detaylı Rapor Metrikleri:</h3>
-//                 ${parsed.infoHeaderHtml}
-//             </div>
-            
-//             <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50; display: flex; align-items: center; gap: 8px;">🎬 Yapay Zeka İşlem Adımları (İncelemek İçin Tıkla)</h3>
-//             <div style="margin-bottom: 25px;">
-//                 ${parsed.stepsHtml || '<div style="color: #888; font-style: italic;">Adım detayları ayrıştırılamadı </div>'}
-//             </div>
-            
-//             <a href="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" class="btn-back">⬅️ Listeye Geri Dön</a>
-//         `;
-
-        
-//         return res.send(baseLayout.replace('', detailHtml));
-//     }
-
-//     // 2. DURUM: GENEL LİSTELEME GÖRÜNÜMÜ
-//     if (!fs.existsSync(reportFolder)) {
-//         return res.send(baseLayout.replace('', "<h3> Henüz hiç rapor oluşturulmamış </h3>"));
-//     }
-
-//     const files = fs.readdirSync(reportFolder).filter(f => f.endsWith('.txt'));
-//     let optionsHtml = files.map(f => `<option value="${f}">${f}</option>`).join('');
-
-//     const listHtml = `
-//         <h2> Güncel Test Raporları Paneli</h2>
-//         <p>Lütfen özetini görmek istediğiniz detaylı <code>.txt</code> raporunu seçin: </p>
-//         <form action="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" method="GET">
-//             <select name="file">
-//                 ${optionsHtml}
-//             </select>
-//             <button type="submit"> Raporu Özetle</button>
-//         </form>
-//     `;
-
-//     return res.send(baseLayout.replace('', listHtml));
-// });
-
-// export default router;
-
-
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { parseReportFile } from '../services/reportParser.js';
 import { CONSTANTS } from '../config/constants.js'; 
-import db from '../config/database.js'; // 📦 SQLite bağlantısını içeri alıyoruz
+import db from '../config/database.js';
 
 const router = express.Router();
 
@@ -87,75 +12,86 @@ const viewPath = path.join(process.cwd(), 'views', 'reports-panel.html');
 
 router.get('/reports-panel', (req, res) => {
     if (!fs.existsSync(viewPath)) return res.send("<h3>❌ views/reports-panel.html dosyası bulunamadı </h3>");
-    const baseLayout = fs.readFileSync(viewPath, 'utf-8');
+    
+    // HTML'i oku
+    let baseLayout = fs.readFileSync(viewPath, 'utf-8');
 
-    // 1. DURUM: DETAY SAYFASI GÖRÜNÜMÜ (Tıklanan Spesifik Raporu Okuma)
+    // 1. DURUM: DETAY SAYFASI
     if (req.query.file) {
-        const fileName = req.query.file;
-
-        if (fileName.includes('/') || fileName.includes('\\') || !fileName.endsWith('.txt')) {
-            return res.status(403).send("<h3>🚨 Güvenlik İhlali: Geçersiz dosya adı </h3>");
-        }
+        const [id, fileName] = req.query.file.split('|');
+        if (!fileName || !fileName.endsWith('.txt')) return res.status(403).send("<h3>🚨 Geçersiz rapor</h3>");
 
         const filePath = path.join(reportFolder, fileName);
-        if (!fs.existsSync(filePath)) return res.send("<h3>❌ Rapor dosyası bulunamadı </h3>");
+        if (!fs.existsSync(filePath)) return res.send("<h3>❌ Dosya bulunamadı</h3>");
 
         const parsed = parseReportFile(filePath);
 
         const detailHtml = `
-            <h2>📊 Test Sonuç Özeti</h2>
-            <hr>
             <div class="card ${parsed.cardClass}">
-                <div class="data-item"><strong> Senaryo Durumu:</strong> ${parsed.status}</div>
-                <div class="data-item"><strong> Özet & Süre:</strong> ${parsed.summary}</div>
-                <h3 style="margin-top: 20px; color: #555;">🔍 Detaylı Rapor Metrikleri:</h3>
+                <h3>${parsed.status}</h3>
+                <p><strong>Özet:</strong> ${parsed.summary}</p>
                 ${parsed.infoHeaderHtml}
+                <hr>
+                ${parsed.stepsHtml}
             </div>
-            
-            <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50; display: flex; align-items: center; gap: 8px;">🎬 Yapay Zeka İşlem Adımları (İncelemek İçin Tıkla)</h3>
-            <div style="margin-bottom: 25px;">
-                ${parsed.stepsHtml || '<div style="color: #888; font-style: italic;">Adım detayları ayrıştırılamadı </div>'}
+            <br>
+            <div style="display:flex; gap:10px;">
+                <a href="/api/scenarios/reports-panel" class="btn-back">⬅️ Listeye Geri Dön</a>
+                <button onclick="deleteReport('${id}', '${fileName}')" class="btn-delete">🗑️ Bu Raporu Sil</button>
             </div>
-            
-            <a href="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" class="btn-back">⬅️ Listeye Geri Dön</a>
+            <script>
+            async function deleteReport(id, logFileName) {
+                if(!confirm("Emin misin?")) return;
+                const res = await fetch('/api/scenarios/delete-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, logFileName })
+                });
+                if(res.ok) { alert("Silindi!"); window.location.href = '/api/scenarios/reports-panel'; }
+            }
+            </script>
         `;
-        
-        return res.send(baseLayout.replace('', detailHtml));
+        // replace işlemini garantili yapıyoruz
+        return res.send(baseLayout.replace('<div class="container">', '<div class="container">' + detailHtml));
     }
 
-    // 2. DURUM: GENEL LİSTELEME GÖRÜNÜMÜ (SQLite'dan Süper Hızlı Listeleme)
+    // 2. DURUM: GENEL LİSTELEME
     const selectQuery = `SELECT * FROM reports ORDER BY created_at DESC`;
-
     db.all(selectQuery, [], (err, rows) => {
-        if (err) {
-            console.error('🚨 Raporlar veri tabanından çekilirken hata oluştu:', err.message);
-            return res.status(500).send("<h3>❌ Veri tabanı hatası oluştu </h3>");
-        }
+        if (err) return res.status(500).send("<h3>❌ Veri tabanı hatası</h3>");
 
-        if (!rows || rows.length === 0) {
-            return res.send(baseLayout.replace('', "<h3> Henüz hiç rapor oluşturulmamış </h3>"));
-        }
-
-        // Dropdown menüsü veya liste yapısı için seçenekleri veri tabanındaki kayıtlardan üretiyoruz
-        // Seçenek metninde hem senaryo adını hem de testin başarı durumunu göstererek şıklaştırdık kanka
-        let optionsHtml = rows.map(row => {
-            const statusIndicator = row.status === 'SUCCESS' ? '✅' : '❌';
-            return `<option value="${row.log_file_name}">${statusIndicator} ${row.scenario_name} (${row.target_url})</option>`;
-        }).join('');
+        // rows boşsa kullanıcıyı uyaralım
+        let optionsHtml = rows.length > 0 
+            ? rows.map(row => {
+                const statusIndicator = row.status === 'SUCCESS' ? '✅' : '❌';
+                return `<option value="${row.id}|${row.log_file_name}">${statusIndicator} ${row.scenario_name}</option>`;
+              }).join('')
+            : '<option value="">Henüz rapor yok</option>';
 
         const listHtml = `
-            <h2> Güncel Test Raporları Paneli</h2>
-            <p>Lütfen özetini görmek istediğiniz detaylı <code>.txt</code> raporunu seçin: </p>
-            <form action="${CONSTANTS.N8N_BASE_URL}/webhook/reports-viewer" method="GET">
-                <select name="file" style="padding: 10px; width: 100%; max-width: 500px; margin-bottom: 15px; border-radius: 4px;">
+            <h2>Güncel Test Raporları Paneli</h2>
+            <form action="/api/scenarios/reports-panel" method="GET">
+                <select name="file" style="padding:10px; width:100%; margin-bottom:10px;">
                     ${optionsHtml}
                 </select>
-                <br>
-                <button type="submit"> Raporu Özetle</button>
+                <button type="submit">Raporu Özetle</button>
             </form>
         `;
+        return res.send(baseLayout.replace('<div class="container">', '<div class="container">' + listHtml));
+    });
+});
 
-        return res.send(baseLayout.replace('', listHtml));
+// SİLME ROTASI (Aynı dosyanın içine, router altına ekle)
+router.post('/delete-report', (req, res) => {
+    const { id, logFileName } = req.body;
+    if (!logFileName) return res.status(400).json({ error: "Dosya adı eksik" });
+
+    const filePath = path.join(reportFolder, logFileName);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    db.run(`DELETE FROM reports WHERE id = ?`, [id], (err) => {
+        if (err) return res.status(500).json({ error: "DB silme hatası" });
+        res.json({ status: "SUCCESS" });
     });
 });
 

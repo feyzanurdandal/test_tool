@@ -1,5 +1,5 @@
 ✅ [TEST SUCCESS] - ai-prompts
-=====================================
+================
 
 > test-tool@1.0.0 test:ai-local
 > playwright test tests/ai-security.spec.ts
@@ -11,17 +11,17 @@ Running 1 test using 1 worker
 
 ***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
 
-◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
 
 [1/1] [chromium] › tests\ai-security.spec.ts:11:1 › Yapay Zeka Test Otomasyonu
 [chromium] › tests\ai-security.spec.ts:11:1 › Yapay Zeka Test Otomasyonu
-[2026-07-08 11:22:54.069 +0300] INFO: Launching local browser
+[2026-07-08 14:45:51.543 +0300] INFO: Launching local browser
     category: "init"
 
 
 ⏳ Sayfa geçişi için kısa duraklama (2sn)...
 
-[2026-07-08 11:22:58.102 +0300] INFO: act cache hit
+[2026-07-08 14:45:57.196 +0300] INFO: act cache hit
     category: "cache"
     instruction: "Focus and click on the input text field with placeholder 'Site içi arama' or name 'q'."
     url: "https://www.dpu.edu.tr/"
@@ -29,30 +29,30 @@ Running 1 test using 1 worker
 
 ⏳ Sayfa geçişi için kısa duraklama (2sn)...
 
-[2026-07-08 11:23:00.228 +0300] INFO: act cache hit
+[2026-07-08 14:45:59.317 +0300] INFO: act cache hit
     category: "cache"
     instruction: "Type the text 'İletişim' into that active input search box."
     url: "https://www.dpu.edu.tr/"
 
 
-[2026-07-08 11:23:00.340 +0300] INFO: act cache hit
+[2026-07-08 14:45:59.425 +0300] INFO: act cache hit
     category: "cache"
     instruction: "Press the 'Enter' key on your keyboard to submit the search form."
     url: "https://www.dpu.edu.tr/"
-[2026-07-08 11:23:00.351 +0300] INFO: pressing key
+[2026-07-08 14:45:59.445 +0300] INFO: pressing key
     category: "action"
     key: "Enter"
     xpath: "xpath=/html[1]/body[1]/div[2]/div[4]/div[7]/div[1]/div[3]/form[1]/input[2]"
 
 
 
-[2026-07-08 11:23:02.468 +0300] INFO: Starting extraction using a11y snapshot
+[2026-07-08 14:46:01.558 +0300] INFO: Starting extraction using a11y snapshot
     category: "extraction"
     instruction: "Verify if the text 'Arama Sonuçları' appears anywhere in the visible page headers."
 
 
 
-[2026-07-08 11:23:03.926 +0300] INFO: response
+[2026-07-08 14:46:02.807 +0300] INFO: response
     category: "aisdk"
     response: {
       "object": {
@@ -73,17 +73,17 @@ Running 1 test using 1 worker
 
 ⏳ Sayfa geçişi için kısa duraklama (2sn)...
 
-[2026-07-08 11:23:05.360 +0300] INFO: response
+[2026-07-08 14:46:04.257 +0300] INFO: response
     category: "aisdk"
     response: {
       "object": {
-        "progress": "The text 'Arama Sonuçları' has been found in the visible page headers.",
+        "progress": "The text 'Arama Sonuçları' has been found in the extracted content.",
         "completed": true
       },
       "usage": {
         "inputTokens": 237,
-        "outputTokens": 26,
-        "totalTokens": 263,
+        "outputTokens": 25,
+        "totalTokens": 262,
         "reasoningTokens": 0,
         "cachedInputTokens": 0
       },
@@ -91,30 +91,30 @@ Running 1 test using 1 worker
     }
 
 
-[2026-07-08 11:23:05.360 +0300] INFO: Extraction completed successfully
+[2026-07-08 14:46:04.259 +0300] INFO: Extraction completed successfully
     category: "extraction"
     prompt_tokens: "2244"
-    completion_tokens: "38"
-    inference_time_ms: "2890"
+    completion_tokens: "37"
+    inference_time_ms: "2697"
     result: "{\"hasSearchResults\":\"Arama Sonuçları\"}"
-[2026-07-08 11:23:05.384 +0300] INFO: act cache hit
+[2026-07-08 14:46:04.302 +0300] INFO: act cache hit
     category: "cache"
     instruction: "Look at the search results and click on the primary link for 'İletişim' or 'Birim İletişim Bilgileri'."
     url: "https://bidb.dpu.edu.tr/index/arama?arama=%C4%B0leti%C5%9Fim"
 
 
 
-[2026-07-08 11:23:07.474 +0300] INFO: Starting extraction using a11y snapshot
+[2026-07-08 14:46:06.403 +0300] INFO: Starting extraction using a11y snapshot
     category: "extraction"
     instruction: "Scan the current page to verify if it contains a contact telephone number formatted like '+90 (274)' or general university phone details."
 
 
 
-[2026-07-08 11:23:08.968 +0300] INFO: response
+[2026-07-08 14:46:07.519 +0300] INFO: response
     category: "aisdk"
     response: {
       "object": {
-        "phoneNumberFound": "+90 (274) 443 10 90\n0 (274) 265 20 43"
+        "phoneNumberFound": "0 (274) 443 10 90\n0 (274) 265 20 43"
       },
       "usage": {
         "inputTokens": 2014,
@@ -127,15 +127,15 @@ Running 1 test using 1 worker
     }
 
 
-*** [BAŞARIYLA AYIKLANDI] phoneNumberFound -> +90 (274) 443 10 90
+*** [BAŞARIYLA AYIKLANDI] phoneNumberFound -> 0 (274) 443 10 90
 0 (274) 265 20 43
 
-[2026-07-08 11:23:10.399 +0300] INFO: response
+[2026-07-08 14:46:08.774 +0300] INFO: response
     category: "aisdk"
     response: {
       "object": {
-        "progress": "Found contact telephone numbers formatted like '+90 (274)' as well as additional university phone details.",
-        "completed": true
+        "progress": "No contact telephone number formatted like '+90 (274)' found, but general phone details extracted.",
+        "completed": false
       },
       "usage": {
         "inputTokens": 260,
@@ -148,12 +148,12 @@ Running 1 test using 1 worker
     }
 
 
-[2026-07-08 11:23:10.399 +0300] INFO: Extraction completed successfully
+[2026-07-08 14:46:08.774 +0300] INFO: Extraction incomplete after processing all data
     category: "extraction"
     prompt_tokens: "2274"
     completion_tokens: "55"
-    inference_time_ms: "2925"
-    result: "{\"phoneNumberFound\":\"+90 (274) 443 10 90\n0 (274) 265 20 43\"}"
+    inference_time_ms: "2370"
+    result: "{\"phoneNumberFound\":\"0 (274) 443 10 90\n0 (274) 265 20 43\"}"
 
 
-  1 passed (20.6s)
+  1 passed (22.3s)
