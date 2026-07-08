@@ -11,12 +11,21 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Bu satırın app.listen()'den önce olduğundan emin ol!
+app.use(express.static('public'));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Eski: app.get('/create', ...)
+// Yeni: Dashboard ve Rota Köprüsü
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'dashboard.html')); 
+});
+
 // 🎨 HTML Form Sayfasını Doğrudan Sunan Rota
-app.get('/create', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'create.html'));
+app.get('/create-test', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'create-test.html'));
 });
 
 // 🛣️ Modüler Rota Yönetimi

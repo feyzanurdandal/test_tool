@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Paneli</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding-top: 50px; }
+        .menu { display: flex; justify-content: center; gap: 20px; }
+        button { padding: 20px 40px; font-size: 18px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Test Otomasyon Merkezi</h1>
+    <div class="menu">
+        <button onclick="window.location.href='/create-test'">+ Senaryo Oluştur</button>
+        <button onclick="window.location.href='/api/scenarios/reports-panel'">📊 Raporları İncele</button>
+        <button onclick="runAllTests()">🚀 Tüm Testleri Toplu Başlat</button>
+
+        <script>
+        async function runAllTests() {
+            if(confirm("Tüm testler sırayla çalışacak, emin misin?")) {
+                await fetch('/api/scenarios/run-all', { method: 'POST' });
+                alert("Toplu test süreci arka planda başladı!");
+            }
+        }
+        </script>
+        <h3>Tekil Senaryo Çalıştır</h3>
+        <select id="scenarioSelector"></select>
+        <button onclick="runSelected()">Seçileni Çalıştır</button>
+
+        <script>
+            // Sayfa açıldığında senaryoları yükle
+            fetch('/api/scenarios/list')
+                .then(res => res.json())
+                .then(data => {
+                    const selector = document.getElementById('scenarioSelector');
+                    data.scenarios.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s;
+                        opt.textContent = s;
+                        selector.appendChild(opt);
+                    });
+                });
+
+            function runSelected() {
+                const scenarioName = document.getElementById('scenarioSelector').value;
+                fetch('/api/scenarios/run-single', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scenarioName })
+                }).then(() => alert("Test başladı!"));
+            }
+        </script>
+    </div>
+</body>
+</html>
