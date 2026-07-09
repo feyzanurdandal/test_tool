@@ -1,25 +1,11 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <title>Yeni Test Senaryosu Oluştur</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .step { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
-    </style>
-</head>
-<body>
-    <h1>Yeni Senaryo Oluştur</h1>
-    
-    <input type="text" id="scenarioName" placeholder="Senaryo Adı">
-    <input type="text" id="targetUrl" placeholder="Hedef URL (örn: https://google.com)">
-    
-    <div id="stepsContainer"></div>
-    
-    <button onclick="addStep()">+ Adım Ekle</button>
-    <button onclick="saveScenario()">Senaryoyu Kaydet</button>
-    <button onclick="runScenario()">Senaryoyu Çalıştır</button>
+<h1>Yeni Senaryo Oluştur</h1>
+<input type="text" id="scenarioName" placeholder="Senaryo Adı">
+<input type="text" id="targetUrl" placeholder="Hedef URL">
 
-    <script src="/js/app.js"></script>
-</body>
-</html>
+<div id="stepsContainer">
+    </div>
+
+<button onclick="addStep()">+ Adım Ekle</button>
+<button onclick="saveScenario()">Senaryoyu AI ile İşle ve Kaydet</button>
+
+<script src="/js/app.js"></script>

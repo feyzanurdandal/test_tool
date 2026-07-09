@@ -318,10 +318,32 @@ import fs from 'fs';
 import path from 'path';
 import { CONSTANTS } from '../config/constants.js';
 import db from '../config/database.js';
+import { processAndSaveScenario } from '../server.js';
 
 const router = express.Router();
 const targetFolder = path.join(process.cwd(), CONSTANTS.SCENARIOS_FOLDER);
 const reportFolder = path.join(process.cwd(), CONSTANTS.REPORTS_FOLDER);
+
+router.post('/create-and-save', async (req, res) => {
+    // Console'a gelen veriyi bastıralım, hatayı hemen görelim
+    console.log("📥 Gelen Veri:", req.body); 
+    
+    const { scenarioName, turkishInstructions, targetUrl } = req.body;
+    
+    // Validasyonları genişletelim
+    if (!scenarioName || !turkishInstructions || !targetUrl) {
+        console.error("❌ Eksik veri hatası!");
+        return res.status(400).json({ error: "scenarioName, turkishInstructions veya targetUrl eksik!" });
+    }
+
+    try {
+        const filePath = await processAndSaveScenario(scenarioName, turkishInstructions, targetUrl);
+        res.status(200).json({ status: "SUCCESS", message: "Senaryo oluşturuldu", path: filePath });
+    } catch (error) {
+        console.error("❌ İşlem Hatası:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 /**
  * 🛠️ Yardımcı Fonksiyon: Testi çalıştıran ortak mantık
