@@ -1,136 +1,30 @@
-<!-- <!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <title>Test Paneli</title>
-    <style>
-        body { font-family: sans-serif; text-align: center; padding-top: 50px; }
-        .menu { display: flex; justify-content: center; gap: 20px; }
-        button { padding: 20px 40px; font-size: 18px; cursor: pointer; }
-    </style>
-</head>
-<body>
-    <h1>Test Otomasyon Merkezi</h1>
-    <div class="menu">
-        <button onclick="window.location.href='/create-test'">+ Senaryo Oluştur</button>
-        <button onclick="window.location.href='/api/scenarios/reports-panel'">📊 Raporları İncele</button>
-        <button onclick="runAllTests()">🚀 Tüm Testleri Toplu Başlat</button>
-
-        <script>
-        async function runAllTests() {
-            if(confirm("Tüm testler sırayla çalışacak, emin misin?")) {
-                await fetch('/api/scenarios/run-all', { method: 'POST' });
-                alert("Toplu test süreci arka planda başladı!");
-            }
-        }
-        </script>
-        <h3>Tekil Senaryo Çalıştır</h3>
-        <select id="scenarioSelector"></select>
-        <button onclick="runSelected()">Seçileni Çalıştır</button>
-
-        <script>
-            // Sayfa açıldığında senaryoları yükle
-            fetch('/api/scenarios/list')
-                .then(res => res.json())
-                .then(data => {
-                    const selector = document.getElementById('scenarioSelector');
-                    data.scenarios.forEach(s => {
-                        const opt = document.createElement('option');
-                        opt.value = s;
-                        opt.textContent = s;
-                        selector.appendChild(opt);
-                    });
-                });
-
-            function runSelected() {
-                const scenarioName = document.getElementById('scenarioSelector').value;
-                fetch('/api/scenarios/run-single', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ scenarioName })
-                }).then(() => alert("Test başladı!"));
-            }
-        </script>
-    </div>
-</body>
-</html> -->
-
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Test Paneli</title>
-    <style>
-        body { font-family: sans-serif; text-align: center; padding: 50px; background: #f4f7f6; }
-        .menu { display: flex; flex-direction: column; align-items: center; gap: 20px; }
-        button { padding: 15px 30px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; background: #2c3e50; color: white; }
-        button.delete { background: #e74c3c; }
-        select { padding: 10px; width: 300px; }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Test Otomasyon Merkezi</title>
 </head>
-<body>
-    <h1>Test Otomasyon Merkezi</h1>
-    <div class="menu">
-        <button onclick="window.location.href='/create-test'">+ Senaryo Oluştur</button>
-        <button onclick="window.location.href='/api/scenarios/reports-panel'">📊 Raporları İncele</button>
-        <button onclick="runAllTests()">🚀 Tüm Testleri Toplu Başlat</button>
+<body class="bg-gray-50 font-sans">
+    <div class="max-w-4xl mx-auto py-10 px-6 text-center">
+        <h1 class="text-4xl font-extrabold text-slate-800 mb-2">Test Otomasyon Merkezi</h1>
+        <p class="text-slate-500 mb-10">Otonom test kontrol paneli</p>
 
-        <hr style="width: 80%;">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <button onclick="window.location.href='/create-test'" class="bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-indigo-700 transition"> + Yeni Senaryo</button>
+            <button onclick="window.location.href='/api/scenarios/reports-panel'" class="bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-700 transition">📊 Raporları İncele</button>
+            <button onclick="runAllTests()" class="bg-amber-500 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-amber-600 transition">🚀 Hepsini Başlat</button>
+        </div>
 
-        <h3>Tekil Senaryo Yönetimi</h3>
-        <select id="scenarioSelector"></select>
-        <div style="display: flex; gap: 10px;">
-            <button onclick="runSelected()">▶️ Çalıştır</button>
-            <button class="delete" onclick="deleteSelected()">🗑️ Sil</button>
+        <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-left">
+            <h3 class="text-lg font-semibold mb-4 text-slate-700">Aktif Senaryo Yönetimi</h3>
+            <select id="scenarioSelector" class="w-full p-3 border border-slate-300 rounded-lg mb-4"></select>
+            <div class="flex gap-4">
+                <button onclick="runSelected()" class="flex-1 bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-900 transition">▶️ Çalıştır</button>
+                <button onclick="deleteSelected()" class="flex-1 bg-red-50 text-red-600 py-3 rounded-lg font-bold hover:bg-red-100 transition">🗑️ Sil</button>
+            </div>
         </div>
     </div>
-
-    <script>
-        async function loadScenarios() {
-            const res = await fetch('/api/scenarios/list');
-            const data = await res.json();
-            const selector = document.getElementById('scenarioSelector');
-            selector.innerHTML = '';
-            data.scenarios.forEach(s => {
-                const opt = document.createElement('option');
-                opt.value = s;
-                opt.textContent = s;
-                selector.appendChild(opt);
-            });
-        }
-
-        async function runSelected() {
-            const scenarioName = document.getElementById('scenarioSelector').value;
-            if(!scenarioName) return;
-            await fetch('/api/scenarios/run-single', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ scenarioName })
-            });
-            alert("Test başlatıldı!");
-        }
-
-        async function deleteSelected() {
-            const scenarioName = document.getElementById('scenarioSelector').value;
-            if(!confirm(scenarioName + " senaryosunu silmek istediğine emin misin?")) return;
-
-            const res = await fetch('/api/scenarios/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ scenarioName })
-            });
-            if(res.ok) { alert("Silindi!"); loadScenarios(); }
-        }
-
-        async function runAllTests() {
-            if(confirm("Tüm testler sırayla çalışacak, emin misin?")) {
-                await fetch('/api/scenarios/run-all', { method: 'POST' });
-                alert("Toplu test başladı!");
-            }
-        }
-
-        loadScenarios();
-    </script>
+    <script src="/js/app.js"></script>
 </body>
 </html>

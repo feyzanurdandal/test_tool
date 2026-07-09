@@ -1,0 +1,17 @@
+{
+  "targetUrl": "https://afamer.dpu.edu.tr/tr",
+  "steps": [
+    {
+      "type": "observe",
+      "instruction": "Find the section named 'Hızlı Erişimler'"
+    },
+    {
+      "type": "observe",
+      "instruction": "Locate the 'Akademik Portal' link under the 'Hızlı Erişimler' section"
+    },
+    {
+      "type": "act",
+      "instruction": "Click on the 'Akademik Portal' link under the 'Hızlı Erişimler' section"
+    }
+  ]
+}

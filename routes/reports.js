@@ -13,7 +13,6 @@ const viewPath = path.join(process.cwd(), 'views', 'reports-panel.html');
 router.get('/reports-panel', (req, res) => {
     if (!fs.existsSync(viewPath)) return res.send("<h3>❌ views/reports-panel.html dosyası bulunamadı </h3>");
     
-    // HTML'i oku
     let baseLayout = fs.readFileSync(viewPath, 'utf-8');
 
     // 1. DURUM: DETAY SAYFASI
@@ -26,18 +25,21 @@ router.get('/reports-panel', (req, res) => {
 
         const parsed = parseReportFile(filePath);
 
+        // Tailwind sınıfları eklendi
         const detailHtml = `
-            <div class="card ${parsed.cardClass}">
-                <h3>${parsed.status}</h3>
-                <p><strong>Özet:</strong> ${parsed.summary}</p>
-                ${parsed.infoHeaderHtml}
-                <hr>
-                ${parsed.stepsHtml}
-            </div>
-            <br>
-            <div style="display:flex; gap:10px;">
-                <a href="/api/scenarios/reports-panel" class="btn-back">⬅️ Listeye Geri Dön</a>
-                <button onclick="deleteReport('${id}', '${fileName}')" class="btn-delete">🗑️ Bu Raporu Sil</button>
+            <div class="space-y-6">
+                <div class="border-2 border-slate-300 p-6 rounded-xl bg-slate-50">
+                    <h3 class="text-xl font-bold mb-2">${parsed.status}</h3>
+                    <p class="mb-4"><strong>Özet:</strong> ${parsed.summary}</p>
+                    ${parsed.infoHeaderHtml}
+                </div>
+                <div class="border-2 border-slate-300 p-4 rounded-xl">
+                    ${parsed.stepsHtml}
+                </div>
+                <div class="flex gap-4">
+                    <a href="/api/scenarios/reports-panel" class="bg-slate-200 px-6 py-3 rounded-lg font-bold border-2 border-slate-300">⬅️ Listeye Dön</a>
+                    <button onclick="deleteReport('${id}', '${fileName}')" class="bg-red-50 text-red-600 px-6 py-3 rounded-lg font-bold border-2 border-red-500 hover:bg-red-100">🗑️ Raporu Sil</button>
+                </div>
             </div>
             <script>
             async function deleteReport(id, logFileName) {
@@ -51,47 +53,30 @@ router.get('/reports-panel', (req, res) => {
             }
             </script>
         `;
-        // replace işlemini garantili yapıyoruz
         return res.send(baseLayout.replace('<div class="container">', '<div class="container">' + detailHtml));
     }
 
     // 2. DURUM: GENEL LİSTELEME
     const selectQuery = `SELECT * FROM reports ORDER BY created_at DESC`;
     db.all(selectQuery, [], (err, rows) => {
-        if (err) return res.status(500).send("<h3>❌ Veri tabanı hatası</h3>");
-
-        // rows boşsa kullanıcıyı uyaralım
         let optionsHtml = rows.length > 0 
             ? rows.map(row => {
                 const statusIndicator = row.status === 'SUCCESS' ? '✅' : '❌';
-                return `<option value="${row.id}|${row.log_file_name}">${statusIndicator} ${row.scenario_name}</option>`;
-              }).join('')
+                const date = new Date(row.created_at).toLocaleString('tr-TR');
+                return `<option value="${row.id}|${row.log_file_name}">${statusIndicator} [${date}] ${row.scenario_name}</option>`;
+            }).join('')
             : '<option value="">Henüz rapor yok</option>';
 
+        // Dropdown'ı belirginleştiren Tailwind sınıfları
         const listHtml = `
-            <h2>Güncel Test Raporları Paneli</h2>
-            <form action="/api/scenarios/reports-panel" method="GET">
-                <select name="file" style="padding:10px; width:100%; margin-bottom:10px;">
+            <form action="/api/scenarios/reports-panel" method="GET" class="space-y-6">
+                <select name="file" class="w-full p-4 border-2 border-slate-400 rounded-lg text-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200">
                     ${optionsHtml}
                 </select>
-                <button type="submit">Raporu Özetle</button>
+                <button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-lg font-bold border-2 border-indigo-700 hover:bg-indigo-700 transition">Raporu Göster</button>
             </form>
         `;
         return res.send(baseLayout.replace('<div class="container">', '<div class="container">' + listHtml));
-    });
-});
-
-// SİLME ROTASI (Aynı dosyanın içine, router altına ekle)
-router.post('/delete-report', (req, res) => {
-    const { id, logFileName } = req.body;
-    if (!logFileName) return res.status(400).json({ error: "Dosya adı eksik" });
-
-    const filePath = path.join(reportFolder, logFileName);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-
-    db.run(`DELETE FROM reports WHERE id = ?`, [id], (err) => {
-        if (err) return res.status(500).json({ error: "DB silme hatası" });
-        res.json({ status: "SUCCESS" });
     });
 });
 

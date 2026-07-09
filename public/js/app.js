@@ -1,73 +1,72 @@
-
-// 1. Dinamik adım ekleme fonksiyonu
+// Adım ekleme
 function addStep() {
     const container = document.getElementById('stepsContainer');
     const stepDiv = document.createElement('div');
-    stepDiv.className = 'step'; // CSS için bu sınıfı kullan
-    stepDiv.innerHTML = `
-        <textarea class="step-instr" placeholder="Buraya Türkçe adımı yaz"></textarea>
-    `;
+    stepDiv.className = 'step';
+    stepDiv.innerHTML = `<textarea class="step-instr w-full p-2 border rounded" placeholder="Buraya adım yaz (örn: Giriş yap)"></textarea>`;
     container.appendChild(stepDiv);
 }
-// app.js içindeki saveScenario fonksiyonunu bu şekilde değiştir
-// 2. Kaydetme Fonksiyonu
-async function saveScenario() {
-    const nameEl = document.getElementById('scenarioName');
-    const urlEl = document.getElementById('targetUrl');
-    
-    // Güvenlik kontrolü
-    if (!nameEl.value || !urlEl.value) {
-        alert("Lütfen Senaryo Adı ve Hedef URL alanlarını doldur!");
-        return;
-    }
 
+// Senaryo Kaydetme
+async function saveScenario() {
     const steps = [];
     document.querySelectorAll('.step-instr').forEach((textarea, index) => {
         if(textarea.value) steps.push(`${index + 1}. ${textarea.value}`);
     });
 
-    if (steps.length === 0) {
-        alert("En az bir adım eklemelisin!");
-        return;
-    }
-
     const payload = {
-        scenarioName: nameEl.value,
-        targetUrl: urlEl.value,
-        turkishInstructions: steps.join('\n') 
+        scenarioName: document.getElementById('scenarioName').value,
+        targetUrl: document.getElementById('targetUrl').value,
+        turkishInstructions: steps.join('\n')
     };
 
-    console.log("📤 Gönderilen Veri:", payload);
-
-    try {
-        const response = await fetch('/api/scenarios/create-and-save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            alert("✅ Senaryo başarıyla AI ile çevrildi ve kaydedildi!");
-        } else {
-            alert("❌ Hata: " + (result.error || "Bilinmeyen bir hata"));
-        }
-    } catch (err) {
-        alert("Bağlantı hatası: " + err.message);
-    }
+    const res = await fetch('/api/scenarios/create-and-save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    });
+    if(res.ok) alert("✅ Başarılı!"); else alert("❌ Hata!");
 }
 
-async function runScenario() {
-    const scenarioName = document.getElementById('scenarioName').value;
-    if (!scenarioName) return alert("Önce bir senaryo adı gir!");
+// Test Çalıştırma
+async function runSelected() {
+    const scenarioName = document.getElementById('scenarioSelector').value;
+    await fetch('/api/scenarios/run-single', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ scenarioName })
+    });
+    alert("Test başladı!");
+}
+// Senaryo Silme
+async function deleteSelected() {
+    const scenarioName = document.getElementById('scenarioSelector').value;
+    if (!scenarioName) return;
+    
+    if (!confirm(scenarioName + " senaryosunu silmek istediğine emin misin?")) return;
 
-    const response = await fetch('/api/scenarios/run-single', {
+    const res = await fetch('/api/scenarios/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenarioName })
     });
 
-    const result = await response.json();
-    alert("Test Sonucu: " + result.status);
+    if (res.ok) {
+        alert("🗑️ Silindi!");
+        loadScenarios(); // Listeyi güncelle
+    } else {
+        alert("❌ Silme hatası!");
+    }
 }
+
+// Senaryo Listeleme (Dashboard için)
+async function loadScenarios() {
+    const res = await fetch('/api/scenarios/list');
+    const data = await res.json();
+    const selector = document.getElementById('scenarioSelector');
+    if(selector) {
+        selector.innerHTML = data.scenarios.map(s => `<option value="${s}">${s}</option>`).join('');
+    }
+}
+
+loadScenarios();

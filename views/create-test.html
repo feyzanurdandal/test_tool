@@ -1,11 +1,27 @@
-<h1>Yeni Senaryo Oluştur</h1>
-<input type="text" id="scenarioName" placeholder="Senaryo Adı">
-<input type="text" id="targetUrl" placeholder="Hedef URL">
-
-<div id="stepsContainer">
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Yeni Senaryo</title>
+</head>
+<body class="bg-slate-50 py-10 px-4">
+    <div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+        <h1 class="text-2xl font-bold mb-6 text-slate-800">Yeni Senaryo Oluştur</h1>
+        
+        <div class="space-y-4">
+            <input type="text" id="scenarioName" class="w-full p-3 border rounded-lg" placeholder="Senaryo Adı">
+            <input type="text" id="targetUrl" class="w-full p-3 border rounded-lg" placeholder="Hedef URL">
+            <div id="stepsContainer" class="space-y-3"></div>
+            
+            <button onclick="addStep()" class="text-indigo-600 font-medium hover:underline">+ Yeni Adım Ekle</button>
+        </div>
+        
+        <div class="mt-8 flex gap-4">
+            <button onclick="saveScenario()" class="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700">Kaydet ve İşle</button>
+            <button onclick="window.location.href='/'" class="bg-slate-100 text-slate-600 px-6 py-3 rounded-lg hover:bg-slate-200">Geri</button>
+        </div>
     </div>
-
-<button onclick="addStep()">+ Adım Ekle</button>
-<button onclick="saveScenario()">Senaryoyu AI ile İşle ve Kaydet</button>
-
-<script src="/js/app.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
