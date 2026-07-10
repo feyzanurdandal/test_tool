@@ -1,0 +1,83 @@
+✅ [TEST SUCCESS] - test
+================
+
+> test-tool@1.0.0 test:ai-local
+> playwright test tests/ai-security.spec.ts
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+
+Running 1 test using 1 worker
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+
+[1/1] [chromium] › tests\ai-security.spec.ts:85:1 › Yapay Zeka Test Otomasyonu
+[chromium] › tests\ai-security.spec.ts:85:1 › Yapay Zeka Test Otomasyonu
+[2026-07-10 15:36:08.794 +0300] INFO: Launching local browser
+    category: "init"
+
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+[2026-07-10 15:36:11.423 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "click on the menu item named 'İletişim'"
+    url: "https://www.dpu.edu.tr/"
+
+
+
+[2026-07-10 15:36:13.811 +0300] INFO: Starting extraction using a11y snapshot
+    category: "extraction"
+    instruction: "find all phone numbers starting with 0"
+
+
+
+[2026-07-10 15:36:18.443 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "phone_numbers": "+90 (274) 443 43 43\n+90 (274) 265 20 31 - 32 - 33 (10 hat)"
+      },
+      "usage": {
+        "inputTokens": 5710,
+        "outputTokens": 39,
+        "totalTokens": 5749,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+*** [BAŞARIYLA AYIKLANDI] phone_numbers -> +90 (274) 443 43 43
++90 (274) 265 20 31 - 32 - 33 (10 hat)
+
+[2026-07-10 15:36:20.103 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "progress": "Extracted phone numbers do not start with 0; they start with +90.",
+        "completed": false
+      },
+      "usage": {
+        "inputTokens": 252,
+        "outputTokens": 25,
+        "totalTokens": 277,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+[2026-07-10 15:36:20.103 +0300] INFO: Extraction incomplete after processing all data
+    category: "extraction"
+    prompt_tokens: "5962"
+    completion_tokens: "64"
+    inference_time_ms: "6290"
+    result: "{\"phone_numbers\":\"+90 (274) 443 43 43\n+90 (274) 265 20 31 - 32 - 33 (10 hat)\"}"
+
+
+  1 passed (16.8s)
