@@ -1,0 +1,161 @@
+✅ [TEST SUCCESS] - ai-prompts
+================
+
+> test-tool@1.0.0 test:ai-local
+> playwright test tests/ai-security.spec.ts
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+
+Running 1 test using 1 worker
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+
+[1/1] [chromium] › tests\ai-security.spec.ts:11:1 › Yapay Zeka Test Otomasyonu
+[chromium] › tests\ai-security.spec.ts:11:1 › Yapay Zeka Test Otomasyonu
+[2026-07-10 11:41:05.863 +0300] INFO: Launching local browser
+    category: "init"
+
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+[2026-07-10 11:41:09.213 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Focus and click on the input text field with placeholder 'Site içi arama' or name 'q'."
+    url: "https://www.dpu.edu.tr/"
+
+
+[2026-07-10 11:41:11.381 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Type the text 'İletişim' into that active input search box."
+    url: "https://www.dpu.edu.tr/"
+
+
+[2026-07-10 11:41:11.498 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Press the 'Enter' key on your keyboard to submit the search form."
+    url: "https://www.dpu.edu.tr/"
+
+
+[2026-07-10 11:41:11.514 +0300] INFO: pressing key
+    category: "action"
+    key: "Enter"
+    xpath: "xpath=/html[1]/body[1]/div[2]/div[4]/div[7]/div[1]/div[3]/form[1]/input[2]"
+
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+
+[2026-07-10 11:41:13.643 +0300] INFO: Starting extraction using a11y snapshot
+    category: "extraction"
+    instruction: "Verify if the text 'Arama Sonuçları' appears anywhere in the visible page headers."
+
+
+
+[2026-07-10 11:41:17.102 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "hasSearchResults": "Arama Sonuçları"
+      },
+      "usage": {
+        "inputTokens": 2007,
+        "outputTokens": 12,
+        "totalTokens": 2019,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+*** [BAŞARIYLA AYIKLANDI] hasSearchResults -> Arama Sonuçları
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+[2026-07-10 11:41:18.594 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "progress": "The text 'Arama Sonuçları' was found in the extracted content.",
+        "completed": true
+      },
+      "usage": {
+        "inputTokens": 237,
+        "outputTokens": 24,
+        "totalTokens": 261,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+[2026-07-10 11:41:18.595 +0300] INFO: Extraction completed successfully
+    category: "extraction"
+    prompt_tokens: "2244"
+    completion_tokens: "36"
+    inference_time_ms: "4949"
+    result: "{\"hasSearchResults\":\"Arama Sonuçları\"}"
+[2026-07-10 11:41:18.630 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Look at the search results and click on the primary link for 'İletişim' or 'Birim İletişim Bilgileri'."
+    url: "https://bidb.dpu.edu.tr/index/arama?arama=%C4%B0leti%C5%9Fim"
+
+
+
+[2026-07-10 11:41:20.772 +0300] INFO: Starting extraction using a11y snapshot
+    category: "extraction"
+    instruction: "Scan the current page to verify if it contains a contact telephone number formatted like '+90 (274)' or general university phone details."
+
+
+
+[2026-07-10 11:41:23.373 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "phoneNumberFound": "0 (274) 443 10 90\n0 (274) 265 20 43"
+      },
+      "usage": {
+        "inputTokens": 2014,
+        "outputTokens": 28,
+        "totalTokens": 2042,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+*** [BAŞARIYLA AYIKLANDI] phoneNumberFound -> 0 (274) 443 10 90
+0 (274) 265 20 43
+
+[2026-07-10 11:41:24.780 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "progress": "The extracted content contains phone numbers, but they do not match the specified format '+90 (274)'.",
+        "completed": false
+      },
+      "usage": {
+        "inputTokens": 260,
+        "outputTokens": 30,
+        "totalTokens": 290,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+[2026-07-10 11:41:24.781 +0300] INFO: Extraction incomplete after processing all data
+    category: "extraction"
+    prompt_tokens: "2274"
+    completion_tokens: "58"
+    inference_time_ms: "4009"
+    result: "{\"phoneNumberFound\":\"0 (274) 443 10 90\n0 (274) 265 20 43\"}"
+
+
+  1 passed (26.7s)

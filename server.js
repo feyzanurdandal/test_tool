@@ -12,13 +12,15 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ─── 1. API ROTAlARI (Statik dosyalardan ÖNCE gelmeli) ───
+app.use('/api/scenarios', scenarioRouter);
+app.use('/api/scenarios', reportRoutes); // Rapor listesi /api/scenarios/api/reports/list yerine geçecek
+
 /**
  * 🆕 OTOMATİK ÇEVİRİ VE KAYIT FONKSİYONU
- * Artık herhangi bir rotadan bunu çağırıp otomatik JSON oluşturabilirsin.
  */
 export async function processAndSaveScenario(scenarioName, turkishInstructions, targetUrl) {
     const stagehandJson = await translateToStagehandJson(turkishInstructions, targetUrl);
@@ -34,11 +36,16 @@ export async function processAndSaveScenario(scenarioName, turkishInstructions, 
     return filePath;
 }
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views', 'dashboard.html')));
-app.get('/create-test', (req, res) => res.sendFile(path.join(__dirname, 'views', 'create-test.html')));
+// ─── 2. REACT BINDINGS (En Altta Olmalı) ───
+// React build (dist) klasörünü static olarak serve et
+app.use(express.static(path.join(process.cwd(), 'dist')));
 
-app.use('/api/scenarios', scenarioRouter);
-app.use('/api/scenarios', reportRoutes);
+// Eğer gelen istek üstteki API'lere çarpmadıysa, doğrudan React'in index.html'ini dön
+// Eski hali: app.get('*', (req, res) => { ... })
+// Yeni ve güvenli hali:
+app.get(/^\/(.*)$/, (req, res) => {
+    res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+});
 
 app.listen(CONSTANTS.PORT, () => {
     console.log(`🚀 Sunucu http://localhost:${CONSTANTS.PORT} üzerinde aktif`);

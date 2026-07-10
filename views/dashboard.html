@@ -1,30 +1,88 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" class="dark">
 <head>
     <meta charset="UTF-8">
     <script src="https://cdn.tailwindcss.com"></script>
-    <title>Test Otomasyon Merkezi</title>
+    <title>Test Otomasyon Paneli</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #09090b; color: #fafafa; }
+    </style>
 </head>
-<body class="bg-gray-50 font-sans">
-    <div class="max-w-4xl mx-auto py-10 px-6 text-center">
-        <h1 class="text-4xl font-extrabold text-slate-800 mb-2">Test Otomasyon Merkezi</h1>
-        <p class="text-slate-500 mb-10">Otonom test kontrol paneli</p>
+<body class="min-h-screen flex flex-col">
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            <button onclick="window.location.href='/create-test'" class="bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-indigo-700 transition"> + Yeni Senaryo</button>
-            <button onclick="window.location.href='/api/scenarios/reports-panel'" class="bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-700 transition">📊 Raporları İncele</button>
-            <button onclick="runAllTests()" class="bg-amber-500 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-amber-600 transition">🚀 Hepsini Başlat</button>
+    <header className="h-14 border-b border-[rgba(255,255,255,0.08)] flex items-center px-6 gap-5 bg-[#09090b] z-20" style="height: 3.5rem; display: flex; align-items: center; padding-left: 1.5rem; padding-right: 1.5rem; gap: 1.25rem; border-b: 1px solid rgba(255,255,255,0.08);">
+        <div class="flex items-center gap-2.5" style="display: flex; align-items: center; gap: 0.625rem;">
+            <div class="w-7 h-7 rounded bg-[#3b82f6] flex items-center justify-center text-white font-bold" style="width: 1.75rem; height: 1.75rem; border-radius: 0.25rem; display: flex; align-items: center; justify-content: center;">🧪</div>
+            <span class="text-sm font-semibold tracking-tight">TestOps</span>
         </div>
+        <div style="width: 1px; height: 1.25rem; background-color: rgba(255,255,255,0.08);"></div>
+        <div class="text-xs font-mono text-muted-foreground px-2 py-1 border border-[rgba(255,255,255,0.08)] rounded bg-[#18181b]">
+            Auth Service <span class="text-[10px] text-yellow-400 font-mono px-1 border border-yellow-500/20 bg-yellow-500/10 rounded ml-1">staging</span>
+        </div>
+        <div style="margin-left: auto;">
+            <span style="font-family: monospace; font-size: 10px; color: #71717a; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.08); border-radius: 4px;">v2.4.1</span>
+        </div>
+    </header>
 
-        <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-left">
-            <h3 class="text-lg font-semibold mb-4 text-slate-700">Aktif Senaryo Yönetimi</h3>
-            <select id="scenarioSelector" class="w-full p-3 border border-slate-300 rounded-lg mb-4"></select>
-            <div class="flex gap-4">
-                <button onclick="runSelected()" class="flex-1 bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-900 transition">▶️ Çalıştır</button>
-                <button onclick="deleteSelected()" class="flex-1 bg-red-50 text-red-600 py-3 rounded-lg font-bold hover:bg-red-100 transition">🗑️ Sil</button>
+    <div class="flex flex-1" style="display: flex; flex: 1 1 0%;">
+        <aside class="w-48 bg-[#111113] p-4 flex flex-col gap-1" style="width: 12rem; border-r: 1px solid rgba(255,255,255,0.06); padding: 1rem; display: flex; flex-direction: column; gap: 0.125rem;">
+            <button onclick="window.location.href='/'" class="w-full text-left px-3 py-2 text-xs rounded font-medium bg-[#3b82f6]/10 text-[#3b82f6] flex items-center gap-2">
+                🧪 Test Senaryoları
+            </button>
+            <button onclick="window.location.href='/api/scenarios/reports-panel'" class="w-full text-left px-3 py-2 text-xs rounded font-medium text-[#a1a1aa] hover:text-[#fafafa] hover:bg-[#27272a] flex items-center gap-2">
+                📄 Raporlar
+            </button>
+            <div style="margin-top: auto; padding-top: 0.75rem; border-t: 1px solid rgba(255,255,255,0.08);">
+                <p style="font-size: 10px; color: #71717a; text-transform: uppercase; tracking: 0.1em; margin-bottom: 0.25rem;">Aktif Proje</p>
+                <p style="font-size: 12px; font-weight: 500; color: #fafafa; margin: 0;">Auth Service</p>
+                <span style="display: inline-block; font-family: monospace; font-size: 10px; color: #f59e0b; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); padding: 2px 6px; border-radius: 4px; margin-top: 4px;">staging</span>
             </div>
-        </div>
+        </aside>
+
+        <main class="flex-1 p-6 overflow-auto">
+          <div class="max-w-5xl mx-auto">
+            <div class="flex items-center justify-between mb-6" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+                <div>
+                    <h1 class="text-sm font-semibold m-0" style="font-size: 0.875rem; font-weight: 600;">Test Senaryoları</h1>
+                    <p class="text-xs text-[#71717a] mt-0.5" id="scenarioCount">Yükleniyor... senaryo · Auth Service</p>
+                </div>
+                <div class="flex items-center gap-2" style="display: flex; gap: 0.5rem;">
+                    <button onclick="runAllTests()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#3b82f6] text-white rounded hover:bg-blue-500 font-medium border border-blue-700">
+                        🚀 Tümünü Çalıştır
+                    </button>
+                    <button onclick="window.location.href='/create-test'" class="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-zinc-700 text-[#a1a1aa] rounded bg-[#18181b] hover:text-[#fafafa] hover:bg-[#27272a]">
+                        + Yeni
+                    </button>
+                </div>
+            </div>
+
+            <div class="border border-[rgba(255,255,255,0.08)] rounded-lg overflow-hidden bg-[#18181b]">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="border-b border-[rgba(255,255,255,0.08)] bg-[#27272a]/20">
+                            <th class="text-left px-4 py-2.5 text-[10px] font-medium text-[#71717a] uppercase tracking-wider">#</th>
+                            <th class="text-left px-4 py-2.5 text-[10px] font-medium text-[#71717a] uppercase tracking-wider">Senaryo Adı</th>
+                            <th class="text-left px-4 py-2.5 text-[10px] font-medium text-[#71717a] uppercase tracking-wider">Durum</th>
+                            <th class="text-right px-4 py-2.5 text-[10px] font-medium text-[#71717a] uppercase tracking-wider">İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scenarioTableBody">
+                        </tbody>
+                </table>
+            </div>
+
+            <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl mt-6">
+                <h3 class="text-xs font-semibold mb-3 text-[#a1a1aa] uppercase tracking-wider">Hızlı İşlem Konsolu</h3>
+                <div class="flex gap-4">
+                    <select id="scenarioSelector" class="flex-1 p-2.5 bg-[#27272a] border border-zinc-700 rounded-lg text-xs text-white focus:ring-1 focus:ring-blue-500"></select>
+                    <button onclick="runSelected()" class="px-5 py-2.5 bg-[#3b82f6]/10 text-[#3b82f6] border border-[#3b82f6]/20 rounded-lg text-xs font-bold hover:bg-[#3b82f6]/20 transition">▶️ Çalıştır</button>
+                    <button onclick="deleteSelected()" class="px-5 py-2.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-xs font-bold hover:bg-red-500/20 transition">🗑️ Sil</button>
+                </div>
+            </div>
+          </div>
+        </main>
     </div>
+
     <script src="/js/app.js"></script>
 </body>
 </html>

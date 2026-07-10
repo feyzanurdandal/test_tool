@@ -15,32 +15,35 @@ function buildAccordionHtml(num, title, logsArray, wasBackup) {
     
     if (promptTokens && completionTokens) {
         const total = parseInt(promptTokens[1]) + parseInt(completionTokens[1]);
-        tokenInfo = `<span style="color: #6c757d; font-size: 12px; margin-left: auto;">💎 Toplam Token: ${total}</span>`;
+        tokenInfo = `<span style="color: #a1a1aa; font-size: 11px; margin-left: auto; font-family: monospace;">💎 Token: ${total}</span>`;
     }
 
     return `
-        <div style="margin-bottom: 10px; border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden; background: white;">
+        <div style="margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; overflow: hidden; background: #18181b;">
             <button type="button" onclick="const p = this.nextElementSibling; p.style.display = p.style.display === 'none' ? 'block' : 'none';" 
-                style="width: 100%; text-align: left; background: #f8f9fa; border: none; padding: 14px; font-size: 14px; font-weight: 600; color: #495057; cursor: pointer; display: flex; align-items: center; border-bottom: 1px solid #dee2e6;">
-                İşlem ${num}: ${title} ${backupBadge} ${tokenInfo}
+                style="width: 100%; text-align: left; background: #27272a/30; border: none; padding: 12px; font-size: 13px; font-weight: 600; color: #fafafa; cursor: pointer; display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <span style="margin-right: 8px;">🔹</span> İşlem ${num}: ${title} ${backupBadge} ${tokenInfo}
             </button>
-            <div style="display: none; padding: 15px; background: #1e1e1e; color: #d4d4d4; font-family: 'Courier New', monospace; font-size: 12px; max-height: 300px; overflow-y: auto; white-space: pre-wrap;">${fullLogsText}</div>
+            <div style="display: none; padding: 15px; background: #09090b; color: #34d399; font-family: 'Courier New', monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; border-top: 1px solid rgba(255,255,255,0.04);">${fullLogsText}</div>
         </div>
     `;
 }
 
 export const parseReportFile = (filePath) => {
+    if (!fs.existsSync(filePath)) {
+        return { cardClass: "error", status: "❌ DOSYA BULUNAMADI", summary: "Log dosyası yok.", infoHeaderHtml: "", stepsHtml: "" };
+    }
+
     const rawContent = fs.readFileSync(filePath, 'utf-8');
     const lines = rawContent.split(/\r?\n/);
 
     const isSuccess = rawContent.includes('✅ [TEST SUCCESS]');
-    const status = isSuccess ? "✅ BAŞARILI" : "❌ BAŞARISIZ";
+    const status = isSuccess ? "BAŞARILI ✅" : "BAŞARISIZ ❌";
     const cardClass = isSuccess ? "success" : "error";
     
     const summaryMatch = rawContent.match(/\d+ passed \(.+\)/);
-    const summary = summaryMatch ? summaryMatch[0] : "Süre/Özet bilgisi alınamadı.";
+    const summary = summaryMatch ? summaryMatch[0] : (isSuccess ? "Tüm adımlar başarıyla tamamlandı." : "Hata ile kesildi.");
 
-    // 🌐 Sabit Metrik Süzgeçleri
     const urlMatch = rawContent.match(/Target URL\s*:\s*(.+)/i) || rawContent.match(/URL\s*->\s*(.+)/i) || rawContent.match(/http[s]?:\/\/[^\s]+/i);
     const modelMatch = rawContent.match(/Model\s*:\s*([\w-]+)/i) || rawContent.match(/LLM\s*:\s*([\w-]+)/i);
     const errorMatch = rawContent.match(/(Error:[\s\S]{1,150})/i) || rawContent.match(/(Patladı:[\s\S]{1,150})/i);
@@ -48,19 +51,18 @@ export const parseReportFile = (filePath) => {
     let infoHeaderHtml = "";
     if (urlMatch) {
         const cleanUrl = urlMatch[1] ? urlMatch[1].trim() : urlMatch[0].trim();
-        infoHeaderHtml += `<div class="data-item"> <strong>Hedef URL:</strong> <a href="${cleanUrl}" target="_blank">${cleanUrl}</a></div>`;
+        infoHeaderHtml += `<p><strong>Hedef URL:</strong> <a href="${cleanUrl}" target="_blank" style="color:#3b82f6; text-decoration:underline;">${cleanUrl}</a></p>`;
     }
-    if (modelMatch) infoHeaderHtml += `<div class="data-item"> <strong>Kullanılan LLM:</strong> <code>${modelMatch[1].trim()}</code></div>`;
+    if (modelMatch) infoHeaderHtml += `<p><strong>Kullanılan LLM:</strong> <code style="background:#27272a; padding:2px 6px; border-radius:4px; font-family:monospace;">${modelMatch[1].trim()}</code></p>`;
     
     if (!isSuccess && errorMatch) {
         infoHeaderHtml += `
-            <div class="data-item" style="background: #fff3f3; border: 1px solid #f5c6cb; padding: 10px; border-radius: 5px; color: #721c24; margin-top: 10px;">
-                🚨 <strong>Kritik Hata Detayı:</strong> <br><pre style="margin: 5px 0; font-size: 13px; white-space: pre-wrap;">${errorMatch[1].trim()}...</pre>
+            <div style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); padding: 12px; border-radius: 6px; color: #ef4444; margin-top: 10px; font-family: monospace;">
+                🚨 <strong>Kritik Hata Detayı:</strong> <br><pre style="margin: 5px 0; font-size: 12px; white-space: pre-wrap;">${errorMatch[1].trim()}...</pre>
             </div>
         `;
     }
 
-    // 🎬 ZAMAN DAMGALI AKIŞ PARÇALAYICI
     let stepsHtml = "";
     let currentStepNum = 0;
     let currentStepLogs = [];
@@ -69,19 +71,13 @@ export const parseReportFile = (filePath) => {
 
     lines.forEach((line) => {
         const trimmedLine = line.trim();
-        
-        // Satırın bir zaman damgasıyla ve INFO ile başlayıp başlamadığını yakalayan Regex kuralı
-        // Örn: [2026-07-03 11:36:35.794 +0300] INFO: Extraction completed successfully
         const infoStepMatch = trimmedLine.match(/^\[.*?\]\s+INFO:\s*(.+)/i);
 
         if (infoStepMatch) {
-            // Eğer önceden birikmiş bir adım varsa onu rapora ekle
             if (currentStepNum > 0 && currentStepLogs.length > 0) {
                 stepsHtml += buildAccordionHtml(currentStepNum, currentStepTitle, currentStepLogs, isBackupAgentTriggered);
             }
-            
             currentStepNum++;
-            // Başlık olarak doğrudan INFO:'dan sonra gelen o anlamlı açıklamayı alıyoruz
             currentStepTitle = infoStepMatch[1].trim();
             currentStepLogs = [];
             isBackupAgentTriggered = false;
@@ -93,23 +89,15 @@ export const parseReportFile = (filePath) => {
                 isBackupAgentTriggered = true;
             }
         } else {
-            // Eğer henüz hiçbir INFO satırına denk gelmediysek ama başta loglar varsa onları ilk adıma dahil etmek için ön hazırlık yapıyoruz
             currentStepNum = 1;
             currentStepTitle = "Test Başlangıç Aşaması ve Yapılandırma";
             currentStepLogs.push(line);
         }
     });
 
-    // Son kalan adımı da listeye ekle
     if (currentStepNum > 0 && currentStepLogs.length > 0) {
         stepsHtml += buildAccordionHtml(currentStepNum, currentStepTitle, currentStepLogs, isBackupAgentTriggered);
     }
 
-    return {
-        cardClass,
-        status,
-        summary,
-        infoHeaderHtml,
-        stepsHtml
-    };
+    return { cardClass, status, summary, infoHeaderHtml, stepsHtml };
 };

@@ -1,19 +1,52 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" class="dark">
 <head>
     <meta charset="UTF-8">
     <script src="https://cdn.tailwindcss.com"></script>
     <title>Test Raporları</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #09090b; color: #fafafa; }
+    </style>
 </head>
-<body class="bg-gray-50 py-10 px-4">
-    <div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg border-2 border-slate-300">
-        <div class="flex justify-between items-center mb-6 border-b-2 border-slate-100 pb-4">
-            <h1 class="text-2xl font-bold text-slate-800">📊 Test Raporları</h1>
-            <a href="/" class="bg-slate-200 text-slate-800 px-4 py-2 rounded-lg font-bold border-2 border-slate-300 hover:bg-slate-300 transition">← Dashboard'a Dön</a>
+<body class="min-h-screen flex flex-col">
+
+    <header className="h-14 border-b border-[rgba(255,255,255,0.08)] flex items-center px-6 gap-5 bg-[#09090b] z-20" style="height: 3.5rem; display: flex; align-items: center; padding-left: 1.5rem; padding-right: 1.5rem; gap: 1.25rem; border-b: 1px solid rgba(255,255,255,0.08);">
+        <div class="flex items-center gap-2.5" style="display: flex; align-items: center; gap: 0.625rem;">
+            <div class="w-7 h-7 rounded bg-[#3b82f6] flex items-center justify-center text-white font-bold" style="width: 1.75rem; height: 1.75rem; border-radius: 0.25rem; display: flex; align-items: center; justify-content: center;">🧪</div>
+            <span class="text-sm font-semibold tracking-tight">TestOps</span>
         </div>
-        <div class="container">
-            <!-- Rapor içeriği buraya dinamik eklenecek -->
+        <div style="width: 1px; height: 1.25rem; background-color: rgba(255,255,255,0.08);"></div>
+        <div class="text-xs font-mono text-muted-foreground px-2 py-1 border border-[rgba(255,255,255,0.08)] rounded bg-[#18181b]">
+            Auth Service <span class="text-[10px] text-yellow-400 font-mono px-1 border border-yellow-500/20 bg-yellow-500/10 rounded ml-1">staging</span>
         </div>
+        <div style="margin-left: auto;">
+            <span style="font-family: monospace; font-size: 10px; color: #71717a; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.08); border-radius: 4px;">v2.4.1</span>
+        </div>
+    </header>
+
+    <div class="flex flex-1" style="display: flex; flex: 1 1 0%;">
+        <aside class="w-48 bg-[#111113] p-4 flex flex-col gap-1" style="width: 12rem; border-r: 1px solid rgba(255,255,255,0.06); padding: 1rem; display: flex; flex-direction: column; gap: 0.125rem;">
+            <button onclick="window.location.href='/'" class="w-full text-left px-3 py-2 text-xs rounded font-medium text-[#a1a1aa] hover:text-[#fafafa] hover:bg-[#27272a] flex items-center gap-2">
+                🧪 Test Senaryoları
+            </button>
+            <button onclick="window.location.href='/api/scenarios/reports-panel'" class="w-full text-left px-3 py-2 text-xs rounded font-medium bg-[#3b82f6]/10 text-[#3b82f6] flex items-center gap-2">
+                📄 Raporlar
+            </button>
+        </aside>
+
+        <main class="flex-1 p-6 overflow-auto">
+            <div class="max-w-5xl mx-auto">
+                <div class="flex justify-between items-center mb-6 border-b border-[rgba(255,255,255,0.08)] pb-4">
+                    <div>
+                        <h1 class="text-sm font-semibold m-0">Test Raporları</h1>
+                        <p class="text-xs text-[#71717a] mt-0.5">Sistem logları ve LLM metrikleri</p>
+                    </div>
+                    <a href="/" class="bg-[#27272a] text-[#a1a1aa] px-4 py-2 rounded-lg text-xs font-bold border border-zinc-700 hover:text-[#fafafa] transition">← Dashboard'a Dön</a>
+                </div>
+                <div class="container">
+                    </div>
+            </div>
+        </main>
     </div>
 </body>
 </html>
