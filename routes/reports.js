@@ -62,4 +62,32 @@ router.get('/api/reports/detail', (req, res) => {
     });
 });
 
+// ─── 🆕 API: TEK BİR RAPORU HEM DİSKTEN HEM DB'DEN SİLME ───
+router.post('/api/reports/delete', (req, res) => {
+    const { id, logFileName } = req.body;
+    
+    if (!id || !logFileName) {
+        return res.status(400).json({ error: "id ve logFileName alanları zorunludur kanka!" });
+    }
+
+    // 1. Fiziksel .txt dosyasını diskten sil
+    const filePath = path.join(reportFolder, logFileName);
+    try {
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+    } catch (fsErr) {
+        console.warn("⚠️ Rapor dosyası diskten silinirken hata (veya zaten yoktu):", fsErr.message);
+    }
+
+    // 2. Satırı SQLite veritabanından temizle
+    const deleteQuery = `DELETE FROM reports WHERE id = ?`;
+    db.run(deleteQuery, [id], function(err) {
+        if (err) {
+            return res.status(500).json({ error: "Veritabanından silinemedi kanka", details: err.message });
+        }
+        return res.json({ success: true, message: "Rapor başarıyla arşivden uçuruldu!" });
+    });
+});
+
 export default router;

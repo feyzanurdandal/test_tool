@@ -133,6 +133,7 @@ exec(command, options, (error, stdout, stderr) => {
 });
 
 // 🗑️ Senaryo Silme - Proje Destekli
+// routes/scenarios.js içindeki /delete endpoint'inin güncel ve kesin hali
 router.post('/delete', (req, res) => {
     const { scenarioName, projectName } = req.body;
     const selectedProj = projectName || 'Auth Service';
@@ -140,11 +141,15 @@ router.post('/delete', (req, res) => {
     const sanitizedName = scenarioName.replace(/[^a-zA-Z0-9_-]/g, '');
     const filePath = path.join(baseScenariosFolder, selectedProj, `${sanitizedName}.json`);
 
-    if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        res.status(200).json({ status: "SUCCESS" });
-    } else {
-        res.status(404).json({ error: "Dosya bulunamadı" });
+    try {
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath); // Fiziksel JSON dosyasını siler
+            return res.status(200).json({ success: true, status: "SUCCESS" });
+        } else {
+            return res.status(404).json({ error: "Senaryo dosyası bulunamadı" });
+        }
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
     }
 });
 
