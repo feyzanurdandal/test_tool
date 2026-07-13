@@ -1,0 +1,13 @@
+{
+  "targetUrl": "https://obs.dpu.edu.tr/",
+  "steps": [
+    {
+      "type": "observe",
+      "instruction": "Find the button labeled 'Akademisyen Girişi'"
+    },
+    {
+      "type": "act",
+      "instruction": "Click the button labeled 'Akademisyen Girişi'"
+    }
+  ]
+}
