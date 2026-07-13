@@ -21,11 +21,12 @@ app.use('/api/scenarios', reportRoutes); // Rapor listesi /api/scenarios/api/rep
 /**
  * 🆕 OTOMATİK ÇEVİRİ VE KAYIT FONKSİYONU
  */
-export async function processAndSaveScenario(scenarioName, turkishInstructions, targetUrl) {
+export async function processAndSaveScenario(scenarioName, turkishInstructions, targetUrl, projectName) {
     const stagehandJson = await translateToStagehandJson(turkishInstructions, targetUrl);
     if (!stagehandJson) throw new Error("Gemini çevirisi başarısız oldu.");
     stagehandJson.targetUrl = targetUrl;
-    const dirPath = path.join(process.cwd(), CONSTANTS.SCENARIOS_FOLDER || 'scenarios');
+    const selectedProj = projectName || 'Proje Seçin';
+    const dirPath = path.join(process.cwd(), CONSTANTS.SCENARIOS_FOLDER || 'scenarios', selectedProj);
     if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
 
     const sanitizedName = scenarioName.replace(/[^a-zA-Z0-9_-]/g, '');

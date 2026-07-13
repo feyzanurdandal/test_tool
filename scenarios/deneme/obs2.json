@@ -1,0 +1,29 @@
+{
+  "targetUrl": "https://obs.dpu.edu.tr/",
+  "steps": [
+    {
+      "type": "observe",
+      "instruction": "Find the button labeled 'Öğrenci Girişi'"
+    },
+    {
+      "type": "act",
+      "instruction": "Click the button labeled 'Öğrenci Girişi'"
+    },
+    {
+      "type": "observe",
+      "instruction": "Find the text box under 'Öğrenci No'"
+    },
+    {
+      "type": "act",
+      "instruction": "Enter '202313211033' into the text box under 'Öğrenci No'"
+    },
+    {
+      "type": "observe",
+      "instruction": "Find the text box under 'şifre'"
+    },
+    {
+      "type": "act",
+      "instruction": "Enter 'feyza' into the text box under 'şifre'"
+    }
+  ]
+}

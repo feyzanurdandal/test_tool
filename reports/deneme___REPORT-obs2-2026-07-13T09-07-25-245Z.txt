@@ -1,0 +1,86 @@
+✅ [TEST SUCCESS] - obs2
+================
+
+> test-tool@1.0.0 test:ai-local
+> playwright test tests/ai-security.spec.ts
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+
+Running 1 test using 1 worker
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+
+◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+
+[1/1] [chromium] › tests\ai-security.spec.ts:104:1 › Yapay Zeka Test Otomasyonu
+[chromium] › tests\ai-security.spec.ts:104:1 › Yapay Zeka Test Otomasyonu
+[2026-07-13 12:07:09.061 +0300] INFO: Launching local browser
+    category: "init"
+
+
+[2026-07-13 12:07:10.325 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Click the button labeled 'Öğrenci Girişi'"
+    url: "https://obs.dpu.edu.tr/"
+
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+[2026-07-13 12:07:16.995 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "action": {
+          "elementId": "2-10",
+          "description": "Textbox for 'Öğrenci No' where the user enters the student number",
+          "method": "fill",
+          "arguments": [
+            "202313211033"
+          ]
+        },
+        "twoStep": false
+      },
+      "usage": {
+        "inputTokens": 1533,
+        "outputTokens": 47,
+        "totalTokens": 1580,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+[2026-07-13 12:07:21.524 +0300] INFO: response
+    category: "aisdk"
+    response: {
+      "object": {
+        "action": {
+          "elementId": "2-12",
+          "description": "Text box for entering the password (Şifre)",
+          "method": "fill",
+          "arguments": [
+            "feyza"
+          ]
+        },
+        "twoStep": false
+      },
+      "usage": {
+        "inputTokens": 1544,
+        "outputTokens": 40,
+        "totalTokens": 1584,
+        "reasoningTokens": 0,
+        "cachedInputTokens": 0
+      },
+      "finishReason": "stop"
+    }
+
+
+  1 passed (22.8s)
