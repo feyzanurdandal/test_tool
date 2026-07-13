@@ -1,0 +1,30 @@
+✅ [TEST SUCCESS] - obs3
+================
+
+> test-tool@1.0.0 test:ai-local
+> playwright test tests/ai-security.spec.ts
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+
+Running 1 test using 1 worker
+
+***Playwright Altyapısı Başlatıldı | Aktif Mod: UI
+
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+
+[1/1] [chromium] › tests\ai-security.spec.ts:104:1 › Yapay Zeka Test Otomasyonu
+[chromium] › tests\ai-security.spec.ts:104:1 › Yapay Zeka Test Otomasyonu
+[2026-07-13 16:23:02.754 +0300] INFO: Launching local browser
+    category: "init"
+
+
+⏳ Sayfa geçişi için kısa duraklama (2sn)...
+
+[2026-07-13 16:23:04.037 +0300] INFO: act cache hit
+    category: "cache"
+    instruction: "Click the button labeled 'Akademisyen Girişi'"
+    url: "https://obs.dpu.edu.tr/"
+
+
+  1 passed (8.1s)
