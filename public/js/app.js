@@ -114,13 +114,46 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 });
 
-                // B. TESTİ KOŞTUR BUTONLARI (Run Buttons - Şimdilik Boş Şablon kanka)
+                
+                // B. TESTİ KOŞTUR BUTONLARI (Playwright Tetikleyici Canavar 🔒)
                 const runButtons = document.querySelectorAll(".run-single-btn");
                 runButtons.forEach(btn => {
                     btn.addEventListener("click", async () => {
                         const scenarioName = btn.getAttribute("data-name");
-                        alert(`🚀 "${scenarioName}" testi birazdan koşturulacak! Altyapıyı hazırlıyoruz...`);
-                        // Buraya az sonra Playwright backend tetikleyicisini yazıp bağlayacağız kanka!
+                        const selectedProjName = projectDropdown.value;
+
+                        // Butonun o anki durumunu kilitleyip yükleniyor yapalım kanka
+                        const originalHtml = btn.innerHTML;
+                        btn.disabled = true;
+                        btn.innerHTML = `<span class="text-amber-400 animate-pulse">Koşturuluyor...</span>`;
+
+                        try {
+                            console.log(`🚀 "${scenarioName}" testi başlatıldı kanka...`);
+                            
+                            const res = await fetch("/api/scenarios/run", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    scenarioName,
+                                    projectName: selectedProjName
+                                })
+                            });
+
+                            const result = await res.json();
+                            
+                            if (res.ok && result.success) {
+                                alert(`🎉 Başarılı! "${scenarioName}" testi Playwright ile başarıyla çalıştırıldı ve tamamlandı!`);
+                            } else {
+                                alert(`❌ Test Başarısız: ${result.error || "Bilinmeyen bir hata oluştu."}\nDetay: ${result.details || ""}`);
+                            }
+                        } catch (err) {
+                            console.error("Test çalıştırma isteğinde hata patladı:", err);
+                            alert("❌ Sunucu bağlantı hatası! Playwright çalıştırılamadı.");
+                        } finally {
+                            // Butonu eski şık haline geri döndürüyoruz kanka
+                            btn.disabled = false;
+                            btn.innerHTML = originalHtml;
+                        }
                     });
                 });
 

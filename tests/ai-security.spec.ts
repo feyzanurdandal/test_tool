@@ -108,8 +108,8 @@ test('Yapay Zeka Test Otomasyonu', async () => {
     const scenarioName = process.env.SCENARIO_NAME || 'ai-prompts';
     
     const projectContext = process.env.PROJECT_CONTEXT ? `${process.env.PROJECT_CONTEXT}/` : '';
-    const promptFilePath = path.resolve(__dirname, `../scenarios/${projectContext}${scenarioName}.json`);
-    
+    const promptFilePath = path.join(process.cwd(), 'cache', 'runtime_steps.json');
+
     if (!fs.existsSync(promptFilePath)) {
         throw new Error(`🚨 Test dosyası belirtilen proje klasöründe bulunamadı: ${promptFilePath}`);
     }

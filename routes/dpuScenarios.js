@@ -1,10 +1,12 @@
 import express from 'express';
 import { exec } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 import dpu from '../config/dpuService.js';
 import { CONSTANTS } from '../config/constants.js';
 // routes/dpuScenarios.js dosyasının en üstündeki importlar arasına ekle kanka:
 import { translateScenario } from '../server.js';
+
 
 const router = express.Router();
 const reportFolder = path.join(process.cwd(), CONSTANTS.REPORTS_FOLDER || 'reports');
@@ -295,6 +297,100 @@ router.post('/delete', async (req, res) => {
 
     } catch (error) {
         console.error("💥 Silme işleminde hata patladı:", error.message);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// ─── 🚀 5. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA (EXEC RUNNER) ───
+router.post('/run', async (req, res) => {
+    const { scenarioName, projectName } = req.body;
+    const selectedProj = (projectName || '').trim();
+
+    if (!scenarioName || !selectedProj) {
+        return res.status(400).json({ error: "Eksik parametre var kanka! Proje veya senaryo adı gelmedi." });
+    }
+
+    try {
+        console.log(`=========================================`);
+        console.log(`🚀 PLAYWRIGHT TEST ÇALIŞTIRMA İSTEĞİ GELDİ!`);
+        console.log(`Senaryo: "${scenarioName}" | Proje: "${selectedProj}"`);
+
+        // 1. DPU Base'den projenin ID'sini alıyoruz
+        const projectRes = await dpu.select('projeler', 100);
+        if (!projectRes.success || !projectRes.data) {
+            return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
+        }
+        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
+        if (!foundProj) {
+            return res.status(404).json({ error: "İlgili proje bulunamadı." });
+        }
+        const projectId = foundProj.id;
+
+        // 2. Senaryolar tablosundan adımları (adimlar) çekiyoruz kanka
+        const scenariosRes = await dpu.select('senaryolar', 100);
+        if (!scenariosRes.success || !scenariosRes.data) {
+            return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
+        }
+
+        const foundScenario = scenariosRes.data.find(s => 
+            String(s.project_id) === String(projectId) && 
+            s.senaryo_adi === scenarioName
+        );
+
+        if (!foundScenario) {
+            return res.status(404).json({ error: "Çalıştırılacak senaryo bulutta bulunamadı." });
+        }
+
+        // Adımları alıyoruz (Stagehand JSON instruct verileri)
+        const rawSteps = foundScenario.adimlar; // ⚠️ Kolon adı 'adimlar'
+        console.log(`📦 Çekilen Ham Adımlar:`, rawSteps);
+
+        // 3. Playwright testinin okuyabilmesi için adımları geçici bir dosyaya yazıyoruz kanka
+        const cacheDir = path.join(process.cwd(), 'cache');
+        if (!fs.existsSync(cacheDir)) {
+            fs.mkdirSync(cacheDir, { recursive: true });
+        }
+        
+        const runtimeStepsPath = path.join(cacheDir, 'runtime_steps.json');
+        
+        // Eğer veritabanından string geldiyse doğrudan yaz, nesneyse string'e çevir kanka
+        const stepsString = typeof rawSteps === 'string' ? rawSteps : JSON.stringify(rawSteps, null, 2);
+        fs.writeFileSync(runtimeStepsPath, stepsString, 'utf-8');
+        console.log(`💾 Geçici test adımları yazıldı: ${runtimeStepsPath}`);
+
+        // 4. Playwright'ı arka planda tetikliyoruz! (Headless/Arka planda koşturacak şekilde kanka)
+        console.log(`🔥 Playwright motoru ateşleniyor...`);
+        
+        // npx playwright test komutunu koşturuyoruz
+        // tests/ai-security.spec.ts dosyanı hedef alıyoruz kanka
+        exec('npx playwright test tests/ai-security.spec.ts', (error, stdout, stderr) => {
+            console.log(`--- Playwright Çıktısı (STDOUT) --- \n${stdout}`);
+            if (stderr) {
+                console.error(`--- Playwright Hata Çıktısı (STDERR) --- \n${stderr}`);
+            }
+
+            if (error) {
+                console.error(`❌ Test başarısız bitti kanka:`, error.message);
+                // Test patlarsa arayüze hata durumunu dönüyoruz
+                return res.status(500).json({ 
+                    success: false, 
+                    error: "Test koşturulurken bir hata patladı!", 
+                    details: error.message,
+                    output: stdout 
+                });
+            }
+
+            console.log(`✅ Test başarıyla tamamlandı!`);
+            console.log(`=========================================`);
+            return res.status(200).json({ 
+                success: true, 
+                message: "Test başarıyla koşturuldu ve tamamlandı!",
+                output: stdout
+            });
+        });
+
+    } catch (error) {
+        console.error("💥 Test koşturma endpoint'inde büyük hata:", error.message);
         return res.status(500).json({ error: error.message });
     }
 });
