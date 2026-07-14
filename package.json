@@ -24,6 +24,7 @@
     "@google/generative-ai": "^0.24.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "node-fetch": "^3.3.2",
     "playwright-core": "^1.61.1",
     "sqlite3": "^6.0.1",
     "zod": "^4.4.3"
