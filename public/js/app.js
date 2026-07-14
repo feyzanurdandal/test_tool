@@ -75,6 +75,55 @@ document.addEventListener("DOMContentLoaded", () => {
                     `;
                     scenariosList.appendChild(row);
                 });
+                // 🔒 TABLODAKİ DİNAMİK BUTONLARIN ETKİNLİK DİNLEYİCİLERİ 🔒
+
+                // A. SİLME BUTONLARI (Delete Buttons)
+                const deleteButtons = document.querySelectorAll(".delete-scenario-btn");
+                deleteButtons.forEach(btn => {
+                    btn.addEventListener("click", async () => {
+                        const scenarioName = btn.getAttribute("data-name");
+                        const selectedProjName = projectDropdown.value;
+                        
+                        // Kullanıcıya emin olup olmadığını soralım kanka, kaza olmasın
+                        const confirmDelete = confirm(`"${scenarioName}" senaryosunu silmek istediğine emin misin kanka?`);
+                        if (!confirmDelete) return;
+
+                        try {
+                            btn.disabled = true;
+                            const res = await fetch("/api/scenarios/delete", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    scenarioName,
+                                    projectName: selectedProjName
+                                })
+                            });
+
+                            const result = await res.json();
+                            if (res.ok && result.success) {
+                                alert("🗑️ Senaryo başarıyla buluttan silindi!");
+                                await loadScenarios(); // Tabloyu tazeleyelim kanka
+                            } else {
+                                alert(`❌ Silinemedi: ${result.error || "Hata oluştu"}`);
+                                btn.disabled = false;
+                            }
+                        } catch (err) {
+                            console.error("Silme isteğinde hata patladı:", err);
+                            btn.disabled = false;
+                        }
+                    });
+                });
+
+                // B. TESTİ KOŞTUR BUTONLARI (Run Buttons - Şimdilik Boş Şablon kanka)
+                const runButtons = document.querySelectorAll(".run-single-btn");
+                runButtons.forEach(btn => {
+                    btn.addEventListener("click", async () => {
+                        const scenarioName = btn.getAttribute("data-name");
+                        alert(`🚀 "${scenarioName}" testi birazdan koşturulacak! Altyapıyı hazırlıyoruz...`);
+                        // Buraya az sonra Playwright backend tetikleyicisini yazıp bağlayacağız kanka!
+                    });
+                });
+
                 lucide.createIcons();
             } else {
                 scenarioCountLabel.textContent = "0";

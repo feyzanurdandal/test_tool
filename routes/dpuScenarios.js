@@ -61,7 +61,7 @@ router.post('/projects/create', async (req, res) => {
     }
 });
 
-// ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME ───
+
 // ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME ───
 router.get('/list', async (req, res) => {
     const { project } = req.query;
@@ -153,36 +153,6 @@ router.get('/content', async (req, res) => {
     }
 });
 
-// ─── 5. API: SENARYO SİLME ───
-router.post('/delete', async (req, res) => {
-    const { scenarioName, projectName } = req.body;
-    const selectedProj = projectName || 'Varsayılan Proje';
-
-    try {
-        // 1. Projenin ID'sini bulalım
-        const projectRes = await dpu.select('projeler', 1, `proje_adi:eq:${selectedProj}`);
-        if (!projectRes.success || projectRes.data.length === 0) {
-            return res.status(404).json({ error: "Proje bulunamadı." });
-        }
-        const projectId = projectRes.data[0].id;
-
-        // 2. İlgili senaryoyu bulalım
-        const scenarioRes = await dpu.select('senaryolar', 1, `project_id:eq:${projectId}&senaryo_adi:eq:${scenarioName}`);
-        if (scenarioRes.success && scenarioRes.data.length > 0) {
-            const scenarioId = scenarioRes.data[0].id;
-            
-            // 3. Bulunan senaryo ID'sini DPU Base'den silelim
-            const deleteRes = await dpu.delete('senaryolar', scenarioId);
-            if (deleteRes.success) {
-                return res.status(200).json({ success: true, status: "SUCCESS" });
-            }
-        }
-        return res.status(404).json({ error: "Senaryo dosyası veritabanında bulunamadı" });
-    } catch (error) {
-        return res.status(500).json({ error: error.message });
-    }
-});
-
 // ─── 💾 5. API: SENARYO KAYDETME VE GERÇEK GEMINI ÇEVİRİSİ (DPU BASE) ───
 router.post('/create-and-save', async (req, res) => {
     const { scenarioName, turkishInstructions, targetUrl, projectName } = req.body;
@@ -260,6 +230,71 @@ router.post('/create-and-save', async (req, res) => {
 
     } catch (error) {
         console.error("💥 Senaryo kaydında büyük hata patladı:", error.message);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+
+// ─── 🗑️ 4. API: SENARYO SİLME (DPU BASE) ───
+router.post('/delete', async (req, res) => {
+    const { scenarioName, projectName } = req.body;
+    const selectedProj = (projectName || '').trim();
+
+    if (!scenarioName || !selectedProj) {
+        return res.status(400).json({ error: "Eksik parametre var kanka! Proje veya senaryo adı gelmedi." });
+    }
+
+    try {
+        console.log(`=========================================`);
+        console.log(`🗑️ SİLME İSTEĞİ GELDİ!`);
+        console.log(`Gelen Proje Adı: "${selectedProj}" | Senaryo: "${scenarioName}"`);
+
+        // 1. Projeleri çekip kod tarafında eşleştiriyoruz
+        const projectRes = await dpu.select('projeler', 100);
+        if (!projectRes.success || !projectRes.data) {
+            return res.status(500).json({ error: "Buluttan projeler tablosuna erişilemedi." });
+        }
+
+        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
+        if (!foundProj) {
+            console.log(`❌ HATA: "${selectedProj}" isimli proje bulunamadı.`);
+            return res.status(404).json({ error: "Proje bulunamadı." }); // 💥 Arayüzdeki hata mesajı
+        }
+        const projectId = foundProj.id;
+        console.log(`🎯 Bulunan Proje ID: ${projectId}`);
+
+        // 2. Senaryoyu bulalım
+        const scenariosRes = await dpu.select('senaryolar', 100);
+        if (!scenariosRes.success || !scenariosRes.data) {
+            return res.status(500).json({ error: "Buluttan senaryolar tablosuna erişilemedi." });
+        }
+
+        const foundScenario = scenariosRes.data.find(s => 
+            String(s.project_id) === String(projectId) && 
+            s.senaryo_adi === scenarioName
+        );
+
+        if (!foundScenario) {
+            return res.status(404).json({ error: "Silinecek senaryo bulunamadı kanka." });
+        }
+
+        const scenarioId = foundScenario.id;
+        console.log(`🎯 Silinecek Senaryo ID: ${scenarioId}`);
+
+        // 3. DPU Base'den silme işlemi
+        const deleteResult = await dpu.delete('senaryolar', scenarioId);
+
+        if (deleteResult.success) {
+            console.log(`✅ Senaryo "${scenarioName}" başarıyla buluttan uçuruldu.`);
+            console.log(`=========================================`);
+            return res.status(200).json({ success: true, message: "Senaryo başarıyla silindi!" });
+        } else {
+            console.error("❌ Silme işlemi başarısız:", deleteResult);
+            return res.status(500).json({ error: "Silme işlemi başarısız.", details: deleteResult });
+        }
+
+    } catch (error) {
+        console.error("💥 Silme işleminde hata patladı:", error.message);
         return res.status(500).json({ error: error.message });
     }
 });
