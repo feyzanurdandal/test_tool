@@ -453,4 +453,119 @@ router.get('/reports/list', async (req, res) => {
     }
 });
 
+// ─── ⚡ 7. API: SIRALI TOPLU TEST KOŞTURMA (BATCH PIPELINE RUNNER) ───
+router.post('/run-batch', async (req, res) => {
+    const { scenarioNames, projectName } = req.body;
+    const selectedProj = (projectName || '').trim();
+
+    if (!scenarioNames || !Array.isArray(scenarioNames) || scenarioNames.length === 0 || !selectedProj) {
+        return res.status(400).json({ error: "Eksik veya hatalı parametre kanka!" });
+    }
+
+    try {
+        console.log(`=========================================`);
+        console.log(`⚡ TOPLU TEST KUYRUĞU BAŞLATILDI!`);
+        console.log(`Proje: "${selectedProj}" | Kuyruk Sırası:`, scenarioNames);
+
+        // 1. Projenin ID'sini bulalım
+        const projectRes = await dpu.select('projeler', 100);
+        if (!projectRes.success || !projectRes.data) {
+            return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
+        }
+        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
+        if (!foundProj) {
+            return res.status(404).json({ error: "İlgili proje bulunamadı." });
+        }
+        const projectId = foundProj.id;
+
+        // 2. Senaryolar tablosundan projeye ait tüm senaryoları çekelim
+        const scenariosRes = await dpu.select('senaryolar', 100);
+        if (!scenariosRes.success || !scenariosRes.data) {
+            return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
+        }
+
+        // Kuyruktaki senaryoların detaylarını tek tek hazırlayalım
+        const batchScenarios = [];
+        scenarioNames.forEach(name => {
+            const found = scenariosRes.data.find(s => 
+                String(s.project_id) === String(projectId) && 
+                s.senaryo_adi === name
+            );
+            if (found) {
+                batchScenarios.push(found);
+            }
+        });
+
+        if (batchScenarios.length === 0) {
+            return res.status(404).json({ error: "Kuyruktaki hiçbir senaryo veritabanında bulunamadı!" });
+        }
+
+        // 3. Sıralı Çocuk Proses Tetikleme Fonksiyonu (Helper)
+        const runSingleTestPromise = (scenario) => {
+            return new Promise((resolve) => {
+                const rawSteps = scenario.adimlar;
+                const cacheDir = path.join(process.cwd(), 'cache');
+                if (!fs.existsSync(cacheDir)) {
+                    fs.mkdirSync(cacheDir, { recursive: true });
+                }
+                
+                const runtimeStepsPath = path.join(cacheDir, 'runtime_steps.json');
+                const stepsString = typeof rawSteps === 'string' ? rawSteps : JSON.stringify(rawSteps, null, 2);
+                
+                // 🔒 Geçici dosyaya sıradaki testin adımlarını mühürlüyoruz
+                fs.writeFileSync(runtimeStepsPath, stepsString, 'utf-8');
+                console.log(`[Batch] "${scenario.senaryo_adi}" geçici adımları yazıldı.`);
+
+                console.log(`[Batch] Playwright "${scenario.senaryo_adi}" için tetikleniyor...`);
+                
+                exec('npx playwright test tests/ai-security.spec.ts', async (error, stdout, stderr) => {
+                    const isSuccess = !error;
+                    const nowIso = new Date().toISOString();
+
+                    // Raporu DPU Base'e yazalım
+                    const reportData = {
+                        project_id: projectId,
+                        scenario_name: scenario.senaryo_adi,
+                        status: isSuccess ? "SUCCESS" : "FAILED",
+                        log_content: stdout + (stderr ? `\n--- Hatalar ---\n${stderr}` : ''),
+                        created_at: nowIso
+                    };
+
+                    try {
+                        await dpu.insert('raporlar', reportData);
+                        console.log(`[Batch] ✅ "${scenario.senaryo_adi}" raporu mühürlendi.`);
+                    } catch (dbErr) {
+                        console.error(`[Batch] ⚠️ Rapor yazma hatası:`, dbErr.message);
+                    }
+
+                    resolve({ scenarioName: scenario.senaryo_adi, success: isSuccess });
+                });
+            });
+        };
+
+        // 4. Kuyruğu asenkron sırayla (Sequential) koşturuyoruz kanka!
+        // Express isteğini bloklamamak için testi arka planda asenkron çalıştıracağız
+        res.status(202).json({ 
+            success: true, 
+            message: "Toplu test pipeline akışı arka planda başlatıldı! Sonuçları Raporlar sekmesinden takip edebilirsin kanka." 
+        });
+
+        // Arka plan sıralı döngüsü:
+        (async () => {
+            for (const scenario of batchScenarios) {
+                console.log(`\n➡️ Pipeline Sıradaki Test: "${scenario.senaryo_adi}"`);
+                await runSingleTestPromise(scenario);
+            }
+            console.log(`\n⚡ BATCH PIPELINE BAŞARIYLA TAMAMLANDI!`);
+            console.log(`=========================================`);
+        })();
+
+    } catch (error) {
+        console.error("💥 Toplu test endpoint'inde hata:", error.message);
+        if (!res.headersSent) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+});
+
 export default router;
