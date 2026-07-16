@@ -11,7 +11,7 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
     let chosenModel = "gemini-3.1-flash-lite";
     let apiKey = process.env.GEMINI_API_KEY;
 
-    // 2. Ayarları DPU Base'den tek sorgu ile çekiyoruz kanka! 🔒
+    // 2. Ayarları DPU Base'den tek sorgu ile çekiyoruz ! 🔒
     try {
         console.log("🔄 [Translator Gateway] Aktif sağlayıcı DPU Base'den sorgulanıyor...");
         
@@ -23,7 +23,7 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
             
             console.log(`🎯 [Translator Gateway] Aktif Çeviri Sağlayıcısı: ${chosenApi}. Key ve Model tek satırdan yükleniyor...`);
             
-            // 🌟 Seçilen sağlayıcının satırını nokta atışı tek seferde çekiyoruz kanka!
+            // 🌟 Seçilen sağlayıcının satırını nokta atışı tek seferde çekiyoruz !
             const providerRes = await dpu.select('ayarlar', 1, `ayar_anahtar:eq:${chosenApi}`);
 
             if (providerRes.success && providerRes.data.length > 0) {
@@ -96,7 +96,7 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
                 }
             };
 
-            // 🌟 Standart dışı yanıt formatlarını ezmek için doğrudan fetch atıyoruz kanka!
+            // 🌟 Standart dışı yanıt formatlarını ezmek için doğrudan fetch atıyoruz !
             const response = await fetch(dpuAiUrl, {
                 method: "POST",
                 headers: {
@@ -114,7 +114,7 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
             const data = await response.json();
             console.log("📦 DPU Sunucusundan Gelen Ham Yanıt:", JSON.stringify(data));
 
-            // 🎯 Akıllı Yanıt Çözümleyici kanka:
+            // 🎯 Akıllı Yanıt Çözümleyici :
             if (data.message && data.message.content) {
                 // Ollama / DPU AI standart formatı 🔒
                 textResult = data.message.content;

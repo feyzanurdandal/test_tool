@@ -243,7 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // 📊 DPU Base'den Raporları Çekip İç İçe Akordeon Yapan Fonksiyon (Silme Özellikli) kanka! 🔒
+    // 📊 DPU Base'den Raporları Çekip İç İçe Akordeon Yapan Fonksiyon (Silme Özellikli)! 🔒
     async function loadReports() {
         const reportsEmpty = document.getElementById("reports-empty");
         const accordionContainer = document.getElementById("reports-list-accordion");
@@ -381,12 +381,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     const chevron = card.querySelector(".chevron-icon");
                     const deleteReportBtn = card.querySelector(".delete-report-btn");
 
-                    // Rapor Silme Olayı kanka! 🔒
+                    // Rapor Silme Olayı! 🔒
                     deleteReportBtn.addEventListener("click", async (e) => {
                         e.stopPropagation(); // Butona tıklayınca akordeon açılmasın, kilit!
                         const reportId = deleteReportBtn.getAttribute("data-id");
 
-                        const confirmDelete = confirm(`Bu test raporunu kalıcı olarak silmek istediğinize emin misiniz kanka?`);
+                        const confirmDelete = confirm(`Bu test raporunu kalıcı olarak silmek istediğinize emin misiniz?`);
                         if (!confirmDelete) return;
 
                         try {
@@ -604,10 +604,32 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+// Rol bazlı yetkilendirme (ADMIN / PM) 
     async function showDashboard(user) {
         loginView.classList.add("hidden");
         appView.classList.remove("hidden");
         userBadge.textContent = `${user.username.toUpperCase()} (${user.role})`;
+
+        // Rol Elementlerini Yakala 
+        const addProjectBtn = document.getElementById("add-project-btn");
+        const settingsNavBtn = document.querySelector('[data-target="view-settings"]');
+
+        if (user.role === "PM") {
+            if (addProjectBtn) addProjectBtn.classList.add("hidden");
+            if (settingsNavBtn) settingsNavBtn.classList.add("hidden");
+
+            // Eğer kazara ayarlar ekranında kaldıysa, senaryolar ekranına zorla yönlendiriyoruz
+            const settingsView = document.getElementById("view-settings");
+            if (settingsView && !settingsView.classList.contains("hidden")) {
+                const scenariosNavBtn = document.querySelector('[data-target="view-scenarios"]');
+                if (scenariosNavBtn) scenariosNavBtn.click();
+            }
+        } else {
+            // ADMIN ise her yeri aslanlar gibi açıyoruz 
+            if (addProjectBtn) addProjectBtn.classList.remove("hidden");
+            if (settingsNavBtn) settingsNavBtn.classList.remove("hidden");
+        }
+
         await loadProjects(); 
     }
 
@@ -641,6 +663,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     navButtons.forEach(btn => {
         btn.addEventListener("click", () => {
+            // Güvenlik Önlemi: PM eğer bir şekilde Ayarlar butonuna basmaya çalışırsa engelliyoruz
+            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+            const targetViewId = btn.getAttribute("data-target");
+
+            if (targetViewId === "view-settings" && userSession.role === "PM") {
+                alert("⚠️ Bu alana erişim yetkiniz bulunmamaktadır!");
+                return;
+            }
+
             navButtons.forEach(b => {
                 b.classList.remove("text-[#3b82f6]", "bg-[#3b82f6]/10");
                 b.classList.add("text-zinc-400", "hover:bg-[#18181b]");
@@ -648,19 +679,54 @@ document.addEventListener("DOMContentLoaded", () => {
             btn.classList.add("text-[#3b82f6]", "bg-[#3b82f6]/10");
             btn.classList.remove("text-zinc-400", "hover:bg-[#18181b]");
 
-            const targetViewId = btn.getAttribute("data-target");
             views.forEach(v => v.classList.add("hidden"));
             document.getElementById(targetViewId).classList.remove("hidden");
         });
     });
 
     addProjectBtn.addEventListener("click", () => {
+        // Son bir UI güvenlik kilidi
+        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+        if (userSession.role === "PM") {
+            alert("⚠️ Proje oluşturma yetkiniz bulunmamaktadır!");
+            return;
+        }
         newProjectNameInput.value = "";
         projectModal.classList.remove("hidden");
         newProjectNameInput.focus();
     });
 
     closeProjectModal.addEventListener("click", () => projectModal.classList.add("hidden"));
+
+    saveProjectBtn.addEventListener("click", async () => {
+        const projectName = newProjectNameInput.value.trim();
+        if (!projectName) return alert("Proje adı boş olamaz.");
+
+        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
+        try {
+            const res = await fetch("/api/scenarios/projects/create", {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "X-User-Role": userSession.role || "PM" // 🌟 Backend'e rolü fırlatıyoruz!
+                },
+                body: JSON.stringify({ projectName })
+            });
+            const result = await res.json();
+            if (result.success) {
+                projectModal.classList.add("hidden");
+                await loadProjects();
+                projectDropdown.value = result.projectName;
+                currentProject = result.projectName;
+                updateProjectLabels();
+            } else {
+                alert(result.error || "Proje oluşturulamadı.");
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    });
 
     saveProjectBtn.addEventListener("click", async () => {
         const projectName = newProjectNameInput.value.trim();
@@ -959,11 +1025,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 translatorApi: document.getElementById("setting-translator-api").value,
                 apiKeys
             };
-
+            
+            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
             try {
                 const res = await fetch("/api/scenarios/settings/save", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { 
+                        "Content-Type": "application/json", 
+                        "X-User-Role": userSession.role || "PM"
+                    },
                     body: JSON.stringify(payload)
                 });
 

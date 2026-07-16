@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import dpu from '../config/dpuService.js';
 import { CONSTANTS } from '../config/constants.js';
-// routes/dpuScenarios.js dosyasının en üstündeki importlar arasına ekle kanka:
+// routes/dpuScenarios.js dosyasının en üstündeki importlar arasına ekle :
 import { translateScenario } from '../server.js';
 
 
@@ -13,7 +13,7 @@ const reportFolder = path.join(process.cwd(), CONSTANTS.REPORTS_FOLDER || 'repor
 
 // ─── 1. API: PROJELERİ LİSTELEME ───
 // Eskiden diskteki 'scenarios' klasörünün içindeki dizinleri okuyorduk.
-// Artık doğrudan DPU Base 'projeler' tablosundan çekiyoruz kanka!
+// Artık doğrudan DPU Base 'projeler' tablosundan çekiyoruz !
 router.get('/projects/list', async (req, res) => {
     try {
         const result = await dpu.select('projeler');
@@ -38,20 +38,24 @@ router.get('/projects/list', async (req, res) => {
 
 // ─── 2. API: YENİ PROJE OLUŞTURMA (Sadece Sistem Yöneticisi yetkisinde olacak) ───
 router.post('/projects/create', async (req, res) => {
+    const userRole = req.headers['x-user-role']; // Gelen rolü yakalıyoruz 
+
+    if (userRole !== 'ADMIN') {
+        return res.status(403).json({ error: "Bu işlem için yetkiniz yok ! Sadece ADMIN yeni proje ekleyebilir." });
+    }
+
     const { projectName } = req.body;
-    if (!projectName) return res.status(400).json({ error: "Proje adı boş olamaz kanka!" });
+    if (!projectName) return res.status(400).json({ error: "Proje adı boş olamaz !" });
 
     const sanitizedProjName = projectName.replace(/[^a-zA-Z0-9\s_-]/g, '').trim();
     if (!sanitizedProjName) return res.status(400).json({ error: "Geçersiz proje adı!" });
 
     try {
-        // Öncelikle bu isimde bir proje var mı diye kontrol edelim
         const checkExist = await dpu.select('projeler', 100, `proje_adi:eq:${sanitizedProjName}`);
         if (checkExist.success && checkExist.data.length > 0) {
             return res.status(400).json({ error: "Bu isimde bir proje zaten mevcut!" });
         }
 
-        // DPU Base 'projeler' tablosuna yeni satır ekliyoruz
         const result = await dpu.insert('projeler', { proje_adi: sanitizedProjName });
         if (result.success) {
             return res.json({ success: true, projectName: sanitizedProjName });
@@ -75,7 +79,7 @@ router.get('/list', async (req, res) => {
 
     try {
         console.log(`=========================================`);
-        console.log(`🔍 LİSTELEME SORGUSU BAŞLADI kanka!`);
+        console.log(`🔍 LİSTELEME SORGUSU BAŞLADI !`);
         console.log(`Aranan Proje Adı: "${selectedProj}"`);
         
         // 1. Önce projeleri buluttan çekelim
@@ -100,7 +104,7 @@ router.get('/list', async (req, res) => {
         if (scenariosRes.success && scenariosRes.data) {
             console.log(`📂 Toplam Senaryo Kayıt Sayısı: ${scenariosRes.data.length}`);
             
-            // Proje ID'sine göre filtreleme yapıyoruz kanka
+            // Proje ID'sine göre filtreleme yapıyoruz 
             const filteredScenarios = scenariosRes.data
                 .filter(s => {
                     // Veritabanındaki project_id ve bizim bulduğumuz ID eşleşiyor mu kontrol ediyoruz
@@ -141,7 +145,7 @@ router.get('/content', async (req, res) => {
         if (scenarioRes.success && scenarioRes.data.length > 0) {
             const scenario = scenarioRes.data[0];
             
-            // Veritabanında JSON tipi string olarak saklanıyor olabilir, onu nesneye çeviriyoruz kanka
+            // Veritabanında JSON tipi string olarak saklanıyor olabilir, onu nesneye çeviriyoruz 
             const adimlarContent = typeof scenario.adimlar === 'string' 
                 ? JSON.parse(scenario.adimlar) 
                 : scenario.adimlar;
@@ -159,17 +163,17 @@ router.get('/content', async (req, res) => {
 router.post('/create-and-save', async (req, res) => {
     const { scenarioName, turkishInstructions, targetUrl, projectName } = req.body;
     
-    // Gelen proje adını temizleyip boşluklarını alıyoruz kanka
+    // Gelen proje adını temizleyip boşluklarını alıyoruz 
     const selectedProj = (projectName || 'Varsayılan Proje').trim();
 
     if (!scenarioName || !turkishInstructions || !targetUrl) {
-        return res.status(400).json({ error: "Eksik alanlar var kanka!" });
+        return res.status(400).json({ error: "Eksik alanlar var !" });
     }
 
     try {
         console.log(`🔍 DPU Base: "${selectedProj}" isimli proje sorgulanıyor...`);
         
-        // 1. Adım: Projeleri listeyip kod tarafında eşleştirme yapıyoruz (Filtreleme hatasını bypass etmek için en garanti yol kanka)
+        // 1. Adım: Projeleri listeyip kod tarafında eşleştirme yapıyoruz (Filtreleme hatasını bypass etmek için en garanti yol )
         const allProjectsRes = await dpu.select('projeler', 100);
         let projectId = null;
 
@@ -188,7 +192,7 @@ router.post('/create-and-save', async (req, res) => {
             if (fallbackRes.success && fallbackRes.data.length > 0) {
                 projectId = fallbackRes.data[0].id;
             } else {
-                return res.status(404).json({ error: "Veritabanında hiç proje tanımlı değil kanka!" });
+                return res.status(404).json({ error: "Veritabanında hiç proje tanımlı değil !" });
             }
         }
 
@@ -243,7 +247,7 @@ router.post('/delete', async (req, res) => {
     const selectedProj = (projectName || '').trim();
 
     if (!scenarioName || !selectedProj) {
-        return res.status(400).json({ error: "Eksik parametre var kanka! Proje veya senaryo adı gelmedi." });
+        return res.status(400).json({ error: "Eksik parametre var ! Proje veya senaryo adı gelmedi." });
     }
 
     try {
@@ -277,7 +281,7 @@ router.post('/delete', async (req, res) => {
         );
 
         if (!foundScenario) {
-            return res.status(404).json({ error: "Silinecek senaryo bulunamadı kanka." });
+            return res.status(404).json({ error: "Silinecek senaryo bulunamadı ." });
         }
 
         const scenarioId = foundScenario.id;
@@ -307,7 +311,7 @@ router.post('/run', async (req, res) => {
     const selectedProj = (projectName || '').trim();
 
     if (!scenarioName || !selectedProj) {
-        return res.status(400).json({ error: "Eksik parametre var kanka! Proje veya senaryo adı gelmedi." });
+        return res.status(400).json({ error: "Eksik parametre var ! Proje veya senaryo adı gelmedi." });
     }
 
     try {
@@ -326,7 +330,7 @@ router.post('/run', async (req, res) => {
         }
         const projectId = foundProj.id;
 
-        // 2. Senaryolar tablosundan adımları (adimlar) çekiyoruz kanka
+        // 2. Senaryolar tablosundan adımları (adimlar) çekiyoruz 
         const scenariosRes = await dpu.select('senaryolar', 100);
         if (!scenariosRes.success || !scenariosRes.data) {
             return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
@@ -345,7 +349,7 @@ router.post('/run', async (req, res) => {
         const rawSteps = foundScenario.adimlar; // ⚠️ Kolon adı 'adimlar'
         console.log(`📦 Çekilen Ham Adımlar:`, rawSteps);
 
-        // 3. Playwright testinin okuyabilmesi için adımları geçici bir dosyaya yazıyoruz kanka
+        // 3. Playwright testinin okuyabilmesi için adımları geçici bir dosyaya yazıyoruz 
         const cacheDir = path.join(process.cwd(), 'cache');
         if (!fs.existsSync(cacheDir)) {
             fs.mkdirSync(cacheDir, { recursive: true });
@@ -353,12 +357,12 @@ router.post('/run', async (req, res) => {
         
         const runtimeStepsPath = path.join(cacheDir, 'runtime_steps.json');
         
-        // Eğer veritabanından string geldiyse doğrudan yaz, nesneyse string'e çevir kanka
+        // Eğer veritabanından string geldiyse doğrudan yaz, nesneyse string'e çevir 
         const stepsString = typeof rawSteps === 'string' ? rawSteps : JSON.stringify(rawSteps, null, 2);
         fs.writeFileSync(runtimeStepsPath, stepsString, 'utf-8');
         console.log(`💾 Geçici test adımları yazıldı: ${runtimeStepsPath}`);
 
-        // 4. Playwright'ı arka planda tetikliyoruz! (Headless/Arka planda koşturacak şekilde kanka)
+        // 4. Playwright'ı arka planda tetikliyoruz! (Headless/Arka planda koşturacak şekilde )
         // 4. Playwright'ı arka planda tetikliyoruz!
         console.log(`🔥 Playwright motoru ateşleniyor...`);
         
@@ -368,7 +372,7 @@ router.post('/run', async (req, res) => {
             const isSuccess = !error;
             const nowIso = new Date().toISOString();
 
-            // 📝 Rapor verisini hazırlıyoruz kanka
+            // 📝 Rapor verisini hazırlıyoruz 
             const reportData = {
                 project_id: projectId,
                 scenario_name: scenarioName,
@@ -383,11 +387,11 @@ router.post('/run', async (req, res) => {
                 await dpu.insert('raporlar', reportData);
                 console.log("✅ Rapor başarıyla mühürlendi!");
             } catch (dbErr) {
-                console.error("⚠️ Rapor veritabanına yazılırken hata oluştu kanka:", dbErr.message);
+                console.error("⚠️ Rapor veritabanına yazılırken hata oluştu :", dbErr.message);
             }
 
             if (error) {
-                console.error(`❌ Test başarısız bitti kanka:`, error.message);
+                console.error(`❌ Test başarısız bitti :`, error.message);
                 return res.status(500).json({ 
                     success: false, 
                     error: "Test koşturulurken bir hata patladı!", 
@@ -434,7 +438,7 @@ router.get('/reports/list', async (req, res) => {
         }
         const projectId = foundProj.id;
 
-        // 2. Raporları çekip filtreleyelim kanka
+        // 2. Raporları çekip filtreleyelim 
         const reportsRes = await dpu.select('raporlar', 100);
         if (reportsRes.success && reportsRes.data) {
             // Sadece bu projeye ait raporları alıp tarihe göre yeniden eskiye sıralıyoruz
@@ -444,7 +448,7 @@ router.get('/reports/list', async (req, res) => {
 
             return res.json({ success: true, reports: filteredReports });
         } else {
-            // Eğer henüz tablo yoksa veya boşsa boş dizi dönüyoruz kanka, çökmesin
+            // Eğer henüz tablo yoksa veya boşsa boş dizi dönüyoruz , çökmesin
             return res.json({ reports: [] });
         }
     } catch (error) {
@@ -459,7 +463,7 @@ router.post('/run-batch', async (req, res) => {
     const selectedProj = (projectName || '').trim();
 
     if (!scenarioNames || !Array.isArray(scenarioNames) || scenarioNames.length === 0 || !selectedProj) {
-        return res.status(400).json({ error: "Eksik veya hatalı parametre kanka!" });
+        return res.status(400).json({ error: "Eksik veya hatalı parametre !" });
     }
 
     try {
@@ -543,11 +547,11 @@ router.post('/run-batch', async (req, res) => {
             });
         };
 
-        // 4. Kuyruğu asenkron sırayla (Sequential) koşturuyoruz kanka!
+        // 4. Kuyruğu asenkron sırayla (Sequential) koşturuyoruz !
         // Express isteğini bloklamamak için testi arka planda asenkron çalıştıracağız
         res.status(202).json({ 
             success: true, 
-            message: "Toplu test pipeline akışı arka planda başlatıldı! Sonuçları Raporlar sekmesinden takip edebilirsin kanka." 
+            message: "Toplu test pipeline akışı arka planda başlatıldı! Sonuçları Raporlar sekmesinden takip edebilirsin ." 
         });
 
         // Arka plan sıralı döngüsü:
@@ -581,14 +585,14 @@ router.get('/settings/get', async (req, res) => {
         };
 
         if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
-            // 1. Önce aktif sağlayıcı seçimlerini alalım kanka
+            // 1. Önce aktif sağlayıcı seçimlerini alalım 
             const testRunnerRow = dbResult.data.find(r => r.ayar_anahtar === 'test_runner_api');
             const translatorRow = dbResult.data.find(r => r.ayar_anahtar === 'translator_api');
 
             if (testRunnerRow) settings.testRunnerApi = testRunnerRow.ayar_deger;
             if (translatorRow) settings.translatorApi = translatorRow.ayar_deger;
 
-            // 2. Sağlayıcı satırlarını (Key & Model tek satırda!) çözüyoruz kanka 🔒
+            // 2. Sağlayıcı satırlarını (Key & Model tek satırda!) çözüyoruz  🔒
             dbResult.data.forEach(row => {
                 if (row.ayar_anahtar !== 'test_runner_api' && row.ayar_anahtar !== 'translator_api') {
                     settings.apiKeys[row.ayar_anahtar] = {
@@ -609,17 +613,21 @@ router.get('/settings/get', async (req, res) => {
 
 // ─── ⚙️ 9. API: DPU BASE ÜZERİNE İLİŞKİSEL AYARLARI KAYDETME (POST) ───
 router.post('/settings/save', async (req, res) => {
+    const userRole = req.headers['x-user-role']; // Rol kontrolü yapıyoruz 
+
+    if (userRole !== 'ADMIN') {
+        return res.status(403).json({ error: "Bu işlem için yetkiniz yok ! Sadece ADMIN sistem ayarlarını değiştirebilir." });
+    }
+
     const { testRunnerApi, translatorApi, apiKeys } = req.body;
     
     try {
-        console.log("💾 DPU Base: Ayarlar yeni şema ile mühürleniyor...");
+        console.log("💾 DPU Base: Ayarlar yeni şema ile kaydediliyor...");
         const nowIso = new Date().toISOString();
 
-        // 1. Mevcut tüm satırları DPU Base'den çekelim
         const currentDb = await dpu.select('ayarlar', 100);
         const existingRows = currentDb.success && currentDb.data ? currentDb.data : [];
 
-        // 2. Kaydedilecek paket listesini hazırlayalım
         const targetSettings = {
             'test_runner_api': { val: testRunnerApi || 'openai', model: null },
             'translator_api': { val: translatorApi || 'gemini', model: null }
@@ -634,30 +642,26 @@ router.post('/settings/save', async (req, res) => {
             });
         }
 
-        // 3. Her bir ayarı tek satırda ilişkisel olarak veritabanına işleyelim kanka! 🔒
         for (const [key, details] of Object.entries(targetSettings)) {
             const matchedRow = existingRows.find(row => row.ayar_anahtar === key);
             
             const insertData = {
                 ayar_anahtar: key,
                 ayar_deger: details.val,
-                ayar_model: details.model, // 🌟 Key ve Model aynı satırda birleşti!
+                ayar_model: details.model,
                 updated_at: nowIso
             };
 
             if (matchedRow) {
-                // Değer veya model değiştiyse güncelliyoruz
                 if (matchedRow.ayar_deger !== details.val || matchedRow.ayar_model !== details.model) {
                     await dpu.delete('ayarlar', matchedRow.id);
                     await dpu.insert('ayarlar', { ...insertData, created_at: matchedRow.created_at || nowIso });
                 }
             } else {
-                // Yoksa yeni ilişkisel satır ekle
                 await dpu.insert('ayarlar', { ...insertData, created_at: nowIso });
             }
         }
 
-        // 4. Silinen eski artıkları temizleme
         for (const row of existingRows) {
             if (row.ayar_anahtar !== 'test_runner_api' && row.ayar_anahtar !== 'translator_api') {
                 if (!(row.ayar_anahtar in targetSettings)) {
@@ -667,7 +671,7 @@ router.post('/settings/save', async (req, res) => {
             }
         }
 
-        console.log("✅ Tüm ayarlar ilişkisel olarak başarıyla mühürlendi kanka!");
+        console.log("✅ Tüm ayarlar ilişkisel olarak başarıyla mühürlendi !");
         return res.json({ success: true, message: "Ayarlar başarıyla veritabanına mühürlendi!" });
 
     } catch (err) {
@@ -681,15 +685,15 @@ router.post('/reports/delete', async (req, res) => {
     const { id } = req.body;
 
     if (!id) {
-        return res.status(400).json({ error: "Eksik parametre kanka! Rapor ID değeri gelmedi." });
+        return res.status(400).json({ error: "Eksik parametre ! Rapor ID değeri gelmedi." });
     }
 
     try {
         console.log(`=========================================`);
-        console.log(`🗑️ RAPOR SİLME İSTEĞİ GELDİ kanka!`);
+        console.log(`🗑️ RAPOR SİLME İSTEĞİ GELDİ !`);
         console.log(`Silinecek Rapor ID: "${id}"`);
 
-        // DPU Base 'raporlar' tablosundan ilgili id'li satırı tamamen siliyoruz kanka! 🔒
+        // DPU Base 'raporlar' tablosundan ilgili id'li satırı tamamen siliyoruz ! 🔒
         const deleteResult = await dpu.delete('raporlar', id);
 
         if (deleteResult.success) {
