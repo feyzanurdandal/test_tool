@@ -359,19 +359,35 @@ router.post('/run', async (req, res) => {
         console.log(`💾 Geçici test adımları yazıldı: ${runtimeStepsPath}`);
 
         // 4. Playwright'ı arka planda tetikliyoruz! (Headless/Arka planda koşturacak şekilde kanka)
+        // 4. Playwright'ı arka planda tetikliyoruz!
         console.log(`🔥 Playwright motoru ateşleniyor...`);
         
-        // npx playwright test komutunu koşturuyoruz
-        // tests/ai-security.spec.ts dosyanı hedef alıyoruz kanka
-        exec('npx playwright test tests/ai-security.spec.ts', (error, stdout, stderr) => {
+        exec('npx playwright test tests/ai-security.spec.ts', async (error, stdout, stderr) => {
             console.log(`--- Playwright Çıktısı (STDOUT) --- \n${stdout}`);
-            if (stderr) {
-                console.error(`--- Playwright Hata Çıktısı (STDERR) --- \n${stderr}`);
+            
+            const isSuccess = !error;
+            const nowIso = new Date().toISOString();
+
+            // 📝 Rapor verisini hazırlıyoruz kanka
+            const reportData = {
+                project_id: projectId,
+                scenario_name: scenarioName,
+                status: isSuccess ? "SUCCESS" : "FAILED",
+                log_content: stdout + (stderr ? `\n--- Hatalar ---\n${stderr}` : ''),
+                created_at: nowIso
+            };
+
+            try {
+                // 🔒 DPU Base üzerindeki 'raporlar' tablosuna sonucu mühürlüyoruz!
+                console.log("💾 Test raporu DPU Base'e kaydediliyor...");
+                await dpu.insert('raporlar', reportData);
+                console.log("✅ Rapor başarıyla mühürlendi!");
+            } catch (dbErr) {
+                console.error("⚠️ Rapor veritabanına yazılırken hata oluştu kanka:", dbErr.message);
             }
 
             if (error) {
                 console.error(`❌ Test başarısız bitti kanka:`, error.message);
-                // Test patlarsa arayüze hata durumunu dönüyoruz
                 return res.status(500).json({ 
                     success: false, 
                     error: "Test koşturulurken bir hata patladı!", 
@@ -381,7 +397,6 @@ router.post('/run', async (req, res) => {
             }
 
             console.log(`✅ Test başarıyla tamamlandı!`);
-            console.log(`=========================================`);
             return res.status(200).json({ 
                 success: true, 
                 message: "Test başarıyla koşturuldu ve tamamlandı!",
@@ -392,6 +407,49 @@ router.post('/run', async (req, res) => {
     } catch (error) {
         console.error("💥 Test koşturma endpoint'inde büyük hata:", error.message);
         return res.status(500).json({ error: error.message });
+    }
+});
+
+// ─── 📊 6. API: PROJE BAZLI RAPORLARI LİSTELEME ───
+router.get('/reports/list', async (req, res) => {
+    const { project } = req.query;
+    const selectedProj = (project || '').trim();
+
+    if (!selectedProj) {
+        return res.json({ reports: [] });
+    }
+
+    try {
+        console.log(`🔍 DPU Base: "${selectedProj}" projesine ait raporlar aranıyor...`);
+        
+        // 1. Projeyi bulalım
+        const projectRes = await dpu.select('projeler', 100);
+        if (!projectRes.success || !projectRes.data) {
+            return res.json({ reports: [] });
+        }
+
+        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
+        if (!foundProj) {
+            return res.json({ reports: [] });
+        }
+        const projectId = foundProj.id;
+
+        // 2. Raporları çekip filtreleyelim kanka
+        const reportsRes = await dpu.select('raporlar', 100);
+        if (reportsRes.success && reportsRes.data) {
+            // Sadece bu projeye ait raporları alıp tarihe göre yeniden eskiye sıralıyoruz
+            const filteredReports = reportsRes.data
+                .filter(r => String(r.project_id) === String(projectId))
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            return res.json({ success: true, reports: filteredReports });
+        } else {
+            // Eğer henüz tablo yoksa veya boşsa boş dizi dönüyoruz kanka, çökmesin
+            return res.json({ reports: [] });
+        }
+    } catch (error) {
+        console.error("💥 Rapor listelemede hata:", error.message);
+        return res.json({ reports: [] });
     }
 });
 

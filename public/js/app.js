@@ -168,9 +168,222 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+// 📊 DPU Base'den Raporları Çekip İç İçe (Dinamik INFO Bölmeli) Akordeon Olarak Döken Fonksiyon 🔒
+    async function loadReports() {
+        const reportsEmpty = document.getElementById("reports-empty");
+        const accordionContainer = document.getElementById("reports-list-accordion");
+
+        if (!reportsEmpty || !accordionContainer) return;
+
+        try {
+            console.log(`🔄 "${currentProject}" projesi için raporlar buluttan isteniyor...`);
+            const res = await fetch(`/api/scenarios/reports/list?project=${encodeURIComponent(currentProject)}`);
+            const result = await res.json();
+
+            if (result.reports && result.reports.length > 0) {
+                reportsEmpty.classList.add("hidden");
+                accordionContainer.classList.remove("hidden");
+                accordionContainer.innerHTML = "";
+
+                result.reports.forEach((report) => {
+                    const isSuccess = report.status === "SUCCESS";
+                    const scenarioName = report.scenario_name || "Bilinmeyen Senaryo";
+                    const logContent = report.log_content || "Log kaydı bulunmuyor.";
+                    const formattedDate = new Date(report.created_at).toLocaleString("tr-TR");
+
+                    // ─── 🧠 GELİŞMİŞ LOG DİLİMLEME ALGORİTMASI ───
+                    const lines = logContent.split('\n');
+                    const steps = [];
+                    let currentStep = null;
+
+                    lines.forEach(line => {
+                        const trimmedLine = line.trim();
+                        if (!trimmedLine) return; // Boş satırları atla kanka
+
+                        // Zaman damgalı INFO:, WARN: veya ERROR: satırlarını yakalayan düzenli ifade (Regex)
+                        // Örn: "[2026-07-16 09:40:26.127 +0300] INFO: act cache hit" satırını yakalar!
+                        const infoRegex = /(?:\[.*?\]\s+)?(INFO|WARN|ERROR):\s*(.*)/i;
+                        const match = trimmedLine.match(infoRegex);
+
+                        if (match) {
+                            // Eğer daha önceden açık olan bir adım varsa onu paketleyip listeye atıyoruz kanka
+                            if (currentStep) {
+                                steps.push(currentStep);
+                            }
+
+                            const logType = match[1].toUpperCase(); // INFO, WARN veya ERROR
+                            const logMessage = match[2].trim();    // "act cache hit" veya "Action: click..." kısmı
+
+                            // Yeni adımı başlatıyoruz kanka
+                            currentStep = {
+                                title: logMessage,
+                                type: logType,
+                                rawHeader: trimmedLine, // Tam orijinal satırı da içeride saklayalım
+                                content: []
+                            };
+                        } else {
+                            // Eğer henüz hiçbir INFO satırı gelmediyse, başlangıç loglarını toplamak için bir kap açıyoruz
+                            if (!currentStep) {
+                                currentStep = {
+                                    title: "Sistem ve Altyapı Başlangıç Logları",
+                                    type: "SYSTEM",
+                                    rawHeader: "",
+                                    content: []
+                                };
+                            }
+                            // Detay logu olarak satırı ekliyoruz kanka
+                            currentStep.content.push(trimmedLine);
+                        }
+                    });
+
+                    // Son kalan adımı da içeriye fırlatıyoruz kanka
+                    if (currentStep) {
+                        steps.push(currentStep);
+                    }
+                    // ─── 🧠 ALGORİTMASININ SONU ───
+
+                    // Her bir dilimlenmiş adım için iç akordeon HTML'i üretiyoruz kanka
+                    let nestedStepsHtml = "";
+                    steps.forEach((step, idx) => {
+                        const stepBody = step.content.join('\n').trim();
+                        
+                        // Sistem başlangıcında log yoksa kalabalık etmesin kanka
+                        if (!stepBody && step.type === "SYSTEM") return;
+
+                        // Log tipine göre şık bir renk etiketi verelim
+                        let badgeClass = "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
+                        if (step.type === "WARN") badgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                        if (step.type === "ERROR") badgeClass = "bg-rose-500/10 text-rose-400 border-rose-500/20";
+                        if (step.type === "INFO") badgeClass = "bg-blue-500/10 text-[#3b82f6] border-blue-500/20";
+
+                        nestedStepsHtml += `
+                            <div class="border border-[rgba(255,255,255,0.04)] rounded-lg overflow-hidden bg-[#09090b]/40">
+                                <div class="inner-accordion-header flex items-center justify-between p-3 cursor-pointer hover:bg-[#27272a]/20 transition select-none">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono text-[10px] text-zinc-500">${String(idx + 1).padStart(2, '0')}.</span>
+                                        <span class="text-[11px] font-medium text-zinc-300">${step.title}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[9px] px-1.5 py-0.5 rounded border ${badgeClass} font-mono font-semibold uppercase">${step.type}</span>
+                                        <i data-lucide="chevron-right" class="inner-chevron w-3.5 h-3.5 text-zinc-600 transition-transform duration-200"></i>
+                                    </div>
+                                </div>
+                                <div class="inner-accordion-content max-h-0 overflow-hidden transition-all duration-200 ease-in-out">
+                                    <div class="p-3 bg-black/40 border-t border-[rgba(255,255,255,0.02)]">
+                                        ${step.rawHeader ? `<div class="text-[10px] font-mono text-zinc-500 border-b border-[rgba(255,255,255,0.02)] pb-1.5 mb-1.5">Ham Satır: ${step.rawHeader}</div>` : ''}
+                                        <pre class="text-[10px] font-mono text-zinc-400 overflow-x-auto whitespace-pre-wrap leading-relaxed select-text">${stepBody || 'Bu adıma ait ekstra detay logu bulunmuyor.'}</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    // Ana Dış Akordeon Kartı
+                    const card = document.createElement("div");
+                    card.className = "bg-[#18181b] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden transition-all duration-300";
+                    card.innerHTML = `
+                        <div class="accordion-header flex items-center justify-between p-4 cursor-pointer hover:bg-[#27272a]/30 transition select-none">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center ${isSuccess ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
+                                    <i data-lucide="${isSuccess ? 'check-circle' : 'alert-triangle'}" class="w-4 h-4"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-xs font-semibold text-white">${scenarioName}</h4>
+                                    <span class="text-[10px] text-zinc-500">${formattedDate}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-[10px] px-2 py-0.5 font-semibold rounded uppercase tracking-wider ${isSuccess ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}">
+                                    ${isSuccess ? 'Başarılı' : 'Hata'}
+                                </span>
+                                <i data-lucide="chevron-down" class="chevron-icon w-4 h-4 text-zinc-500 transition-transform duration-300"></i>
+                            </div>
+                        </div>
+
+                        <div class="accordion-content max-h-0 overflow-hidden transition-all duration-300 ease-in-out bg-[#09090b]/50 border-t border-[rgba(255,255,255,0)]">
+                            <div class="p-4 space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[10px] uppercase font-semibold tracking-wider text-zinc-500">Adım Bazlı Test Akışı</span>
+                                    <button class="copy-log-btn text-[10px] text-zinc-500 hover:text-white transition flex items-center gap-1" data-log="${encodeURIComponent(logContent)}">
+                                        <i data-lucide="copy" class="w-3 h-3"></i> Ham Logu Kopyala
+                                    </button>
+                                </div>
+                                
+                                <div class="space-y-2">
+                                    ${nestedStepsHtml}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    // ─── ↕️ DIŞ AKORDEON TETİKLEYİCİSİ ───
+                    const header = card.querySelector(".accordion-header");
+                    const content = card.querySelector(".accordion-content");
+                    const chevron = card.querySelector(".chevron-icon");
+
+                    header.addEventListener("click", () => {
+                        const isOpen = content.style.maxHeight && content.style.maxHeight !== "0px";
+
+                        if (isOpen) {
+                            content.style.maxHeight = "0px";
+                            content.style.borderTopColor = "transparent";
+                            chevron.style.transform = "rotate(0deg)";
+                        } else {
+                            content.style.maxHeight = "none"; 
+                            content.style.borderTopColor = "rgba(255,255,255,0.06)";
+                            chevron.style.transform = "rotate(180deg)";
+                        }
+                    });
+
+                    // ─── ↕️ İÇ AKORDEON TETİKLEYİCİLERİ ───
+                    const innerCards = card.querySelectorAll(".inner-accordion-header");
+                    innerCards.forEach(innerHeader => {
+                        innerHeader.addEventListener("click", (e) => {
+                            e.stopPropagation(); 
+                            const innerContent = innerHeader.nextElementSibling;
+                            const innerChevron = innerHeader.querySelector(".inner-chevron");
+                            const isInnerOpen = innerContent.style.maxHeight && innerContent.style.maxHeight !== "0px";
+
+                            if (isInnerOpen) {
+                                innerContent.style.maxHeight = "0px";
+                                innerChevron.style.transform = "rotate(0deg)";
+                            } else {
+                                innerContent.style.maxHeight = innerContent.scrollHeight + "px";
+                                innerChevron.style.transform = "rotate(90deg)"; 
+                            }
+                        });
+                    });
+
+                    // Ham Log Kopyalama
+                    const copyBtn = card.querySelector(".copy-log-btn");
+                    copyBtn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        const rawLog = decodeURIComponent(copyBtn.getAttribute("data-log"));
+                        navigator.clipboard.writeText(rawLog);
+                        
+                        const origHtml = copyBtn.innerHTML;
+                        copyBtn.innerHTML = `<span class="text-emerald-400">Kopyalandı!</span>`;
+                        setTimeout(() => copyBtn.innerHTML = origHtml, 1500);
+                    });
+
+                    accordionContainer.appendChild(card);
+                });
+
+                lucide.createIcons();
+            } else {
+                accordionContainer.innerHTML = "";
+                accordionContainer.classList.add("hidden");
+                reportsEmpty.classList.remove("hidden");
+            }
+        } catch (err) {
+            console.error("❌ Raporlar listelenirken hata patladı:", err.message);
+        }
+    }
+
     function updateProjectLabels() {
         currentProjectLabels.forEach(lbl => lbl.textContent = currentProject);
         loadScenarios(); 
+        loadReports();
     }
 
     // 3. DPU Base Projelerini Yükleyen Fonksiyon (Tam Sıralı kanka 🔒)
