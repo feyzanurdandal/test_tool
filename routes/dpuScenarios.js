@@ -568,4 +568,113 @@ router.post('/run-batch', async (req, res) => {
     }
 });
 
+// ─── ⚙️ 8. API: DPU BASE'DEN İLİŞKİSEL AYARLARI GETİRME (GET) ───
+router.get('/settings/get', async (req, res) => {
+    try {
+        console.log("🔄 DPU Base: Tüm ayar satırları ilişkisel olarak sorgulanıyor...");
+        const dbResult = await dpu.select('ayarlar', 100);
+
+        const settings = {
+            testRunnerApi: "openai",
+            translatorApi: "gemini",
+            apiKeys: {}
+        };
+
+        if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
+            // 1. Önce aktif sağlayıcı seçimlerini alalım kanka
+            const testRunnerRow = dbResult.data.find(r => r.ayar_anahtar === 'test_runner_api');
+            const translatorRow = dbResult.data.find(r => r.ayar_anahtar === 'translator_api');
+
+            if (testRunnerRow) settings.testRunnerApi = testRunnerRow.ayar_deger;
+            if (translatorRow) settings.translatorApi = translatorRow.ayar_deger;
+
+            // 2. Sağlayıcı satırlarını (Key & Model tek satırda!) çözüyoruz kanka 🔒
+            dbResult.data.forEach(row => {
+                if (row.ayar_anahtar !== 'test_runner_api' && row.ayar_anahtar !== 'translator_api') {
+                    settings.apiKeys[row.ayar_anahtar] = {
+                        key: row.ayar_deger || "",
+                        model: row.ayar_model || "" // 🌟 İşte o efsane yeni kolonumuz!
+                    };
+                }
+            });
+        }
+
+        return res.json({ success: true, settings });
+
+    } catch (err) {
+        console.error("❌ Ayarlar çekilirken hata oluştu:", err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── ⚙️ 9. API: DPU BASE ÜZERİNE İLİŞKİSEL AYARLARI KAYDETME (POST) ───
+router.post('/settings/save', async (req, res) => {
+    const { testRunnerApi, translatorApi, apiKeys } = req.body;
+    
+    try {
+        console.log("💾 DPU Base: Ayarlar yeni şema ile mühürleniyor...");
+        const nowIso = new Date().toISOString();
+
+        // 1. Mevcut tüm satırları DPU Base'den çekelim
+        const currentDb = await dpu.select('ayarlar', 100);
+        const existingRows = currentDb.success && currentDb.data ? currentDb.data : [];
+
+        // 2. Kaydedilecek paket listesini hazırlayalım
+        const targetSettings = {
+            'test_runner_api': { val: testRunnerApi || 'openai', model: null },
+            'translator_api': { val: translatorApi || 'gemini', model: null }
+        };
+
+        if (apiKeys && typeof apiKeys === 'object') {
+            Object.entries(apiKeys).forEach(([provider, details]) => {
+                targetSettings[provider] = {
+                    val: details.key || "",
+                    model: details.model || ""
+                };
+            });
+        }
+
+        // 3. Her bir ayarı tek satırda ilişkisel olarak veritabanına işleyelim kanka! 🔒
+        for (const [key, details] of Object.entries(targetSettings)) {
+            const matchedRow = existingRows.find(row => row.ayar_anahtar === key);
+            
+            const insertData = {
+                ayar_anahtar: key,
+                ayar_deger: details.val,
+                ayar_model: details.model, // 🌟 Key ve Model aynı satırda birleşti!
+                updated_at: nowIso
+            };
+
+            if (matchedRow) {
+                // Değer veya model değiştiyse güncelliyoruz
+                if (matchedRow.ayar_deger !== details.val || matchedRow.ayar_model !== details.model) {
+                    await dpu.delete('ayarlar', matchedRow.id);
+                    await dpu.insert('ayarlar', { ...insertData, created_at: matchedRow.created_at || nowIso });
+                }
+            } else {
+                // Yoksa yeni ilişkisel satır ekle
+                await dpu.insert('ayarlar', { ...insertData, created_at: nowIso });
+            }
+        }
+
+        // 4. Silinen eski artıkları temizleme
+        for (const row of existingRows) {
+            if (row.ayar_anahtar !== 'test_runner_api' && row.ayar_anahtar !== 'translator_api') {
+                if (!(row.ayar_anahtar in targetSettings)) {
+                    console.log(`🧹 DPU Base: Silinmiş eski sağlayıcı temizleniyor -> ${row.ayar_anahtar}`);
+                    await dpu.delete('ayarlar', row.id);
+                }
+            }
+        }
+
+        console.log("✅ Tüm ayarlar ilişkisel olarak başarıyla mühürlendi kanka!");
+        return res.json({ success: true, message: "Ayarlar başarıyla veritabanına mühürlendi!" });
+
+    } catch (err) {
+        console.error("❌ Ayarlar kaydedilirken hata oluştu:", err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+
 export default router;

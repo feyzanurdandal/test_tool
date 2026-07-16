@@ -28,54 +28,104 @@
 //     const stepsContainer = document.getElementById("steps-container");
 //     const addStepFieldBtn = document.getElementById("add-step-field-btn");
 
-//     // ─── ⚡ TOPLU TEST KUYRUĞUNU ATEŞLEME ETKİNLİĞİ ───
-//     const startBatchBtn = document.getElementById("start-batch-btn");
-//     startBatchBtn.addEventListener("click", async () => {
-//         if (batchQueue.length === 0) return;
-
-//         const confirmBatch = confirm(`Seçtiğin ${batchQueue.length} senaryo sırasıyla arka arkaya koşturulacak kanka. Emin misin?`);
-//         if (!confirmBatch) return;
-
-//         const originalText = startBatchBtn.textContent;
-//         startBatchBtn.disabled = true;
-//         startBatchBtn.textContent = "Pipeline Çalıştırılıyor...";
-//         startBatchBtn.className = "bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm animate-pulse cursor-wait";
-
-//         try {
-//             console.log(`⚡ Toplu test pipeline başlatıldı:`, batchQueue);
-//             const res = await fetch("/api/scenarios/run-batch", {
-//                 method: "POST",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({
-//                     scenarioNames: batchQueue,
-//                     projectName: projectDropdown.value
-//                 })
-//             });
-
-//             const result = await res.json();
-//             if (res.ok && result.success) {
-//                 alert(`🚀 Pipeline başarıyla kuruldu ve arka planda ateşlendi!\n\nTest sonuçları bittikçe "Raporlar" sekmesine düşecek kanka. Oradan anlık takip edebilirsin.`);
-//             } else {
-//                 alert(`❌ Hata: ${result.error || "Toplu test başlatılamadı."}`);
-//             }
-//         } catch (err) {
-//             console.error("Toplu test tetiklemede bağlantı hatası:", err);
-//             alert("❌ Sunucu bağlantı hatası patladı!");
-//         } finally {
-//             // Kuyruğu temizleyip butonu eski haline getiriyoruz
-//             batchQueue = [];
-//             loadBatchScenarios(); // Listeyi temizleyelim kanka
-//         }
-//     });
-
 //     // 🔒 BAŞLANGIÇTA BOŞ BIRAKIYORUZ KANKA (Varsayılan Proje belasını engellemek için!)
 //     let currentProject = "";
 //     // ⚡ Toplu Testler için Tıklama Sıralı Kuyruk Dizisi kanka
 //     let batchQueue = [];
 
+//     // ─── ⚡ TOPLU TEST KUYRUĞUNU ADIM ADIM ATEŞLEME ETKİNLİĞİ (Gelişmiş Sıralı Akış) ───
+//     const startBatchBtn = document.getElementById("start-batch-btn");
+//     startBatchBtn.addEventListener("click", async () => {
+//         if (batchQueue.length === 0) return;
+
+//         const totalTests = batchQueue.length;
+//         const confirmBatch = confirm(`Seçtiğin ${totalTests} senaryo sırasıyla canlı olarak koşturulacak kanka. Hazır mısın?`);
+//         if (!confirmBatch) return;
+
+//         // 1. Buton durumunu çalışıyor moduna alıyoruz
+//         startBatchBtn.disabled = true;
+//         startBatchBtn.className = "bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm animate-pulse cursor-wait";
+        
+//         // Çalıştırılacak kopyasını alıyoruz ki döngü esnasında diziyi manipüle edebilelim
+//         const activeQueue = [...batchQueue]; 
+//         console.log("⚡ Canlı Pipeline Başlatıldı kanka. Sıralama:", activeQueue);
+
+//         // 2. Her bir testi sırayla (Sequential) koşturuyoruz kanka 🔒
+//         for (let i = 0; i < activeQueue.length; i++) {
+//             const scenarioName = activeQueue[i];
+//             const remainingCount = activeQueue.length - i; // Kalan test sayısı
+
+//             // Buton üzerindeki sayıyı dinamik olarak güncelliyoruz kanka!
+//             startBatchBtn.textContent = `Çalışacak Test Sayısı: ${remainingCount}...`;
+
+//             // Tabloda ilgili satırı bulup durum hücresini güncelliyoruz
+//             const rows = document.querySelectorAll("#batch-list tr");
+//             let targetOrderCell = null;
+            
+//             rows.forEach(row => {
+//                 const checkbox = row.querySelector(".batch-checkbox");
+//                 if (checkbox && checkbox.value === scenarioName) {
+//                     targetOrderCell = row.querySelector(".batch-order-cell");
+//                     // Satırı parlatıp sarı 'Çalışıyor...' durumuna çekiyoruz kanka
+//                     row.className = "border-b border-amber-500/30 bg-amber-500/5 transition h-12";
+//                     targetOrderCell.innerHTML = `<span class="text-amber-400 animate-pulse font-bold">Çalışıyor...</span>`;
+//                 }
+//             });
+
+//             try {
+//                 console.log(`🚀 [Pipeline] ${scenarioName} başlatılıyor... (${remainingCount} test kaldı)`);
+                
+//                 // Tekil test çalıştırma endpoint'ine istek atıp bitmesini bekliyoruz!
+//                 const res = await fetch("/api/scenarios/run", {
+//                     method: "POST",
+//                     headers: { "Content-Type": "application/json" },
+//                     body: JSON.stringify({
+//                         scenarioName,
+//                         projectName: projectDropdown.value
+//                     })
+//                 });
+
+//                 const result = await res.json();
+                
+//                 // Test sonucuna göre tablodaki ilgili satırı yeşile veya kırmızıya boyuyoruz kanka!
+//                 rows.forEach(row => {
+//                     const checkbox = row.querySelector(".batch-checkbox");
+//                     if (checkbox && checkbox.value === scenarioName) {
+//                         const orderCell = row.querySelector(".batch-order-cell");
+//                         if (res.ok && result.success) {
+//                             row.className = "border-b border-emerald-500/20 bg-emerald-500/5 transition h-12";
+//                             orderCell.innerHTML = `<span class="text-emerald-400 font-bold">Tamamlandı</span>`;
+//                         } else {
+//                             row.className = "border-b border-rose-500/20 bg-rose-500/5 transition h-12";
+//                             orderCell.innerHTML = `<span class="text-rose-400 font-bold">Başarısız</span>`;
+//                         }
+//                     }
+//                 });
+
+//             } catch (err) {
+//                 console.error(`❌ [Pipeline] ${scenarioName} hataya düştü:`, err);
+//                 rows.forEach(row => {
+//                     const checkbox = row.querySelector(".batch-checkbox");
+//                     if (checkbox && checkbox.value === scenarioName) {
+//                         const orderCell = row.querySelector(".batch-order-cell");
+//                         row.className = "border-b border-rose-500/20 bg-rose-500/5 transition h-12";
+//                         orderCell.innerHTML = `<span class="text-rose-400 font-bold">Bağlantı Hatası</span>`;
+//                     }
+//                 });
+//             }
+//         }
+
+//         // 3. Tüm testler bittiğinde butonu sıfırlıyoruz kanka
+//         alert("⚡ Harika! Seçilen tüm test pipeline adımları koşturuldu ve sonuçlar raporlara mühürlendi!");
+        
+//         batchQueue = []; // Kuyruğu temizle
+//         updateBatchButtonState(); // Butonu 0 durumuna çek
+//         await loadReports(); // Raporları anında tazele kanka!
+//     });
+
+
 //     // 1. Senaryoları Çekip Tabloya Döken Fonksiyon
 //     async function loadScenarios() {
-//         // Eğer henüz bir proje seçilmemişse istek atmayı tamamen engelliyoruz!
 //         if (!currentProject || currentProject === "Varsayılan Proje") {
 //             console.log("⚠️ Geçerli bir proje seçilmediği için senaryo isteği iptal edildi.");
 //             return;
@@ -117,16 +167,14 @@
 //                     `;
 //                     scenariosList.appendChild(row);
 //                 });
-//                 // 🔒 TABLODAKİ DİNAMİK BUTONLARIN ETKİNLİK DİNLEYİCİLERİ 🔒
 
-//                 // A. SİLME BUTONLARI (Delete Buttons)
+//                 // A. SİLME BUTONLARI
 //                 const deleteButtons = document.querySelectorAll(".delete-scenario-btn");
 //                 deleteButtons.forEach(btn => {
 //                     btn.addEventListener("click", async () => {
 //                         const scenarioName = btn.getAttribute("data-name");
 //                         const selectedProjName = projectDropdown.value;
                         
-//                         // Kullanıcıya emin olup olmadığını soralım kanka, kaza olmasın
 //                         const confirmDelete = confirm(`"${scenarioName}" senaryosunu silmek istediğine emin misin kanka?`);
 //                         if (!confirmDelete) return;
 
@@ -144,7 +192,7 @@
 //                             const result = await res.json();
 //                             if (res.ok && result.success) {
 //                                 alert("🗑️ Senaryo başarıyla buluttan silindi!");
-//                                 await loadScenarios(); // Tabloyu tazeleyelim kanka
+//                                 await loadScenarios(); 
 //                             } else {
 //                                 alert(`❌ Silinemedi: ${result.error || "Hata oluştu"}`);
 //                                 btn.disabled = false;
@@ -156,22 +204,19 @@
 //                     });
 //                 });
 
-                
-//                 // B. TESTİ KOŞTUR BUTONLARI (Playwright Tetikleyici Canavar 🔒)
+//                 // B. TEKİL TESTİ KOŞTUR BUTONLARI
 //                 const runButtons = document.querySelectorAll(".run-single-btn");
 //                 runButtons.forEach(btn => {
 //                     btn.addEventListener("click", async () => {
 //                         const scenarioName = btn.getAttribute("data-name");
 //                         const selectedProjName = projectDropdown.value;
 
-//                         // Butonun o anki durumunu kilitleyip yükleniyor yapalım kanka
 //                         const originalHtml = btn.innerHTML;
 //                         btn.disabled = true;
 //                         btn.innerHTML = `<span class="text-amber-400 animate-pulse">Koşturuluyor...</span>`;
 
 //                         try {
 //                             console.log(`🚀 "${scenarioName}" testi başlatıldı kanka...`);
-                            
 //                             const res = await fetch("/api/scenarios/run", {
 //                                 method: "POST",
 //                                 headers: { "Content-Type": "application/json" },
@@ -182,7 +227,6 @@
 //                             });
 
 //                             const result = await res.json();
-                            
 //                             if (res.ok && result.success) {
 //                                 alert(`🎉 Başarılı! "${scenarioName}" testi Playwright ile başarıyla çalıştırıldı ve tamamlandı!`);
 //                             } else {
@@ -192,7 +236,6 @@
 //                             console.error("Test çalıştırma isteğinde hata patladı:", err);
 //                             alert("❌ Sunucu bağlantı hatası! Playwright çalıştırılamadı.");
 //                         } finally {
-//                             // Butonu eski şık haline geri döndürüyoruz kanka
 //                             btn.disabled = false;
 //                             btn.innerHTML = originalHtml;
 //                         }
@@ -210,7 +253,7 @@
 //         }
 //     }
 
-//     // 📊 DPU Base'den Raporları Çekip İç İçe (Dinamik INFO Bölmeli) Akordeon Olarak Döken Fonksiyon 🔒
+//     // 📊 DPU Base'den Raporları Çekip İç İçe Akordeon Yapan Fonksiyon
 //     async function loadReports() {
 //         const reportsEmpty = document.getElementById("reports-empty");
 //         const accordionContainer = document.getElementById("reports-list-accordion");
@@ -233,38 +276,31 @@
 //                     const logContent = report.log_content || "Log kaydı bulunmuyor.";
 //                     const formattedDate = new Date(report.created_at).toLocaleString("tr-TR");
 
-//                     // ─── 🧠 GELİŞMİŞ LOG DİLİMLEME ALGORİTMASI ───
 //                     const lines = logContent.split('\n');
 //                     const steps = [];
 //                     let currentStep = null;
 
 //                     lines.forEach(line => {
 //                         const trimmedLine = line.trim();
-//                         if (!trimmedLine) return; // Boş satırları atla kanka
+//                         if (!trimmedLine) return;
 
-//                         // Zaman damgalı INFO:, WARN: veya ERROR: satırlarını yakalayan düzenli ifade (Regex)
-//                         // Örn: "[2026-07-16 09:40:26.127 +0300] INFO: act cache hit" satırını yakalar!
 //                         const infoRegex = /(?:\[.*?\]\s+)?(INFO|WARN|ERROR):\s*(.*)/i;
 //                         const match = trimmedLine.match(infoRegex);
 
 //                         if (match) {
-//                             // Eğer daha önceden açık olan bir adım varsa onu paketleyip listeye atıyoruz kanka
 //                             if (currentStep) {
 //                                 steps.push(currentStep);
 //                             }
+//                             const logType = match[1].toUpperCase();
+//                             const logMessage = match[2].trim();
 
-//                             const logType = match[1].toUpperCase(); // INFO, WARN veya ERROR
-//                             const logMessage = match[2].trim();    // "act cache hit" veya "Action: click..." kısmı
-
-//                             // Yeni adımı başlatıyoruz kanka
 //                             currentStep = {
 //                                 title: logMessage,
 //                                 type: logType,
-//                                 rawHeader: trimmedLine, // Tam orijinal satırı da içeride saklayalım
+//                                 rawHeader: trimmedLine,
 //                                 content: []
 //                             };
 //                         } else {
-//                             // Eğer henüz hiçbir INFO satırı gelmediyse, başlangıç loglarını toplamak için bir kap açıyoruz
 //                             if (!currentStep) {
 //                                 currentStep = {
 //                                     title: "Sistem ve Altyapı Başlangıç Logları",
@@ -273,26 +309,19 @@
 //                                     content: []
 //                                 };
 //                             }
-//                             // Detay logu olarak satırı ekliyoruz kanka
 //                             currentStep.content.push(trimmedLine);
 //                         }
 //                     });
 
-//                     // Son kalan adımı da içeriye fırlatıyoruz kanka
 //                     if (currentStep) {
 //                         steps.push(currentStep);
 //                     }
-//                     // ─── 🧠 ALGORİTMASININ SONU ───
 
-//                     // Her bir dilimlenmiş adım için iç akordeon HTML'i üretiyoruz kanka
 //                     let nestedStepsHtml = "";
 //                     steps.forEach((step, idx) => {
 //                         const stepBody = step.content.join('\n').trim();
-                        
-//                         // Sistem başlangıcında log yoksa kalabalık etmesin kanka
 //                         if (!stepBody && step.type === "SYSTEM") return;
 
-//                         // Log tipine göre şık bir renk etiketi verelim
 //                         let badgeClass = "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
 //                         if (step.type === "WARN") badgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
 //                         if (step.type === "ERROR") badgeClass = "bg-rose-500/10 text-rose-400 border-rose-500/20";
@@ -320,7 +349,6 @@
 //                         `;
 //                     });
 
-//                     // Ana Dış Akordeon Kartı
 //                     const card = document.createElement("div");
 //                     card.className = "bg-[#18181b] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden transition-all duration-300";
 //                     card.innerHTML = `
@@ -350,22 +378,17 @@
 //                                         <i data-lucide="copy" class="w-3 h-3"></i> Ham Logu Kopyala
 //                                     </button>
 //                                 </div>
-                                
-//                                 <div class="space-y-2">
-//                                     ${nestedStepsHtml}
-//                                 </div>
+//                                 <div class="space-y-2">${nestedStepsHtml}</div>
 //                             </div>
 //                         </div>
 //                     `;
 
-//                     // ─── ↕️ DIŞ AKORDEON TETİKLEYİCİSİ ───
 //                     const header = card.querySelector(".accordion-header");
 //                     const content = card.querySelector(".accordion-content");
 //                     const chevron = card.querySelector(".chevron-icon");
 
 //                     header.addEventListener("click", () => {
 //                         const isOpen = content.style.maxHeight && content.style.maxHeight !== "0px";
-
 //                         if (isOpen) {
 //                             content.style.maxHeight = "0px";
 //                             content.style.borderTopColor = "transparent";
@@ -377,7 +400,6 @@
 //                         }
 //                     });
 
-//                     // ─── ↕️ İÇ AKORDEON TETİKLEYİCİLERİ ───
 //                     const innerCards = card.querySelectorAll(".inner-accordion-header");
 //                     innerCards.forEach(innerHeader => {
 //                         innerHeader.addEventListener("click", (e) => {
@@ -396,7 +418,6 @@
 //                         });
 //                     });
 
-//                     // Ham Log Kopyalama
 //                     const copyBtn = card.querySelector(".copy-log-btn");
 //                     copyBtn.addEventListener("click", (e) => {
 //                         e.stopPropagation();
@@ -422,7 +443,7 @@
 //         }
 //     }
 
-//     // ⚡ Toplu Testleri Checkbox ve Tıklama Sırasıyla Listeyip Yöneten Fonksiyon (Kurşun Geçirmez Hale Getirildi 🔒)
+//     // ⚡ Toplu Testleri Checkbox ve Tıklama Sırasıyla Listeyip Yöneten Fonksiyon
 //     async function loadBatchScenarios() {
 //         const batchEmpty = document.getElementById("batch-empty");
 //         const batchTable = document.getElementById("batch-table");
@@ -436,7 +457,6 @@
 //             const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}`);
 //             const result = await res.json();
 
-//             // Her proje değiştiğinde veya sayfa yenilendiğinde kuyruğu sıfırlayalım kanka
 //             batchQueue = [];
 //             updateBatchButtonState();
 
@@ -458,7 +478,6 @@
 
 //                     const checkbox = row.querySelector(".batch-checkbox");
 
-//                     // Tıklama sırasına göre sıralı kuyruk mantığı kanka (click olayı ile tam senkronize 🔒)
 //                     checkbox.addEventListener("click", () => {
 //                         if (checkbox.checked) {
 //                             if (!batchQueue.includes(scenarioName)) {
@@ -467,8 +486,6 @@
 //                         } else {
 //                             batchQueue = batchQueue.filter(name => name !== scenarioName);
 //                         }
-                        
-//                         // Her tıklamada hem UI'ı hem buton durumlarını anında eşitliyoruz
 //                         updateBatchTableUI();
 //                     });
 
@@ -483,7 +500,6 @@
 //         }
 //     }
 
-//     // Tablodaki sıra numaralarını ve checkbox durumlarını tam senkronize eden yardımcı fonksiyon (Kurşun Geçirmez 🔒)
 //     function updateBatchTableUI() {
 //         const rows = document.querySelectorAll("#batch-list tr");
 //         rows.forEach(row => {
@@ -493,13 +509,11 @@
 
 //             const indexInQueue = batchQueue.indexOf(scenarioName);
 //             if (indexInQueue !== -1) {
-//                 // Eğer kuyruktaysa: Checkbox'ı işaretle, sırasını yaz ve maviye boya!
 //                 checkbox.checked = true;
 //                 orderCell.textContent = String(indexInQueue + 1).padStart(2, '0');
 //                 orderCell.className = "py-3 px-4 font-mono text-[#3b82f6] font-bold batch-order-cell";
 //                 row.className = "border-b border-[rgba(59,130,246,0.15)] bg-[#3b82f6]/5 transition h-12";
 //             } else {
-//                 // Eğer kuyrukta değilse: Checkbox işaretini kaldır, sırayı sıfırla ve eski sade haline getir!
 //                 checkbox.checked = false;
 //                 orderCell.textContent = "-";
 //                 orderCell.className = "py-3 px-4 font-mono text-zinc-500 font-semibold batch-order-cell";
@@ -510,7 +524,6 @@
 //         updateBatchButtonState();
 //     }
 
-//     // Başlat butonunun aktifliğini ve sayısını güncelleyen yardımcı fonksiyon
 //     function updateBatchButtonState() {
 //         const startBatchBtn = document.getElementById("start-batch-btn");
 //         const selectedBatchCountLabel = document.getElementById("selected-batch-count");
@@ -538,7 +551,6 @@
 //         loadBatchScenarios();
 //     }
 
-//     // 3. DPU Base Projelerini Yükleyen Fonksiyon (Tam Sıralı kanka 🔒)
 //     async function loadProjects() {
 //         try {
 //             console.log("🔄 DPU Base projeleri yükleniyor...");
@@ -554,7 +566,6 @@
 //                     projectDropdown.appendChild(opt);
 //                 });
                 
-//                 // 🔒 Proje yüklendiği an ilk projeyi setliyoruz
 //                 currentProject = result.projects[0];
 //                 projectDropdown.value = currentProject;
 //                 updateProjectLabels();
@@ -572,16 +583,14 @@
 //         loginView.classList.add("hidden");
 //         appView.classList.remove("hidden");
 //         userBadge.textContent = `${user.username.toUpperCase()} (${user.role})`;
-//         await loadProjects(); // 🔒 Tam kilit!
+//         await loadProjects(); 
 //     }
 
-//     // ─── 🔓 OTURUM KONTROLÜ (AÇILIŞTA) ───
 //     const savedUser = localStorage.getItem("test_user");
 //     if (savedUser) {
 //         showDashboard(JSON.parse(savedUser));
 //     }
 
-//     // ─── 🔑 GİRİŞ / ÇIKIS YÖNETİMİ ───
 //     loginForm.addEventListener("submit", (e) => {
 //         e.preventDefault();
 //         loginError.classList.add("hidden");
@@ -605,7 +614,6 @@
 //         loginForm.reset();
 //     });
 
-//     // ─── 🎛️ SOL MENÜ SEKME DEĞİŞTİRME ───
 //     navButtons.forEach(btn => {
 //         btn.addEventListener("click", () => {
 //             navButtons.forEach(b => {
@@ -621,7 +629,6 @@
 //         });
 //     });
 
-//     // ─── 📦 PROJE MODAL ETKİNLİKLERİ ───
 //     addProjectBtn.addEventListener("click", () => {
 //         newProjectNameInput.value = "";
 //         projectModal.classList.remove("hidden");
@@ -655,7 +662,6 @@
 //         }
 //     });
 
-//     // ─── 🧪 SENARYO MODAL ETKİNLİKLERİ ───
 //     openNewScenarioBtn.addEventListener("click", () => {
 //         scenarioForm.reset();
 //         stepsContainer.innerHTML = `
@@ -701,7 +707,6 @@
 //         });
 //     }
 
-//     // ─── 💾 SENARYO FORMU GÖNDERME ───
 //     scenarioForm.addEventListener("submit", async (e) => {
 //         e.preventDefault();
 
@@ -746,11 +751,130 @@
 //         }
 //     });
 
-//     // ─── 🔄 DROPDOWN DEĞİŞİM DİNLEYİCİSİ ───
 //     projectDropdown.addEventListener("change", (e) => {
 //         currentProject = e.target.value;
 //         updateProjectLabels();
 //     });
+
+// // ─── ⚙️ DİNAMİK AYARLAR VE ÇOKLU API ANAHTARLARI YÖNETİMİ ───
+//     const settingsForm = document.getElementById("settings-form");
+//     const apiKeysContainer = document.getElementById("api-keys-container");
+//     const addApiKeyBtn = document.getElementById("add-api-key-btn");
+
+//     // A. Ayarları Yükleyen Fonksiyon
+//     async function loadSystemSettings() {
+//         if (!settingsForm) return;
+
+//         try {
+//             console.log("🔄 Dinamik sistem ayarları buluttan isteniyor...");
+//             const res = await fetch("/api/scenarios/settings/get");
+//             const result = await res.json();
+
+//             if (result.success && result.settings) {
+//                 const s = result.settings;
+//                 document.getElementById("setting-test-runner-api").value = s.testRunnerApi || "openai";
+//                 document.getElementById("setting-test-runner-model").value = s.testRunnerModel || "openai/gpt-4o-mini";
+//                 document.getElementById("setting-setting-translator-api") ? document.getElementById("setting-setting-translator-api").value = s.translatorApi || "gemini" : null;
+//                 document.getElementById("setting-translator-api").value = s.translatorApi || "gemini";
+//                 document.getElementById("setting-translator-model").value = s.translatorModel || "gemini-1.5-pro";
+
+//                 // Mevcut API keyleri listeleyelim kanka
+//                 apiKeysContainer.innerHTML = "";
+//                 if (s.apiKeys) {
+//                     Object.entries(s.apiKeys).forEach(([provider, keyVal]) => {
+//                         addApiKeyRow(provider, keyVal);
+//                     });
+//                 }
+//             }
+//         } catch (err) {
+//             console.error("❌ Ayarlar yüklenirken hata oluştu:", err);
+//         }
+//     }
+
+//     // B. Dinamik Key-Value API Key Satırı Ekleyen Yardımcı Fonksiyon
+//     function addApiKeyRow(provider = "", keyVal = "") {
+//         const row = document.createElement("div");
+//         row.className = "flex items-center gap-3 bg-[#27272a]/30 p-2.5 rounded-lg border border-[rgba(255,255,255,0.04)] animate-slide-in";
+//         row.innerHTML = `
+//             <input type="text" required placeholder="Sağlayıcı Örn: openai, gemini, anthropic" value="${provider}" class="api-provider-input flex-1 bg-transparent text-xs text-white outline-none border-r border-[rgba(255,255,255,0.06)] pr-2 font-mono font-bold">
+//             <input type="password" required placeholder="API Key Değeri" value="${keyVal}" class="api-value-input flex-[2] bg-transparent text-xs text-zinc-300 outline-none">
+//             <button type="button" class="remove-api-key-btn text-zinc-500 hover:text-red-400 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+//         `;
+
+//         row.querySelector(".remove-api-key-btn").addEventListener("click", () => {
+//             row.remove();
+//         });
+
+//         apiKeysContainer.appendChild(row);
+//         lucide.createIcons();
+//     }
+
+//     // "Yeni API Key Ekle" butonunu tetikliyoruz
+//     if (addApiKeyBtn) {
+//         addApiKeyBtn.addEventListener("click", () => addApiKeyRow());
+//     }
+
+//     // C. Ayarları Kaydetme Olayı
+//     if (settingsForm) {
+//         settingsForm.addEventListener("submit", async (e) => {
+//             e.preventDefault();
+
+//             const saveBtn = document.getElementById("save-settings-btn");
+//             const originalHtml = saveBtn.innerHTML;
+//             saveBtn.disabled = true;
+//             saveBtn.innerHTML = `<span>Kaydediliyor...</span>`;
+
+//             // Dinamik olarak eklenen API key değerlerini topluyoruz kanka
+//             const apiKeys = {};
+//             const providerInputs = document.querySelectorAll(".api-provider-input");
+//             const valueInputs = document.querySelectorAll(".api-value-input");
+
+//             providerInputs.forEach((input, index) => {
+//                 const provider = input.value.trim().toLowerCase(); // Küçük harf yapalım pürüz çıkmasın kanka
+//                 const keyVal = valueInputs[index].value.trim();
+//                 if (provider) {
+//                     apiKeys[provider] = keyVal;
+//                 }
+//             });
+
+//             const payload = {
+//                 testRunnerApi: document.getElementById("setting-test-runner-api").value,
+//                 testRunnerModel: document.getElementById("setting-test-runner-model").value.trim(),
+//                 translatorApi: document.getElementById("setting-translator-api").value,
+//                 translatorModel: document.getElementById("setting-translator-model").value.trim(),
+//                 apiKeys
+//             };
+
+//             try {
+//                 const res = await fetch("/api/scenarios/settings/save", {
+//                     method: "POST",
+//                     headers: { "Content-Type": "application/json" },
+//                     body: JSON.stringify(payload)
+//                 });
+
+//                 const result = await res.json();
+//                 if (res.ok && result.success) {
+//                     alert("🎉 Ayarlar başarıyla güncellendi ve sisteme mühürlendi kanka!");
+//                     await loadSystemSettings();
+//                 } else {
+//                     alert(`❌ Ayarlar kaydedilemedi: ${result.error || "Hata oluştu"}`);
+//                 }
+//             } catch (err) {
+//                 console.error("Ayarlar kaydedilirken ağ hatası:", err);
+//                 alert("❌ Sunucu bağlantı hatası!");
+//             } finally {
+//                 saveBtn.disabled = false;
+//                 saveBtn.innerHTML = originalHtml;
+//             }
+//         });
+//     }
+
+//     // Sol menüde "Ayarlar" sekmesine tıklandığında ayarları yükleyelim kanka
+//     const settingsTabBtn = document.querySelector('[data-target="view-settings"]');
+//     if (settingsTabBtn) {
+//         settingsTabBtn.addEventListener("click", loadSystemSettings);
+//     }
+
 // });
 
 
@@ -789,7 +913,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // ⚡ Toplu Testler için Tıklama Sıralı Kuyruk Dizisi kanka
     let batchQueue = [];
 
-    // ─── ⚡ TOPLU TEST KUYRUĞUNU ADIM ADIM ATEŞLEME ETKİNLİĞİ (Gelişmiş Sıralı Akış) ───
+    // ─── ⚡ TOPLU TEST KUYRUĞUNU ADIM ADIM ATEŞLEME ETKİNLİĞİ ───
     const startBatchBtn = document.getElementById("start-batch-btn");
     startBatchBtn.addEventListener("click", async () => {
         if (batchQueue.length === 0) return;
@@ -798,23 +922,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const confirmBatch = confirm(`Seçtiğin ${totalTests} senaryo sırasıyla canlı olarak koşturulacak kanka. Hazır mısın?`);
         if (!confirmBatch) return;
 
-        // 1. Buton durumunu çalışıyor moduna alıyoruz
         startBatchBtn.disabled = true;
         startBatchBtn.className = "bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm animate-pulse cursor-wait";
         
-        // Çalıştırılacak kopyasını alıyoruz ki döngü esnasında diziyi manipüle edebilelim
         const activeQueue = [...batchQueue]; 
         console.log("⚡ Canlı Pipeline Başlatıldı kanka. Sıralama:", activeQueue);
 
-        // 2. Her bir testi sırayla (Sequential) koşturuyoruz kanka 🔒
         for (let i = 0; i < activeQueue.length; i++) {
             const scenarioName = activeQueue[i];
-            const remainingCount = activeQueue.length - i; // Kalan test sayısı
+            const remainingCount = activeQueue.length - i; 
 
-            // Buton üzerindeki sayıyı dinamik olarak güncelliyoruz kanka!
             startBatchBtn.textContent = `Çalışacak Test Sayısı: ${remainingCount}...`;
 
-            // Tabloda ilgili satırı bulup durum hücresini güncelliyoruz
             const rows = document.querySelectorAll("#batch-list tr");
             let targetOrderCell = null;
             
@@ -822,7 +941,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 const checkbox = row.querySelector(".batch-checkbox");
                 if (checkbox && checkbox.value === scenarioName) {
                     targetOrderCell = row.querySelector(".batch-order-cell");
-                    // Satırı parlatıp sarı 'Çalışıyor...' durumuna çekiyoruz kanka
                     row.className = "border-b border-amber-500/30 bg-amber-500/5 transition h-12";
                     targetOrderCell.innerHTML = `<span class="text-amber-400 animate-pulse font-bold">Çalışıyor...</span>`;
                 }
@@ -831,7 +949,6 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 console.log(`🚀 [Pipeline] ${scenarioName} başlatılıyor... (${remainingCount} test kaldı)`);
                 
-                // Tekil test çalıştırma endpoint'ine istek atıp bitmesini bekliyoruz!
                 const res = await fetch("/api/scenarios/run", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -843,7 +960,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const result = await res.json();
                 
-                // Test sonucuna göre tablodaki ilgili satırı yeşile veya kırmızıya boyuyoruz kanka!
                 rows.forEach(row => {
                     const checkbox = row.querySelector(".batch-checkbox");
                     if (checkbox && checkbox.value === scenarioName) {
@@ -871,12 +987,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        // 3. Tüm testler bittiğinde butonu sıfırlıyoruz kanka
         alert("⚡ Harika! Seçilen tüm test pipeline adımları koşturuldu ve sonuçlar raporlara mühürlendi!");
         
-        batchQueue = []; // Kuyruğu temizle
-        updateBatchButtonState(); // Butonu 0 durumuna çek
-        await loadReports(); // Raporları anında tazele kanka!
+        batchQueue = []; 
+        updateBatchButtonState(); 
+        await loadReports(); 
     });
 
 
@@ -1511,4 +1626,212 @@ document.addEventListener("DOMContentLoaded", () => {
         currentProject = e.target.value;
         updateProjectLabels();
     });
+
+
+// ─── ⚙️ DİNAMİK AYARLAR VE ÇOKLU API ANAHTARLARI YÖNETİMİ ───
+    const settingsForm = document.getElementById("settings-form");
+    const apiKeysContainer = document.getElementById("api-keys-container");
+    const addApiKeyBtn = document.getElementById("add-api-key-btn");
+
+    // 🔒 Dropdown Listesini En Baştakiler Sabit Kalacak Şekilde Güncelleyen Fonksiyon kanka!
+    function refreshApiDropdowns(selectedRunner = "", selectedTranslator = "") {
+        const runnerSelect = document.getElementById("setting-test-runner-api");
+        const translatorSelect = document.getElementById("setting-translator-api");
+        if (!runnerSelect || !translatorSelect) return;
+
+        const currentRunner = selectedRunner || runnerSelect.value || "openai";
+        const currentTranslator = selectedTranslator || translatorSelect.value || "gemini";
+
+        const providers = ["openai", "gemini"];
+
+        document.querySelectorAll(".api-provider-input").forEach(input => {
+            const val = input.value.trim().toLowerCase();
+            if (val && !providers.includes(val)) {
+                providers.push(val);
+            }
+        });
+
+        runnerSelect.innerHTML = "";
+        providers.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p;
+            if (p === "openai") opt.textContent = "OpenAI (ChatGPT)";
+            else if (p === "gemini") opt.textContent = "Google Gemini";
+            else opt.textContent = p.toUpperCase();
+            runnerSelect.appendChild(opt);
+        });
+        runnerSelect.value = providers.includes(currentRunner) ? currentRunner : "openai";
+
+        translatorSelect.innerHTML = "";
+        providers.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p;
+            if (p === "openai") opt.textContent = "OpenAI (ChatGPT)";
+            else if (p === "gemini") opt.textContent = "Google Gemini";
+            else opt.textContent = p.toUpperCase();
+            translatorSelect.appendChild(opt);
+        });
+        translatorSelect.value = providers.includes(currentTranslator) ? currentTranslator : "gemini";
+    }
+
+    // A. Ayarları Sunucudan Çekip Formu Kilitleyen Fonksiyon
+    async function loadSystemSettings() {
+        if (!settingsForm) return;
+
+        try {
+            console.log("🔄 Dinamik sistem ayarları yükleniyor...");
+            const res = await fetch("/api/scenarios/settings/get");
+            const result = await res.json();
+
+            if (result.success && result.settings) {
+                const s = result.settings;
+
+                apiKeysContainer.innerHTML = "";
+                if (s.apiKeys) {
+                    Object.entries(s.apiKeys).forEach(([provider, details]) => {
+                        // Eğer eski sürümden kalan düz string varsa kaza çıkmasın diye fallback yapıyoruz kanka
+                        const keyVal = typeof details === "object" ? details.key : details;
+                        const modelVal = typeof details === "object" ? details.model : "";
+                        addApiKeyRow(provider, keyVal, modelVal);
+                    });
+                }
+
+                refreshApiDropdowns(s.testRunnerApi, s.translatorApi);
+            }
+        } catch (err) {
+            console.error("❌ Ayarlar yüklenirken hata oluştu:", err);
+        }
+    }
+
+// B. Dinamik Sağlayıcı, API Key (Şifreli/Göz Butonlu) ve Model Satırı Ekleyen Yardımcı Fonksiyon kanka! 🔒
+    function addApiKeyRow(provider = "", keyVal = "", modelVal = "") {
+        const row = document.createElement("div");
+        // responsive grid ve ferah paddingler eklendi kanka
+        row.className = "grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-[#27272a]/30 p-3 rounded-xl border border-[rgba(255,255,255,0.04)] animate-slide-in w-full";
+        
+        row.innerHTML = `
+            <div class="md:col-span-3">
+                <input type="text" required placeholder="Sağlayıcı adı (Örn: openai)" value="${provider}" 
+                       class="api-provider-input w-full bg-transparent text-xs text-white outline-none font-mono font-bold border-b md:border-b-0 md:border-r border-[rgba(255,255,255,0.06)] pb-1 md:pb-0 md:pr-2">
+            </div>
+            
+            <div class="md:col-span-5 flex items-center bg-[#18181b] border border-[rgba(255,255,255,0.05)] rounded-lg px-2.5 py-1.5 w-full gap-2">
+                <input type="password" required placeholder="API Key Değeri" value="${keyVal}" 
+                       class="api-value-input w-full bg-transparent text-xs text-zinc-300 outline-none font-mono">
+                <button type="button" class="toggle-password-btn text-zinc-500 hover:text-zinc-300 transition focus:outline-none">
+                    <i data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+            </div>
+            
+            <div class="md:col-span-3">
+                <input type="text" required placeholder="Model adı (Örn: gpt-4o-mini)" value="${modelVal}" 
+                       class="api-model-input w-full bg-[#18181b] border border-[rgba(255,255,255,0.05)] p-2 rounded-lg text-xs text-amber-400 outline-none font-mono">
+            </div>
+            
+            <div class="md:col-span-1 flex justify-end">
+                <button type="button" class="remove-api-key-btn text-zinc-500 hover:text-red-400 transition p-1.5 rounded-lg hover:bg-red-500/10">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </div>
+        `;
+
+        const providerInput = row.querySelector(".api-provider-input");
+        const passwordInput = row.querySelector(".api-value-input");
+        const togglePasswordBtn = row.querySelector(".toggle-password-btn");
+        const eyeIcon = togglePasswordBtn.querySelector("i");
+
+        // Göz butonuna basıldığında input tipini password/text arasında değiştirme sihri kanka! 🔒
+        togglePasswordBtn.addEventListener("click", () => {
+            if (passwordInput.type === "password") {
+                passwordInput.type = "text";
+                togglePasswordBtn.innerHTML = `<i data-lucide="eye-off" class="w-4 h-4"></i>`;
+            } else {
+                passwordInput.type = "password";
+                togglePasswordBtn.innerHTML = `<i data-lucide="eye" class="w-4 h-4"></i>`;
+            }
+            lucide.createIcons(); // İkonu anında yenileyelim
+        });
+
+        providerInput.addEventListener("input", () => {
+            refreshApiDropdowns();
+        });
+
+        row.querySelector(".remove-api-key-btn").addEventListener("click", () => {
+            row.remove();
+            refreshApiDropdowns();
+        });
+
+        apiKeysContainer.appendChild(row);
+        lucide.createIcons();
+    }
+
+    if (addApiKeyBtn) {
+        addApiKeyBtn.addEventListener("click", () => {
+            addApiKeyRow();
+            refreshApiDropdowns();
+        });
+    }
+
+    // C. Ayarları Kaydetme Olayı
+    if (settingsForm) {
+        settingsForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const saveBtn = document.getElementById("save-settings-btn");
+            const originalHtml = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = `<span>Kaydediliyor...</span>`;
+
+            const apiKeys = {};
+            const providerInputs = document.querySelectorAll(".api-provider-input");
+            const valueInputs = document.querySelectorAll(".api-value-input");
+            const modelInputs = document.querySelectorAll(".api-model-input");
+
+            providerInputs.forEach((input, index) => {
+                const provider = input.value.trim().toLowerCase(); 
+                const keyVal = valueInputs[index].value.trim();
+                const modelVal = modelInputs[index].value.trim();
+                
+                if (provider) {
+                    apiKeys[provider] = {
+                        key: keyVal,
+                        model: modelVal
+                    };
+                }
+            });
+
+            const payload = {
+                testRunnerApi: document.getElementById("setting-test-runner-api").value,
+                translatorApi: document.getElementById("setting-translator-api").value,
+                apiKeys
+            };
+
+            try {
+                const res = await fetch("/api/scenarios/settings/save", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    alert("🎉 Muhteşem! Sağlayıcı ayarları ve model isimleri diske başarıyla kilitlendi kanka!");
+                    await loadSystemSettings();
+                } else {
+                    alert(`❌ Ayarlar kaydedilemedi: ${result.error || "Hata oluştu"}`);
+                }
+            } catch (err) {
+                console.error("Ayarlar kaydedilirken ağ hatası:", err);
+                alert("❌ Sunucu bağlantı hatası!");
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalHtml;
+            }
+        });
+    }
+
+    const settingsTabBtn = document.querySelector('[data-target="view-settings"]');
+    if (settingsTabBtn) {
+        settingsTabBtn.addEventListener("click", loadSystemSettings);
+    }
 });

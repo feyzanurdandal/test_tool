@@ -83,6 +83,9 @@
                 <button data-target="view-reports" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
                     <i data-lucide="file-text" class="w-4 h-4"></i> <span>Raporlar</span>
                 </button>
+                <button data-target="view-settings" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
+                    <i data-lucide="settings" class="w-4 h-4"></i> <span>Ayarlar</span>
+                </button>
             </aside>
 
             <main class="flex-1 bg-[#09090b] p-8 overflow-y-auto">
@@ -151,6 +154,58 @@
                         
                         <div id="reports-list-accordion" class="space-y-3"></div>
                     </div>
+                </div>
+
+<div id="view-settings" class="view-content space-y-6 hidden animate-fade-in w-full">
+                    <div>
+                        <h2 class="text-xl font-bold tracking-tight text-white">Sistem Ayarları</h2>
+                        <p class="text-xs text-zinc-500 mt-0.5">Yapay zeka sağlayıcılarını ve bunlara ait anahtar/model ikililerini dinamik yönetin kanka</p>
+                    </div>
+
+                    <form id="settings-form" class="space-y-6 w-full bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl">
+                        
+                        <div class="space-y-3">
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider border-b border-[rgba(255,255,255,0.06)] pb-2 flex items-center gap-1.5 text-amber-400">
+                                <i data-lucide="play-circle" class="w-4 h-4"></i> Test Senaryosu Çalıştırma (Stagehand)
+                            </h3>
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Aktif Test Sağlayıcısı</label>
+                                <select id="setting-test-runner-api" class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-lg outline-none focus:border-[#3b82f6] transition font-medium cursor-pointer">
+                                    </select>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 pt-2">
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider border-b border-[rgba(255,255,255,0.06)] pb-2 flex items-center gap-1.5 text-[#3b82f6]">
+                                <i data-lucide="languages" class="w-4 h-4"></i> Senaryo Çevirisi (Türkçe ➡️ JSON)
+                            </h3>
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Aktif Çeviri Sağlayıcısı</label>
+                                <select id="setting-translator-api" class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-lg outline-none focus:border-[#3b82f6] transition font-medium cursor-pointer">
+                                    </select>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 pt-2">
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider border-b border-[rgba(255,255,255,0.06)] pb-2 flex items-center justify-between">
+                                <span class="flex items-center gap-1.5 text-zinc-300">
+                                    <i data-lucide="key-round" class="w-4 h-4"></i> Sağlayıcı Tanımlamaları (Key & Model)
+                                </span>
+                                <button type="button" id="add-api-key-btn" class="text-[10px] text-[#3b82f6] hover:text-blue-400 font-semibold transition flex items-center gap-1">
+                                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Yeni Sağlayıcı Ekle
+                                </button>
+                            </h3>
+                            
+                            <div id="api-keys-container" class="space-y-3 overflow-y-auto pr-1">
+                                </div>
+                        </div>
+
+                        <div class="border-t border-[rgba(255,255,255,0.06)] pt-4 flex justify-end">
+                            <button type="submit" id="save-settings-btn" class="px-5 py-2.5 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold border border-blue-600 transition shadow-sm flex items-center gap-1.5">
+                                <i data-lucide="save" class="w-4 h-4"></i> Ayarları Kaydet
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
             </main>

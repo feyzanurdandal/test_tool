@@ -92,6 +92,7 @@
 // });
 
 // tests/ai-security.spec.ts
+// tests/ai-security.spec.ts
 import { test, expect } from '@playwright/test';
 import { Stagehand } from '@browserbasehq/stagehand';
 import { chromium } from 'playwright-core';
@@ -116,14 +117,72 @@ test('Yapay Zeka Test Otomasyonu', async () => {
 
     const promptData = JSON.parse(fs.readFileSync(promptFilePath, 'utf-8'));
 
-    process.env.OPENAI_API_KEY = CONSTANTS.OPENAI_API_KEY;
+// ─── ⚙️ DİNAMİK AYARLARI OKUMA SİHRİ (DPU Base İlişkisel Sürüm! 🔒) ───
+    let activeModel = 'openai/gpt-4o-mini';
+    let chosenApi = 'openai';
+    let apiKeyValue = CONSTANTS.OPENAI_API_KEY;
+    let customBaseUrl: string | undefined = undefined;
+
+    try {
+        console.log("🔄 [Test Runner] Aktif test çalıştırıcı sağlayıcı DPU Base'den sorgulanıyor...");
+        
+        // Önce aktif test sağlayıcısını seçelim
+        const activeRunnerRes = await dpu.select('ayarlar', 1, 'ayar_anahtar:eq:test_runner_api');
+
+        if (activeRunnerRes.success && activeRunnerRes.data.length > 0) {
+            chosenApi = activeRunnerRes.data[0].ayar_deger;
+            console.log(`🎯 [Test Runner] Aktif Çalıştırıcı Sağlayıcı: ${chosenApi}. Key ve Model tek satırdan çekiliyor...`);
+
+            // 🌟 Sağlayıcıya ait satırı nokta atışı tek sorgu ile çekip hem key hem de model bilgisini tek seferde alıyoruz kanka! kilit! 🔒
+            const providerRes = await dpu.select('ayarlar', 1, `ayar_anahtar:eq:${chosenApi}`);
+
+            if (providerRes.success && providerRes.data.length > 0) {
+                apiKeyValue = providerRes.data[0].ayar_deger;  // API Key değerimiz
+                activeModel = providerRes.data[0].ayar_model;  // Model değerimiz (Yeni kolon!)
+            }
+
+            // 🎯 EVRENSEL SAĞLAYICI ÖNEKİ (PREFIX) STANDARTLAŞTIRMASI
+            if (chosenApi.toLowerCase().includes("openai")) {
+                if (!activeModel.startsWith("openai/")) {
+                    activeModel = `openai/${activeModel}`;
+                }
+            } else if (chosenApi.toLowerCase().includes("gemini")) {
+                if (!activeModel.startsWith("google/") && !activeModel.startsWith("gemini/")) {
+                    activeModel = `google/${activeModel}`;
+                }
+            } else if (chosenApi.toLowerCase().includes("qwen") || chosenApi.toLowerCase().includes("local") || chosenApi.toLowerCase().includes("dpu")) {
+                customBaseUrl = "https://ai.dpu.edu.tr/api";
+                if (!activeModel.startsWith("openai/")) {
+                    activeModel = `openai/${activeModel}`;
+                }
+                console.log(`🔌 DPU Yerel Sunucusu Bağlantı Köprüsü kuruldu: ${customBaseUrl}`);
+            }
+        }
+    } catch (err: any) {
+        console.warn("⚠️ DPU Base ayar tablosu sorgulanamadı, local CONSTANTS kullanılacak:", err.message);
+    }
+
+    // 🎯 Çevre değişkenlerini ve API Anahtarlarını kütüphanelere dağıtıyoruz
+    if (chosenApi.toLowerCase().includes("gemini")) {
+        process.env.GEMINI_API_KEY = apiKeyValue;
+    } else {
+        process.env.OPENAI_API_KEY = apiKeyValue || "local-no-key";
+    }
+
+    console.log(`⚙️ [Test Runner] Stagehand Başlatılıyor. Sağlayıcı: ${chosenApi} | Model: ${activeModel}`);
 
     const stagehand = new Stagehand({
         env: 'LOCAL',
-        model: 'openai/gpt-4o-mini',
+        model: activeModel as any,
         cacheDir: path.resolve(__dirname, '../cache/ai-security'),
         domSettleTimeout: 10000,
-        localBrowserLaunchOptions: { headless: false }
+        localBrowserLaunchOptions: { headless: false },
+        // 🌟 Eğer DPU Qwen seçildiyse API endpoint geçişi yapıyoruz kanka
+        ...(customBaseUrl ? { 
+            configuration: {
+                baseURL: customBaseUrl
+            }
+        } : {})
     });
 
     await stagehand.init();
