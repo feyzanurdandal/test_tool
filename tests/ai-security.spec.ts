@@ -1,97 +1,3 @@
-// // tests/ai-security.spec.ts
-// import { test, expect } from '@playwright/test';
-// import { Stagehand } from '@browserbasehq/stagehand';
-// import { chromium } from 'playwright-core';
-// import { z } from 'zod';
-// import * as fs from 'fs';
-// import * as path from 'path';
-// import { fileURLToPath } from 'url';
-// import { CONSTANTS } from '../config/constants.js'; 
-
-// test('Yapay Zeka Test Otomasyonu', async () => {
-//     const __filename = fileURLToPath(import.meta.url);
-//     const __dirname = path.dirname(__filename);
-    
-//     const scenarioName = process.env.SCENARIO_NAME || 'ai-prompts'; // n8n'den gelen isim yoksa varsayılanı oku
-    
-//     // 🚀 Sadece çoklu proje klasör eki eklendi, başka hiçbir şeye dokunulmadı
-//     const projectContext = process.env.PROJECT_CONTEXT ? `${process.env.PROJECT_CONTEXT}/` : '';
-//     const promptFilePath = path.resolve(__dirname, `../scenarios/${projectContext}${scenarioName}.json`);
-    
-//     if (!fs.existsSync(promptFilePath)) {
-//         throw new Error(`🚨 Test dosyası belirtilen proje klasöründe bulunamadı: ${promptFilePath}`);
-//     }
-
-//     const promptData = JSON.parse(fs.readFileSync(promptFilePath, 'utf-8'));
-
-//     process.env.OPENAI_API_KEY = CONSTANTS.OPENAI_API_KEY;
-
-//     const stagehand = new Stagehand({
-//         env: 'LOCAL',
-//         model: 'openai/gpt-4o-mini', // Bütçe dostu, hızlı model
-//         cacheDir: path.resolve(__dirname, '../cache/ai-security'),
-//         domSettleTimeout: 10000,
-//         localBrowserLaunchOptions: { headless: false }
-//     });
-
-//     await stagehand.init();
-//     const browser = await chromium.connectOverCDP({ wsEndpoint: stagehand.connectURL() });
-//     const pwPage = browser.contexts()[0].pages()[0];
-//     await pwPage.setViewportSize({ width: 1280, height: 720 });
-
-//     try {
-//         await pwPage.goto(promptData.targetUrl);
-
-//         // Orijinal döngün ve fallback (yedek ajan) mantığın birebir korundu
-//         for (const step of promptData.steps) {
-//             try {
-//                 if (step.type === 'act') {
-//                     // Talimat metin girmeyle mi alakalı? (Metin gir, yaz, doldur vb.)
-//                     const isWritingTask = step.instruction.toLowerCase().includes('enter') || 
-//                                         step.instruction.toLowerCase().includes('type') || 
-//                                         step.instruction.toLowerCase().includes('fill');
-
-//                     let finalInstruction = step.instruction;
-
-//                     if (isWritingTask) {
-//                         // 🚀 YAPAY ZEKAYA KATI KURAL ENJEKSİYONU:
-//                         finalInstruction = `${step.instruction} (CRITICAL: Target ONLY the actual <input> or text-entry element. DO NOT perform fill action on a <span>, <div> or label wrapper)`;
-//                     }
-
-//                     await stagehand.act(finalInstruction, { page: pwPage });
-                    
-//                     const isNavigationStep = step.instruction.toLowerCase().includes('enter') || 
-//                                             step.instruction.toLowerCase().includes('click') || 
-//                                             step.instruction.toLowerCase().includes('submit');
-//                     if (isNavigationStep) {
-//                         console.log("⏳ Sayfa geçişi için kısa duraklama (2sn)...");
-//                         await pwPage.waitForTimeout(2000); 
-//                     }
-//                 }
-//                 else if (step.type === 'extract') {
-//                     const dynamicSchema = z.object({ [step.field]: z.string() });
-//                     const response = await stagehand.extract(step.instruction, dynamicSchema, { page: pwPage });
-                    
-//                     console.log(`*** [BAŞARIYLA AYIKLANDI] ${step.field} ->`, response[step.field]);
-                    
-//                     expect(response[step.field]).toBeDefined();
-//                     expect(response[step.field].length).toBeGreaterThan(0);
-//                 }
-//             } catch (e) {
-//                 console.warn("⚠️ Hata oldu, yedek ajan devreye giriyor...");
-//                 const agent = stagehand.agent({
-//                     mode: "dom", // CUA değil DOM modu (Sadece OpenAI ile çalışır)
-//                     model: "openai/gpt-4o" // Yedek olarak daha güçlü OpenAI modeli
-//                 });
-//                 await agent.execute({ instruction: step.instruction, page: pwPage });
-//             }
-//         }
-//     } finally {
-//         await stagehand.close();
-//     }
-// });
-
-// tests/ai-security.spec.ts
 // tests/ai-security.spec.ts
 import { test, expect } from '@playwright/test';
 import { Stagehand } from '@browserbasehq/stagehand';
@@ -106,42 +12,42 @@ test('Yapay Zeka Test Otomasyonu', async () => {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     
-    const scenarioName = process.env.SCENARIO_NAME || 'ai-prompts';
+    const scenarioName = process.env.SCENARIO_NAME;
     
     const projectContext = process.env.PROJECT_CONTEXT ? `${process.env.PROJECT_CONTEXT}/` : '';
     const promptFilePath = path.join(process.cwd(), 'cache', 'runtime_steps.json');
 
     if (!fs.existsSync(promptFilePath)) {
-        throw new Error(`🚨 Test dosyası belirtilen proje klasöründe bulunamadı: ${promptFilePath}`);
+        throw new Error(`Test dosyası belirtilen proje klasöründe bulunamadı: ${promptFilePath}`);
     }
 
     const promptData = JSON.parse(fs.readFileSync(promptFilePath, 'utf-8'));
 
-// ─── ⚙️ DİNAMİK AYARLARI OKUMA SİHRİ (DPU Base İlişkisel Sürüm! 🔒) ───
+// ───  DİNAMİK AYARLARI OKUMA  ───
     let activeModel = 'openai/gpt-4o-mini';
     let chosenApi = 'openai';
     let apiKeyValue = CONSTANTS.OPENAI_API_KEY;
     let customBaseUrl: string | undefined = undefined;
 
     try {
-        console.log("🔄 [Test Runner] Aktif test çalıştırıcı sağlayıcı DPU Base'den sorgulanıyor...");
+        console.log("[Test Runner] Aktif test çalıştırıcı sağlayıcı DPU Base'den sorgulanıyor...");
         
         // Önce aktif test sağlayıcısını seçelim
         const activeRunnerRes = await dpu.select('ayarlar', 1, 'ayar_anahtar:eq:test_runner_api');
 
         if (activeRunnerRes.success && activeRunnerRes.data.length > 0) {
             chosenApi = activeRunnerRes.data[0].ayar_deger;
-            console.log(`🎯 [Test Runner] Aktif Çalıştırıcı Sağlayıcı: ${chosenApi}. Key ve Model tek satırdan çekiliyor...`);
+            console.log(`[Test Runner] Aktif Çalıştırıcı Sağlayıcı: ${chosenApi}. Key ve Model tek satırdan çekiliyor...`);
 
-            // 🌟 Sağlayıcıya ait satırı nokta atışı tek sorgu ile çekip hem key hem de model bilgisini tek seferde alıyoruz kanka! kilit! 🔒
+            //  Sağlayıcıya ait satırı nokta atışı tek sorgu ile çekip hem key hem de model bilgisini tek seferde alıyoruz
             const providerRes = await dpu.select('ayarlar', 1, `ayar_anahtar:eq:${chosenApi}`);
 
             if (providerRes.success && providerRes.data.length > 0) {
                 apiKeyValue = providerRes.data[0].ayar_deger;  // API Key değerimiz
-                activeModel = providerRes.data[0].ayar_model;  // Model değerimiz (Yeni kolon!)
+                activeModel = providerRes.data[0].ayar_model;  // Model değerimiz
             }
 
-            // 🎯 EVRENSEL SAĞLAYICI ÖNEKİ (PREFIX) STANDARTLAŞTIRMASI
+            // EVRENSEL SAĞLAYICI ÖNEKİ (PREFIX) STANDARTLAŞTIRMASI
             if (chosenApi.toLowerCase().includes("openai")) {
                 if (!activeModel.startsWith("openai/")) {
                     activeModel = `openai/${activeModel}`;
@@ -155,11 +61,11 @@ test('Yapay Zeka Test Otomasyonu', async () => {
                 if (!activeModel.startsWith("openai/")) {
                     activeModel = `openai/${activeModel}`;
                 }
-                console.log(`🔌 DPU Yerel Sunucusu Bağlantı Köprüsü kuruldu: ${customBaseUrl}`);
+                console.log(`DPU Yerel Sunucusu Bağlantı Köprüsü kuruldu: ${customBaseUrl}`);
             }
         }
     } catch (err: any) {
-        console.warn("⚠️ DPU Base ayar tablosu sorgulanamadı, local CONSTANTS kullanılacak:", err.message);
+        console.warn("DPU Base ayar tablosu sorgulanamadı, local CONSTANTS kullanılacak:", err.message);
     }
 
     // 🎯 Çevre değişkenlerini ve API Anahtarlarını kütüphanelere dağıtıyoruz
@@ -169,7 +75,7 @@ test('Yapay Zeka Test Otomasyonu', async () => {
         process.env.OPENAI_API_KEY = apiKeyValue || "local-no-key";
     }
 
-    console.log(`⚙️ [Test Runner] Stagehand Başlatılıyor. Sağlayıcı: ${chosenApi} | Model: ${activeModel}`);
+    console.log(`[Test Runner] Stagehand Başlatılıyor. Sağlayıcı: ${chosenApi} | Model: ${activeModel}`);
 
     const stagehand = new Stagehand({
         env: 'LOCAL',
@@ -177,7 +83,7 @@ test('Yapay Zeka Test Otomasyonu', async () => {
         cacheDir: path.resolve(__dirname, '../cache/ai-security'),
         domSettleTimeout: 10000,
         localBrowserLaunchOptions: { headless: false },
-        // 🌟 Eğer DPU Qwen seçildiyse API endpoint geçişi yapıyoruz kanka
+        // Eğer DPU Qwen seçildiyse API endpoint geçişi yapıyoruz
         ...(customBaseUrl ? { 
             configuration: {
                 baseURL: customBaseUrl

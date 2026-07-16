@@ -676,5 +676,35 @@ router.post('/settings/save', async (req, res) => {
     }
 });
 
+// ─── 🗑️ 6.5. API: TEKİL TEST RAPORUNU SİLME (DPU BASE) ───
+router.post('/reports/delete', async (req, res) => {
+    const { id } = req.body;
+
+    if (!id) {
+        return res.status(400).json({ error: "Eksik parametre kanka! Rapor ID değeri gelmedi." });
+    }
+
+    try {
+        console.log(`=========================================`);
+        console.log(`🗑️ RAPOR SİLME İSTEĞİ GELDİ kanka!`);
+        console.log(`Silinecek Rapor ID: "${id}"`);
+
+        // DPU Base 'raporlar' tablosundan ilgili id'li satırı tamamen siliyoruz kanka! 🔒
+        const deleteResult = await dpu.delete('raporlar', id);
+
+        if (deleteResult.success) {
+            console.log(`✅ Rapor (ID: ${id}) başarıyla buluttan temizlendi.`);
+            console.log(`=========================================`);
+            return res.status(200).json({ success: true, message: "Test raporu başarıyla silindi!" });
+        } else {
+            console.error("❌ Rapor silme işlemi başarısız:", deleteResult);
+            return res.status(500).json({ error: "Silme işlemi veritabanında başarısız oldu.", details: deleteResult });
+        }
+
+    } catch (error) {
+        console.error("💥 Rapor silme endpoint'inde hata patladı:", error.message);
+        return res.status(500).json({ error: error.message });
+    }
+});
 
 export default router;

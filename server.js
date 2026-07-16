@@ -14,7 +14,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /**
- * 🆕 SADECE AI ÇEVİRİSİ YAPIP NET JSON DÖNEN YENİ FONKSİYON
+ * SADECE AI ÇEVİRİSİ YAPIP NET JSON DÖNEN YENİ FONKSİYON
  */
 export async function translateScenario(turkishInstructions, targetUrl) {
     const stagehandJson = await translateToStagehandJson(turkishInstructions, targetUrl);
@@ -24,7 +24,7 @@ export async function translateScenario(turkishInstructions, targetUrl) {
 }
 
 /**
- * 🔄 ESKİ OTOMATİK ÇEVİRİ VE KAYIT FONKSİYONU (YENİ MEKANİZMAYI KULLANACAK ŞEKİLDE)
+ * ESKİ OTOMATİK ÇEVİRİ VE KAYIT FONKSİYONU (YENİ MEKANİZMAYI KULLANACAK ŞEKİLDE)
  */
 export async function processAndSaveScenario(scenarioName, turkishInstructions, targetUrl, projectName) {
     const stagehandJson = await translateScenario(turkishInstructions, targetUrl);
@@ -47,11 +47,10 @@ import reportRoutes from './routes/reports.js';
 app.use('/api/scenarios', dpuScenariosRouter);
 app.use('/api/reports', reportRoutes);
 
-// ─── 2. STATIC FILES & HTML BINDINGS (YENİ SAF VANILLA JS DÜNYASI) ───
-// Eskiden 'dist' klasörünü serve ediyorduk, artık yeni 'public' klasörümüz aktif!
+// ─── 2. STATIC FILES & HTML BINDINGS 
 app.use(express.static(path.join(process.cwd(), 'public')));
 
-// API istekleri dışındaki tüm istekleri bizim public/index.html dosyamıza yönlendir kanka
+// API istekleri dışındaki tüm istekleri bizim public/index.html dosyamıza yönlendir
 app.get(/^(?!\/api).*$/, (req, res) => {
     res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
 });
