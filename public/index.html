@@ -86,6 +86,10 @@
                 <button data-target="view-settings" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
                     <i data-lucide="settings" class="w-4 h-4"></i> <span>Ayarlar</span>
                 </button>
+                <!-- index.html aside içerisine eklenecek buton -->
+                <button id="nav-users-btn" data-target="view-users" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b] hidden">
+                    <i data-lucide="users" class="w-4 h-4"></i> <span>Kullanıcı Yönetimi</span>
+                </button>
             </aside>
 
             <main class="flex-1 bg-[#09090b] p-8 overflow-y-auto">
@@ -156,7 +160,7 @@
                     </div>
                 </div>
 
-<div id="view-settings" class="view-content space-y-6 hidden animate-fade-in w-full">
+                <div id="view-settings" class="view-content space-y-6 hidden animate-fade-in w-full">
                     <div>
                         <h2 class="text-xl font-bold tracking-tight text-white">Sistem Ayarları</h2>
                         <p class="text-xs text-zinc-500 mt-0.5">Yapay zeka sağlayıcılarını ve bunlara ait anahtar/model ikililerini dinamik yönetin </p>
@@ -206,6 +210,70 @@
                             </button>
                         </div>
                     </form>
+                </div>
+
+                <!-- index.html main içerisine eklenecek görünüm -->
+                <div id="view-users" class="view-content space-y-6 hidden w-full">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-xl font-bold tracking-tight text-white">Kullanıcı Yönetimi</h2>
+                            <p class="text-xs text-zinc-500 mt-0.5">Sistem kullanıcılarını ve proje yetkilerini yönetin</p>
+                        </div>
+                        <button id="open-new-user-modal-btn" class="bg-[#3b82f6] hover:bg-blue-500 text-white text-xs font-medium px-4 py-2 rounded-lg transition border border-blue-600 flex items-center gap-1.5 shadow-sm">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i> Yeni Kullanıcı
+                        </button>
+                    </div>
+
+                    <div class="bg-[#09090b] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden min-h-[200px] flex flex-col justify-center items-center p-8">
+                        <div id="users-empty" class="text-xs text-zinc-500 font-medium hidden">Sistemde kayıtlı kullanıcı bulunmuyor.</div>
+                        <table id="users-table" class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-[rgba(255,255,255,0.06)] text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                                    <th class="py-3 px-4">Kullanıcı Adı</th>
+                                    <th class="py-3 px-4">Rol</th>
+                                    <th class="py-3 px-4">Atanmış Projeler</th>
+                                    <th class="py-3 px-4 text-right">İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-list" class="text-xs text-zinc-300 divide-y divide-[rgba(255,255,255,0.04)]"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Yeni Kullanıcı Ekleme Modali -->
+                <div id="user-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div class="w-full max-w-md bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-white">Yeni Kullanıcı Oluştur</h3>
+                            <button id="close-user-modal" class="text-zinc-500 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+                        </div>
+                        <form id="user-form" class="space-y-4">
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Kullanıcı Adı</label>
+                                <input type="text" id="new-user-username" required class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Şifre</label>
+                                <input type="password" id="new-user-password" required class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Rolü</label>
+                                <select id="new-user-role" required class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-lg outline-none cursor-pointer">
+                                    <option value="PM">PM (Proje Yöneticisi)</option>
+                                    <option value="ADMIN">ADMIN (Tam Yetkili)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Çalışabileceği Projeler</label>
+                                <div id="user-projects-checkboxes" class="space-y-1.5 max-h-[120px] overflow-y-auto bg-[#27272a]/40 p-3 rounded-lg border border-[rgba(255,255,255,0.04)]">
+                                    <!-- Dinamik olarak dolacak -->
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full py-2 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition">
+                                Kullanıcıyı Kaydet
+                            </button>
+                        </form>
+                    </div>
                 </div>
 
             </main>

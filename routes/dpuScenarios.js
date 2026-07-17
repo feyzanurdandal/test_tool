@@ -20,18 +20,72 @@ const runPlaywrightTest = () => {
     });
 };
 
-// ─── 1. API: PROJELERİ LİSTELEME (DPU BASE) ───
+// routes/dpuScenarios.js dosyasının en üstüne ekle kanka:
+import crypto from 'crypto';
+const SECRET_KEY = 'djheschoeschsojcosdj';
+
+// Token'ı çözen ve imza doğruluğunu kontrol eden sihirli fonksiyonumuz 🔒
+function getRoleFromToken(token) {
+    if (!token) return 'GUEST';
+    try {
+        const [username, role, signature] = token.split(':');
+        
+        // Gelen bilgilerle sunucu tarafında yeniden imza hesaplıyoruz
+        const expectedSignature = crypto.createHmac('sha256', SECRET_KEY)
+                                        .update(`${username}:${role}`)
+                                        .digest('hex');
+
+        // Eğer imzalar uyuşuyorsa rol güvenlidir!
+        if (signature === expectedSignature) {
+            return role;
+        }
+    } catch (e) {
+        console.error("Güvenlik Duvarı: Token doğrulanamadı!", e.message);
+    }
+    return 'GUEST';
+}
+
+// Kullanıcının adını token'dan güvenle çıkaran fonksiyon 🔒
+function getUsernameFromToken(token) {
+    if (!token) return null;
+    try {
+        const [username, role, signature] = token.split(':');
+        return username;
+    } catch (e) {
+        return null;
+    }
+}
+
+// ─── 1. API: PROJELERİ LİSTELEME (ROL BAZLI FİLTRELİ!) ───
 router.get('/projects/list', async (req, res) => {
+    const userToken = req.headers['x-user-token'];
+    const userRole = getRoleFromToken(userToken);
+    const username = getUsernameFromToken(userToken);
+
     try {
         const result = await dpu.select('projeler', 100);
         if (!result.success) {
             return res.status(500).json({ error: "DPU Base listeleme hatası", details: result });
         }
 
-        const projectNames = result.data.map(p => p.proje_adi);
+        let projectNames = result.data.map(p => p.proje_adi);
+
+        // 🛡️ SİBER GÜVENLİK FİLTRESİ: Eğer kullanıcı ADMIN değilse sadece atandığı projeleri görebilir!
+        if (userRole !== 'ADMIN' && username) {
+            const permissionsRes = await dpu.select('kullanici_projeleri', 100);
+            if (permissionsRes.success && permissionsRes.data) {
+                // Sadece bu kullanıcıya atanan proje adlarını filtreliyoruz kanka 🔑
+                const allowedProjects = permissionsRes.data
+                    .filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase())
+                    .map(p => p.proje_adi);
+
+                projectNames = projectNames.filter(name => allowedProjects.includes(name));
+            } else {
+                projectNames = []; // Atanmış izin tablosu yoksa hiçbir projeyi göremez!
+            }
+        }
         
-        // Veritabanı tamamen boşsa ilk varsayılan projeyi güvenle ekliyoruz
-        if (projectNames.length === 0) {
+        if (projectNames.length === 0 && userRole === 'ADMIN') {
             await dpu.insert('projeler', { proje_adi: 'Varsayılan Proje' });
             return res.json({ success: true, projects: ['Varsayılan Proje'] });
         }
@@ -44,10 +98,11 @@ router.get('/projects/list', async (req, res) => {
 
 // ─── 2. API: YENİ PROJE OLUŞTURMA (Sadece ADMIN Yetkili) ───
 router.post('/projects/create', async (req, res) => {
-    const userRole = req.headers['x-user-role'];
+    // const userRole = req.headers['x-user-role'];
+    const userRole = getRoleFromToken(userToken);
 
     if (userRole !== 'ADMIN') {
-        return res.status(403).json({ error: "Bu işlem için yetkiniz yok! Sadece ADMIN yeni proje ekleyebilir." });
+        return res.status(403).json({ error: "Bu işlem için yetkiniz yok! Sadece ADMIN yetkilidir." });
     }
 
     const { projectName } = req.body;
@@ -126,35 +181,6 @@ router.get('/list', async (req, res) => {
         return res.status(500).json({ error: error.message });
     }
 });
-
-// // ─── 4. API: SENARYO JSON İÇERİĞİNİ OKUMA ───
-// router.get('/content', async (req, res) => {
-//     const { scenarioName, project } = req.query;
-//     const selectedProj = project || 'Varsayılan Proje';
-
-//     if (!scenarioName) return res.status(400).json({ error: "scenarioName parametresi zorunlu!" });
-
-//     try {
-//         const projectRes = await dpu.select('projeler', 1, `proje_adi:eq:${selectedProj}`);
-//         if (!projectRes.success || projectRes.data.length === 0) {
-//             return res.status(404).json({ error: "Proje bulunamadı." });
-//         }
-//         const projectId = projectRes.data[0].id;
-
-//         const scenarioRes = await dpu.select('senaryolar', 1, `project_id:eq:${projectId}&senaryo_adi:eq:${scenarioName}`);
-//         if (scenarioRes.success && scenarioRes.data.length > 0) {
-//             const scenario = scenarioRes.data[0];
-//             const adimlarContent = typeof scenario.adimlar === 'string' 
-//                 ? JSON.parse(scenario.adimlar) 
-//                 : scenario.adimlar;
-
-//             return res.json({ success: true, content: adimlarContent });
-//         }
-//         return res.status(404).json({ error: "Senaryo bulunamadı." });
-//     } catch (error) {
-//         return res.status(500).json({ error: error.message });
-//     }
-// });
 
 // ─── 4. API: SENARYO JSON İÇERİĞİNİ OKUMA (BELLEKTE GÜVENLİ FİLTRELEME! 🔒) ───
 router.get('/content', async (req, res) => {
@@ -553,7 +579,9 @@ router.get('/settings/get', async (req, res) => {
 
 // ─── 11. API: DPU BASE ÜZERİNE İLİŞKİSEL AYARLARI KAYDETME ───
 router.post('/settings/save', async (req, res) => {
-    const userRole = req.headers['x-user-role'];
+    // const userRole = req.headers['x-user-role'];
+    const userRole = getRoleFromToken(userToken);
+
 
     if (userRole !== 'ADMIN') {
         return res.status(403).json({ error: "Bu işlem için yetkiniz yok! Sadece ADMIN sistem ayarlarını değiştirebilir." });
@@ -627,6 +655,111 @@ router.post('/reports/delete', async (req, res) => {
         return res.status(500).json({ error: "Silme işlemi veritabanında başarısız oldu.", details: deleteResult });
     } catch (error) {
         return res.status(500).json({ error: error.message });
+    }
+});
+
+// ─── 👨‍💼 KULLANICI YÖNETİMİ API ENDPOINT'LERİ (Sadece ADMIN Yetkili) ───
+
+// 1. Kullanıcıları Listeleme
+router.get('/users/list', async (req, res) => {
+    const userToken = req.headers['x-user-token'];
+    if (getRoleFromToken(userToken) !== 'ADMIN') return res.status(403).json({ error: "Yetkisiz işlem!" });
+
+    try {
+        const usersRes = await dpu.select('kullanicilar', 100);
+        const projectsRes = await dpu.select('projeler', 100);
+        const permsRes = await dpu.select('kullanici_projeleri', 100);
+
+        if (usersRes.success) {
+            // Kullanıcıları ve atandıkları projeleri birleştirip gönderiyoruz kanka
+            const formattedUsers = usersRes.data.map(user => {
+                const userProjects = permsRes.success && permsRes.data
+                    ? permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === user.kullanici_adi.toLowerCase()).map(p => p.proje_adi)
+                    : [];
+
+                return {
+                    id: user.id,
+                    kullanici_adi: user.kullanici_adi,
+                    rol: user.rol,
+                    projeler: userProjects
+                };
+            });
+
+            return res.json({ success: true, users: formattedUsers, allProjects: projectsRes.success ? projectsRes.data.map(p => p.proje_adi) : [] });
+        }
+        return res.status(500).json({ error: "Kullanıcılar yüklenemedi." });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Yeni Kullanıcı Oluşturma & Proje Atama
+router.post('/users/create', async (req, res) => {
+    const userToken = req.headers['x-user-token'];
+    if (getRoleFromToken(userToken) !== 'ADMIN') return res.status(403).json({ error: "Yetkisiz işlem!" });
+
+    const { username, password, role, selectedProjects } = req.body;
+
+    if (!username || !password || !role) {
+        return res.status(400).json({ error: "Eksik alanlar var!" });
+    }
+
+    try {
+        // Çift kayıt kontrolü
+        const usersCheck = await dpu.select('kullanicilar', 100);
+        if (usersCheck.success && usersCheck.data.some(u => u.kullanici_adi.toLowerCase() === username.toLowerCase())) {
+            return res.status(400).json({ error: "Bu kullanıcı adı zaten mevcut!" });
+        }
+
+        // Kullanıcıyı ekle
+        const userInsert = await dpu.insert('kullanicilar', {
+            kullanici_adi: username,
+            sifre: password,
+            rol: role.toUpperCase()
+        });
+
+        if (userInsert.success) {
+            // Proje yetkilerini ekle
+            if (Array.isArray(selectedProjects)) {
+                for (const proj of selectedProjects) {
+                    await dpu.insert('kullanici_projeleri', {
+                        kullanici_adi: username,
+                        proje_adi: proj
+                    });
+                }
+            }
+            return res.json({ success: true, message: "Kullanıcı başarıyla oluşturuldu!" });
+        }
+        return res.status(500).json({ error: "Kullanıcı eklenemedi." });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. Kullanıcı Silme
+router.post('/users/delete', async (req, res) => {
+    const userToken = req.headers['x-user-token'];
+    if (getRoleFromToken(userToken) !== 'ADMIN') return res.status(403).json({ error: "Yetkisiz işlem!" });
+
+    const { id, username } = req.body;
+
+    try {
+        // 1. Kullanıcıyı sil
+        const deleteUser = await dpu.delete('kullanicilar', id);
+        if (deleteUser.success) {
+            // 2. Kullanıcının proje ilişkilerini temizle
+            const permsRes = await dpu.select('kullanici_projeleri', 100);
+            if (permsRes.success && permsRes.data) {
+                const userPerms = permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase());
+                for (const perm of userPerms) {
+                    await dpu.delete('kullanici_projeleri', perm.id);
+                }
+            }
+            return res.json({ success: true, message: "Kullanıcı ve yetkileri silindi!" });
+        }
+        return res.status(500).json({ error: "Kullanıcı silinemedi." });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
     }
 });
 

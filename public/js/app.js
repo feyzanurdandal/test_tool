@@ -114,135 +114,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
 
-    // // 1. Senaryoları Çekip Tabloya Döken Fonksiyon
-    // async function loadScenarios() {
-    //     if (!currentProject || currentProject === "Varsayılan Proje") {
-    //         console.log("⚠️ Geçerli bir proje seçilmediği için senaryo isteği iptal edildi.");
-    //         return;
-    //     }
-
-    //     const scenariosTable = document.getElementById("scenarios-table");
-    //     const scenariosEmpty = document.getElementById("scenarios-empty");
-    //     const scenariosList = document.getElementById("scenarios-list");
-    //     const scenarioCountLabel = document.querySelector(".scenario-count");
-
-    //     if (!scenariosTable || !scenariosEmpty || !scenariosList) return;
-
-    //     try {
-    //         console.log(` "${currentProject}" projesi için senaryolar buluttan isteniyor...`);
-    //         const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}`);
-    //         const result = await res.json();
-
-    //         if (result.scenarios && result.scenarios.length > 0) {
-    //             scenariosEmpty.classList.add("hidden");
-    //             scenariosTable.classList.remove("hidden");
-    //             scenariosList.innerHTML = "";
-    //             scenarioCountLabel.textContent = result.scenarios.length;
-
-    //             result.scenarios.forEach((scenarioName, index) => {
-    //                 const row = document.createElement("tr");
-    //                 row.className = "border-b border-[rgba(255,255,255,0.04)] hover:bg-[#18181b]/40 transition";
-    //                 row.innerHTML = `
-    //                     <td class="py-3 px-4 font-mono text-zinc-500">${String(index + 1).padStart(2, '0')}</td>
-    //                     <td class="py-3 px-4 font-medium text-white">${scenarioName}</td>
-    //                     <td class="py-3 px-4">
-    //                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
-    //                             <span class="w-1 h-1 rounded-full bg-zinc-400"></span> Hazır
-    //                         </span>
-    //                     </td>
-    //                     <td class="py-3 px-4 text-right">
-    //                         <button class="run-single-btn text-[#3b82f6] hover:text-blue-400 font-medium transition mr-3" data-name="${scenarioName}">Testi Çalıştır</button>
-    //                         <button class="delete-scenario-btn text-zinc-500 hover:text-red-400 transition" data-name="${scenarioName}"><i data-lucide="trash-2" class="w-3.5 h-3.5 inline"></i></button>
-    //                     </td>
-    //                 `;
-    //                 scenariosList.appendChild(row);
-    //             });
-
-    //             // A. SİLME BUTONLARI
-    //             const deleteButtons = document.querySelectorAll(".delete-scenario-btn");
-    //             deleteButtons.forEach(btn => {
-    //                 btn.addEventListener("click", async () => {
-    //                     const scenarioName = btn.getAttribute("data-name");
-    //                     const selectedProjName = projectDropdown.value;
-                        
-    //                     const confirmDelete = confirm(`"${scenarioName}" senaryosunu silmek istediğinize emin misiniz?`);
-    //                     if (!confirmDelete) return;
-
-    //                     try {
-    //                         btn.disabled = true;
-    //                         const res = await fetch("/api/scenarios/delete", {
-    //                             method: "POST",
-    //                             headers: { "Content-Type": "application/json" },
-    //                             body: JSON.stringify({
-    //                                 scenarioName,
-    //                                 projectName: selectedProjName
-    //                             })
-    //                         });
-
-    //                         const result = await res.json();
-    //                         if (res.ok && result.success) {
-    //                             alert("Senaryo başarıyla buluttan silindi!");
-    //                             await loadScenarios(); 
-    //                         } else {
-    //                             alert(`Silinemedi: ${result.error || "Hata oluştu"}`);
-    //                             btn.disabled = false;
-    //                         }
-    //                     } catch (err) {
-    //                         console.error("Silme isteğinde hata verildi:", err);
-    //                         btn.disabled = false;
-    //                     }
-    //                 });
-    //             });
-
-    //             // B. TEKİL TESTİ KOŞTUR BUTONLARI
-    //             const runButtons = document.querySelectorAll(".run-single-btn");
-    //             runButtons.forEach(btn => {
-    //                 btn.addEventListener("click", async () => {
-    //                     const scenarioName = btn.getAttribute("data-name");
-    //                     const selectedProjName = projectDropdown.value;
-
-    //                     const originalHtml = btn.innerHTML;
-    //                     btn.disabled = true;
-    //                     btn.innerHTML = `<span class="text-amber-400 animate-pulse">Çalıştırılıyor...</span>`;
-
-    //                     try {
-    //                         console.log(`"${scenarioName}" testi başlatıldı...`);
-    //                         const res = await fetch("/api/scenarios/run", {
-    //                             method: "POST",
-    //                             headers: { "Content-Type": "application/json" },
-    //                             body: JSON.stringify({
-    //                                 scenarioName,
-    //                                 projectName: selectedProjName
-    //                             })
-    //                         });
-
-    //                         const result = await res.json();
-    //                         if (res.ok && result.success) {
-    //                             alert(`Başarılı: "${scenarioName}" testi Playwright ile başarıyla çalıştırıldı ve tamamlandı!`);
-    //                         } else {
-    //                             alert(`Test Başarısız: ${result.error || "Bilinmeyen bir hata oluştu."}\nDetay: ${result.details || ""}`);
-    //                         }
-    //                     } catch (err) {
-    //                         console.error("Test çalıştırma isteğinde hata patladı:", err);
-    //                         alert("Sunucu bağlantı hatası! Playwright çalıştırılamadı.");
-    //                     } finally {
-    //                         btn.disabled = false;
-    //                         btn.innerHTML = originalHtml;
-    //                     }
-    //                 });
-    //             });
-
-    //             lucide.createIcons();
-    //         } else {
-    //             scenarioCountLabel.textContent = "0";
-    //             scenariosTable.classList.add("hidden");
-    //             scenariosEmpty.classList.remove("hidden");
-    //         }
-    //     } catch (err) {
-    //         console.error("Senaryolar listelenirken hata verdi:", err.message);
-    //     }
-    // }
-
     // 1. Senaryoları Çekip Şık Birer Akordeon Kartı Olarak Döken Fonksiyon 🚀
     async function loadScenarios() {
         if (!currentProject || currentProject === "Varsayılan Proje") {
@@ -846,58 +717,128 @@ document.addEventListener("DOMContentLoaded", () => {
         loadBatchScenarios();
     }
 
-    async function loadProjects() {
-        try {
-            console.log("Veritabanaından projeler yükleniyor...");
-            const res = await fetch("/api/scenarios/projects/list");
-            const result = await res.json();
+    // async function loadProjects() {
+    //     try {
+    //         console.log("Veritabanaından projeler yükleniyor...");
+    //         const res = await fetch("/api/scenarios/projects/list");
+    //         const result = await res.json();
             
-            if (result.success && result.projects && result.projects.length > 0) {
-                projectDropdown.innerHTML = "";
-                result.projects.forEach(projName => {
-                    const opt = document.createElement("option");
-                    opt.value = projName;
-                    opt.textContent = projName;
-                    projectDropdown.appendChild(opt);
-                });
+    //         if (result.success && result.projects && result.projects.length > 0) {
+    //             projectDropdown.innerHTML = "";
+    //             result.projects.forEach(projName => {
+    //                 const opt = document.createElement("option");
+    //                 opt.value = projName;
+    //                 opt.textContent = projName;
+    //                 projectDropdown.appendChild(opt);
+    //             });
                 
-                currentProject = result.projects[0];
-                projectDropdown.value = currentProject;
-                updateProjectLabels();
-            } else {
-                projectDropdown.innerHTML = `<option value="dpu">dpu</option>`;
-                currentProject = "dpu";
-                updateProjectLabels();
+    //             currentProject = result.projects[0];
+    //             projectDropdown.value = currentProject;
+    //             updateProjectLabels();
+    //         } else {
+    //             projectDropdown.innerHTML = `<option value="dpu">dpu</option>`;
+    //             currentProject = "dpu";
+    //             updateProjectLabels();
+    //         }
+    //     } catch (err) {
+    //         console.error("Projeler yüklenirken hata oluştu:", err);
+    //     }
+    // }
+
+
+    // 📂 DPU Base'deki Projeleri Çekip Dropdown'a ve Modallere Dolduran Fonksiyon 🔒
+    async function loadProjects() {
+        const projectDropdown = document.getElementById("project-dropdown");
+        const batchProjectDropdown = document.getElementById("batch-project-dropdown");
+        const scenarioProjectDropdown = document.getElementById("scenario-project");
+
+        if (!projectDropdown) return;
+
+        // 🌟 GÜVENLİK: Giriş yapmış kullanıcının token'ını local storage'dan alıyoruz!
+        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
+        try {
+            // 🚨 KRİTİK DÜZELTME: İsteğin başlığına (header) kullanıcının şifreli token'ını ekliyoruz!
+            const res = await fetch("/api/scenarios/projects/list", {
+                headers: {
+                    "X-User-Token": userSession.token || ""
+                }
+            });
+            const result = await res.json();
+
+            if (result.success && result.projects) {
+                // Dropdown'ları temizleyip sadece yetkili olunan projelerle dolduruyoruz
+                projectDropdown.innerHTML = "";
+                if (batchProjectDropdown) batchProjectDropdown.innerHTML = "";
+                if (scenarioProjectDropdown) {
+                    scenarioProjectDropdown.innerHTML = `<option value="" disabled selected>Proje Seçin</option>`;
+                }
+
+                result.projects.forEach((proj) => {
+                    // Ana Proje Dropdown'ı
+                    const opt = document.createElement("option");
+                    opt.value = proj;
+                    opt.textContent = proj;
+                    projectDropdown.appendChild(opt);
+
+                    // Toplu Test Proje Dropdown'ı
+                    if (batchProjectDropdown) {
+                        const optBatch = document.createElement("option");
+                        optBatch.value = proj;
+                        optBatch.textContent = proj;
+                        batchProjectDropdown.appendChild(optBatch);
+                    }
+
+                    // Yeni Senaryo Ekleme Proje Dropdown'ı
+                    if (scenarioProjectDropdown) {
+                        const optScen = document.createElement("option");
+                        optScen.value = proj;
+                        optScen.textContent = proj;
+                        scenarioProjectDropdown.appendChild(optScen);
+                    }
+                });
+
+                // Eğer aktif seçili proje listede yoksa, listedeki ilk projeyi aktif yapıyoruz
+                if (result.projects.length > 0) {
+                    if (!result.projects.includes(currentProject)) {
+                        currentProject = result.projects[0];
+                        projectDropdown.value = currentProject;
+                    } else {
+                        projectDropdown.value = currentProject;
+                    }
+                } else {
+                    currentProject = "";
+                }
+
+                // Senaryoları ve raporları yeni kısıtlı proje listesine göre tetikle!
+                await loadScenarios();
+                await loadReports();
             }
         } catch (err) {
-            console.error("Projeler yüklenirken hata oluştu:", err);
+            console.error("Projeler yüklenirken hata oluştu:", err.message);
         }
     }
 
 // Rol bazlı yetkilendirme (ADMIN / PM) 
+    // Rol bazlı dashboard ve menü kilitleri 🔓
     async function showDashboard(user) {
         loginView.classList.add("hidden");
         appView.classList.remove("hidden");
         userBadge.textContent = `${user.username.toUpperCase()} (${user.role})`;
 
-        // Rol Elementlerini Yakala 
         const addProjectBtn = document.getElementById("add-project-btn");
         const settingsNavBtn = document.querySelector('[data-target="view-settings"]');
+        const usersNavBtn = document.getElementById("nav-users-btn"); // Kullanıcı yönetim sekmesi
 
         if (user.role === "PM") {
             if (addProjectBtn) addProjectBtn.classList.add("hidden");
             if (settingsNavBtn) settingsNavBtn.classList.add("hidden");
-
-            // Eğer kazara ayarlar ekranında kaldıysa, senaryolar ekranına zorla yönlendiriyoruz
-            const settingsView = document.getElementById("view-settings");
-            if (settingsView && !settingsView.classList.contains("hidden")) {
-                const scenariosNavBtn = document.querySelector('[data-target="view-scenarios"]');
-                if (scenariosNavBtn) scenariosNavBtn.click();
-            }
+            if (usersNavBtn) usersNavBtn.classList.add("hidden"); // PM ise kullanıcı yönetimini gizle!
         } else {
-            // ADMIN ise her yeri aslanlar gibi açıyoruz 
+            // ADMIN ise her yeri aç kanka!
             if (addProjectBtn) addProjectBtn.classList.remove("hidden");
             if (settingsNavBtn) settingsNavBtn.classList.remove("hidden");
+            if (usersNavBtn) usersNavBtn.classList.remove("hidden"); // ADMIN ise göster!
         }
 
         await loadProjects(); 
@@ -908,18 +849,32 @@ document.addEventListener("DOMContentLoaded", () => {
         showDashboard(JSON.parse(savedUser));
     }
 
-    loginForm.addEventListener("submit", (e) => {
+    loginForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         loginError.classList.add("hidden");
         const username = document.getElementById("login-username").value.trim();
         const password = document.getElementById("login-password").value;
 
-        if ((username === "admin" || username === "pm") && password === "123456") {
-            const session = { username, role: username === "admin" ? "ADMIN" : "PM" };
-            localStorage.setItem("test_user", JSON.stringify(session));
-            showDashboard(session);
-        } else {
-            loginError.textContent = "Hatalı giriş!";
+        try {
+            // Artık giriş doğrulaması doğrudan backend'e soruluyor!
+            const res = await fetch("/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password })
+            });
+
+            const result = await res.json();
+            if (res.ok && result.success) {
+                // Token ve rol bilgisini session olarak tarayıcıya mühürlüyoruz
+                const session = { username: result.username, role: result.role, token: result.token };
+                localStorage.setItem("test_user", JSON.stringify(session));
+                showDashboard(session);
+            } else {
+                loginError.textContent = result.error || "Giriş başarısız!";
+                loginError.classList.remove("hidden");
+            }
+        } catch (err) {
+            loginError.textContent = "Sunucu bağlantı hatası!";
             loginError.classList.remove("hidden");
         }
     });
@@ -979,7 +934,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 method: "POST",
                 headers: { 
                     "Content-Type": "application/json",
-                    "X-User-Role": userSession.role || "PM" // 🌟 Backend'e rolü fırlatıyoruz!
+                    "X-User-Token": userSession.token || "" // 🌟 Backend'e rolü fırlatıyoruz!
                 },
                 body: JSON.stringify({ projectName })
             });
@@ -1313,7 +1268,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     method: "POST",
                     headers: { 
                         "Content-Type": "application/json", 
-                        "X-User-Role": userSession.role || "PM"
+                        "X-User-Token": userSession.token || ""
                     },
                     body: JSON.stringify(payload)
                 });
@@ -1338,5 +1293,138 @@ document.addEventListener("DOMContentLoaded", () => {
     const settingsTabBtn = document.querySelector('[data-target="view-settings"]');
     if (settingsTabBtn) {
         settingsTabBtn.addEventListener("click", loadSystemSettings);
+    }
+
+
+    // ─── KULLANICI YÖNETİMİ FRONTEND SİHRİ ───
+    const openNewUserModalBtn = document.getElementById("open-new-user-modal-btn");
+    const userModal = document.getElementById("user-modal");
+    const closeUserModal = document.getElementById("close-user-modal");
+    const userForm = document.getElementById("user-form");
+    const usersList = document.getElementById("users-list");
+    const userProjectsCheckboxes = document.getElementById("user-projects-checkboxes");
+
+    const usersTabBtn = document.getElementById("nav-users-btn");
+    if (usersTabBtn) {
+        usersTabBtn.addEventListener("click", loadUsers);
+    }
+
+    async function loadUsers() {
+        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+        try {
+            const res = await fetch("/api/scenarios/users/list", {
+                headers: { "X-User-Token": userSession.token || "" }
+            });
+            const result = await res.json();
+
+            if (result.success && result.users) {
+                usersList.innerHTML = "";
+                
+                result.users.forEach(user => {
+                    const row = document.createElement("tr");
+                    row.className = "border-b border-[rgba(255,255,255,0.04)] hover:bg-[#18181b]/40 transition h-12";
+                    
+                    const pBadges = user.rol === 'ADMIN' 
+                        ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#3b82f6]/10 text-[#3b82f6] border border-[#3b82f6]/20">TÜMÜ (ADMIN)</span>`
+                        : (user.projeler.length > 0 
+                            ? user.projeler.map(p => `<span class="px-2 py-0.5 mr-1 rounded text-[10px] bg-zinc-500/10 text-zinc-300 border border-zinc-500/20 font-mono">${p}</span>`).join('')
+                            : `<span class="text-zinc-500 italic text-[10px]">Atanmış proje yok</span>`);
+
+                    row.innerHTML = `
+                        <td class="py-3 px-4 font-semibold text-white">${user.kullanici_adi}</td>
+                        <td class="py-3 px-4 font-mono text-zinc-400">${user.rol}</td>
+                        <td class="py-3 px-4">${pBadges}</td>
+                        <td class="py-3 px-4 text-right">
+                            <button class="delete-user-btn text-zinc-500 hover:text-red-400 transition" data-id="${user.id}" data-username="${user.kullanici_adi}">
+                                <i data-lucide="user-minus" class="w-4 h-4 inline"></i>
+                            </button>
+                        </td>
+                    `;
+                    usersList.appendChild(row);
+                });
+
+                // Silme olayları
+                document.querySelectorAll(".delete-user-btn").forEach(btn => {
+                    btn.addEventListener("click", async () => {
+                        const id = btn.getAttribute("data-id");
+                        const username = btn.getAttribute("data-username");
+                        if (confirm(`"${username}" isimli kullanıcıyı tamamen silmek istiyor musunuz?`)) {
+                            const delRes = await fetch("/api/scenarios/users/delete", {
+                                method: "POST",
+                                headers: { 
+                                    "Content-Type": "application/json",
+                                    "X-User-Token": userSession.token || ""
+                                },
+                                body: JSON.stringify({ id, username })
+                            });
+                            if (delRes.ok) {
+                                alert("Kullanıcı başarıyla silindi!");
+                                await loadUsers();
+                            }
+                        }
+                    });
+                });
+
+                // Projeler checkbox alanını doldurma
+                userProjectsCheckboxes.innerHTML = "";
+                result.allProjects.forEach(proj => {
+                    userProjectsCheckboxes.innerHTML += `
+                        <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                            <input type="checkbox" value="${proj}" class="user-proj-cb w-3.5 h-3.5 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0">
+                            <span>${proj}</span>
+                        </label>
+                    `;
+                });
+
+                lucide.createIcons();
+            }
+        } catch (err) {
+            console.error("Kullanıcılar yüklenirken hata:", err);
+        }
+    }
+
+    if (openNewUserModalBtn) {
+        openNewUserModalBtn.addEventListener("click", () => {
+            userForm.reset();
+            userModal.classList.remove("hidden");
+        });
+    }
+
+    if (closeUserModal) {
+        closeUserModal.addEventListener("click", () => userModal.classList.add("hidden"));
+    }
+
+    if (userForm) {
+        userForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const username = document.getElementById("new-user-username").value.trim();
+            const password = document.getElementById("new-user-password").value;
+            const role = document.getElementById("new-user-role").value;
+            const selectedProjects = Array.from(document.querySelectorAll(".user-proj-cb:checked")).map(cb => cb.value);
+
+            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
+            try {
+                const res = await fetch("/api/scenarios/users/create", {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "X-User-Token": userSession.token || ""
+                    },
+                    body: JSON.stringify({ username, password, role, selectedProjects })
+                });
+
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    alert("Kullanıcı başarıyla oluşturuldu!");
+                    userModal.classList.add("hidden");
+                    await loadUsers();
+                } else {
+                    alert(`Hata: ${result.error}`);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        });
     }
 });
