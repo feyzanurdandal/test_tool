@@ -114,7 +114,136 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
 
-    // 1. Senaryoları Çekip Tabloya Döken Fonksiyon
+    // // 1. Senaryoları Çekip Tabloya Döken Fonksiyon
+    // async function loadScenarios() {
+    //     if (!currentProject || currentProject === "Varsayılan Proje") {
+    //         console.log("⚠️ Geçerli bir proje seçilmediği için senaryo isteği iptal edildi.");
+    //         return;
+    //     }
+
+    //     const scenariosTable = document.getElementById("scenarios-table");
+    //     const scenariosEmpty = document.getElementById("scenarios-empty");
+    //     const scenariosList = document.getElementById("scenarios-list");
+    //     const scenarioCountLabel = document.querySelector(".scenario-count");
+
+    //     if (!scenariosTable || !scenariosEmpty || !scenariosList) return;
+
+    //     try {
+    //         console.log(` "${currentProject}" projesi için senaryolar buluttan isteniyor...`);
+    //         const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}`);
+    //         const result = await res.json();
+
+    //         if (result.scenarios && result.scenarios.length > 0) {
+    //             scenariosEmpty.classList.add("hidden");
+    //             scenariosTable.classList.remove("hidden");
+    //             scenariosList.innerHTML = "";
+    //             scenarioCountLabel.textContent = result.scenarios.length;
+
+    //             result.scenarios.forEach((scenarioName, index) => {
+    //                 const row = document.createElement("tr");
+    //                 row.className = "border-b border-[rgba(255,255,255,0.04)] hover:bg-[#18181b]/40 transition";
+    //                 row.innerHTML = `
+    //                     <td class="py-3 px-4 font-mono text-zinc-500">${String(index + 1).padStart(2, '0')}</td>
+    //                     <td class="py-3 px-4 font-medium text-white">${scenarioName}</td>
+    //                     <td class="py-3 px-4">
+    //                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
+    //                             <span class="w-1 h-1 rounded-full bg-zinc-400"></span> Hazır
+    //                         </span>
+    //                     </td>
+    //                     <td class="py-3 px-4 text-right">
+    //                         <button class="run-single-btn text-[#3b82f6] hover:text-blue-400 font-medium transition mr-3" data-name="${scenarioName}">Testi Çalıştır</button>
+    //                         <button class="delete-scenario-btn text-zinc-500 hover:text-red-400 transition" data-name="${scenarioName}"><i data-lucide="trash-2" class="w-3.5 h-3.5 inline"></i></button>
+    //                     </td>
+    //                 `;
+    //                 scenariosList.appendChild(row);
+    //             });
+
+    //             // A. SİLME BUTONLARI
+    //             const deleteButtons = document.querySelectorAll(".delete-scenario-btn");
+    //             deleteButtons.forEach(btn => {
+    //                 btn.addEventListener("click", async () => {
+    //                     const scenarioName = btn.getAttribute("data-name");
+    //                     const selectedProjName = projectDropdown.value;
+                        
+    //                     const confirmDelete = confirm(`"${scenarioName}" senaryosunu silmek istediğinize emin misiniz?`);
+    //                     if (!confirmDelete) return;
+
+    //                     try {
+    //                         btn.disabled = true;
+    //                         const res = await fetch("/api/scenarios/delete", {
+    //                             method: "POST",
+    //                             headers: { "Content-Type": "application/json" },
+    //                             body: JSON.stringify({
+    //                                 scenarioName,
+    //                                 projectName: selectedProjName
+    //                             })
+    //                         });
+
+    //                         const result = await res.json();
+    //                         if (res.ok && result.success) {
+    //                             alert("Senaryo başarıyla buluttan silindi!");
+    //                             await loadScenarios(); 
+    //                         } else {
+    //                             alert(`Silinemedi: ${result.error || "Hata oluştu"}`);
+    //                             btn.disabled = false;
+    //                         }
+    //                     } catch (err) {
+    //                         console.error("Silme isteğinde hata verildi:", err);
+    //                         btn.disabled = false;
+    //                     }
+    //                 });
+    //             });
+
+    //             // B. TEKİL TESTİ KOŞTUR BUTONLARI
+    //             const runButtons = document.querySelectorAll(".run-single-btn");
+    //             runButtons.forEach(btn => {
+    //                 btn.addEventListener("click", async () => {
+    //                     const scenarioName = btn.getAttribute("data-name");
+    //                     const selectedProjName = projectDropdown.value;
+
+    //                     const originalHtml = btn.innerHTML;
+    //                     btn.disabled = true;
+    //                     btn.innerHTML = `<span class="text-amber-400 animate-pulse">Çalıştırılıyor...</span>`;
+
+    //                     try {
+    //                         console.log(`"${scenarioName}" testi başlatıldı...`);
+    //                         const res = await fetch("/api/scenarios/run", {
+    //                             method: "POST",
+    //                             headers: { "Content-Type": "application/json" },
+    //                             body: JSON.stringify({
+    //                                 scenarioName,
+    //                                 projectName: selectedProjName
+    //                             })
+    //                         });
+
+    //                         const result = await res.json();
+    //                         if (res.ok && result.success) {
+    //                             alert(`Başarılı: "${scenarioName}" testi Playwright ile başarıyla çalıştırıldı ve tamamlandı!`);
+    //                         } else {
+    //                             alert(`Test Başarısız: ${result.error || "Bilinmeyen bir hata oluştu."}\nDetay: ${result.details || ""}`);
+    //                         }
+    //                     } catch (err) {
+    //                         console.error("Test çalıştırma isteğinde hata patladı:", err);
+    //                         alert("Sunucu bağlantı hatası! Playwright çalıştırılamadı.");
+    //                     } finally {
+    //                         btn.disabled = false;
+    //                         btn.innerHTML = originalHtml;
+    //                     }
+    //                 });
+    //             });
+
+    //             lucide.createIcons();
+    //         } else {
+    //             scenarioCountLabel.textContent = "0";
+    //             scenariosTable.classList.add("hidden");
+    //             scenariosEmpty.classList.remove("hidden");
+    //         }
+    //     } catch (err) {
+    //         console.error("Senaryolar listelenirken hata verdi:", err.message);
+    //     }
+    // }
+
+    // 1. Senaryoları Çekip Şık Birer Akordeon Kartı Olarak Döken Fonksiyon 🚀
     async function loadScenarios() {
         if (!currentProject || currentProject === "Varsayılan Proje") {
             console.log("⚠️ Geçerli bir proje seçilmediği için senaryo isteği iptal edildi.");
@@ -139,29 +268,138 @@ document.addEventListener("DOMContentLoaded", () => {
                 scenariosList.innerHTML = "";
                 scenarioCountLabel.textContent = result.scenarios.length;
 
+                // Tablo başlıklarındaki "Durum" sütununu "Hedef URL" olarak güncelliyoruz kanka 🎨
+                const tableHeader = scenariosTable.querySelector("thead tr");
+                if (tableHeader) {
+                    tableHeader.innerHTML = `
+                        <th class="py-3 px-4 w-12">#</th>
+                        <th class="py-3 px-4">Senaryo Adı</th>
+                        <th class="py-3 px-4">Hedef URL</th>
+                        <th class="py-3 px-4 text-right">İşlemler</th>
+                    `;
+                }
+
                 result.scenarios.forEach((scenarioName, index) => {
+                    // Her bir senaryo için iki parçalı bir yapı oluşturuyoruz: Satır ve gizli akordeon içeriği!
+                    const rowId = `scenario-row-${index}`;
+                    const contentId = `scenario-content-${index}`;
+
+                    // 1. Ana Senaryo Satırı
                     const row = document.createElement("tr");
-                    row.className = "border-b border-[rgba(255,255,255,0.04)] hover:bg-[#18181b]/40 transition";
+                    row.className = "border-b border-[rgba(255,255,255,0.04)] hover:bg-[#18181b]/40 transition cursor-pointer select-none";
+                    row.setAttribute("data-target", contentId);
+                    
+                    // Geçici olarak "Yükleniyor..." yazıp, content çekildiğinde gerçek URL'i buraya basacağız
                     row.innerHTML = `
                         <td class="py-3 px-4 font-mono text-zinc-500">${String(index + 1).padStart(2, '0')}</td>
-                        <td class="py-3 px-4 font-medium text-white">${scenarioName}</td>
-                        <td class="py-3 px-4">
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
-                                <span class="w-1 h-1 rounded-full bg-zinc-400"></span> Hazır
-                            </span>
+                        <td class="py-3 px-4 font-medium text-white flex items-center gap-2">
+                            <i data-lucide="chevron-right" class="chevron-icon-scen w-4 h-4 text-zinc-500 transition-transform duration-200"></i>
+                            <span>${scenarioName}</span>
                         </td>
-                        <td class="py-3 px-4 text-right">
-                            <button class="run-single-btn text-[#3b82f6] hover:text-blue-400 font-medium transition mr-3" data-name="${scenarioName}">Testi Çalıştır</button>
+                        <td class="py-3 px-4 target-url-cell text-zinc-400 font-mono text-[11px]">-</td>
+                        <td class="py-3 px-4 text-right" onclick="event.stopPropagation();">
+                            <button class="run-single-btn text-[#3b82f6] hover:text-blue-400 font-medium transition mr-4" data-name="${scenarioName}">Testi Çalıştır</button>
                             <button class="delete-scenario-btn text-zinc-500 hover:text-red-400 transition" data-name="${scenarioName}"><i data-lucide="trash-2" class="w-3.5 h-3.5 inline"></i></button>
                         </td>
                     `;
                     scenariosList.appendChild(row);
+
+                    // 2. Akordeon İçerik Satırı (Başlangıçta gizli)
+                    const contentRow = document.createElement("tr");
+                    contentRow.id = contentId;
+                    contentRow.className = "hidden bg-[#09090b]/50";
+                    contentRow.innerHTML = `
+                        <td colspan="4" class="p-4 border-b border-[rgba(255,255,255,0.04)]">
+                            <div class="space-y-3 bg-[#18181b]/40 p-4 rounded-xl border border-[rgba(255,255,255,0.06)]">
+                                <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-2">
+                                    <span class="text-[10px] uppercase font-bold tracking-wider text-zinc-500 flex items-center gap-1">
+                                        <i data-lucide="list-todo" class="w-3.5 h-3.5 text-[#3b82f6]"></i> Yapay Zeka Test Adımları
+                                    </span>
+                                    <span class="text-[10px] font-mono text-zinc-500 bg-[#27272a]/40 px-2 py-0.5 rounded">JSON Modeli</span>
+                                </div>
+                                <div class="steps-details-container space-y-2 text-xs text-zinc-300">
+                                    <div class="animate-pulse text-zinc-500 text-[11px]">Buluttan adımlar yükleniyor...</div>
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                    scenariosList.appendChild(contentRow);
+
+                    // 💥 TIKLAMA VE AKORDEON AÇILMA SİHRİ!
+                    row.addEventListener("click", async () => {
+                        const contentEl = document.getElementById(contentId);
+                        const chevronIcon = row.querySelector(".chevron-icon-scen");
+                        const isOpen = !contentEl.classList.contains("hidden");
+
+                        if (isOpen) {
+                            contentEl.classList.add("hidden");
+                            if (chevronIcon) chevronIcon.style.transform = "rotate(0deg)";
+                        } else {
+                            contentEl.classList.remove("hidden");
+                            if (chevronIcon) chevronIcon.style.transform = "rotate(90deg)";
+
+                            // Akordeon açıldığında eğer adımlar henüz çekilmediyse buluttan talep ediyoruz
+                            const detailsContainer = contentRow.querySelector(".steps-details-container");
+                            if (detailsContainer.getAttribute("data-loaded") !== "true") {
+                                try {
+                                    const contentRes = await fetch(`/api/scenarios/content?scenarioName=${encodeURIComponent(scenarioName)}&project=${encodeURIComponent(currentProject)}`);
+                                    const contentResult = await contentRes.json();
+
+                                    if (contentResult.success && contentResult.content) {
+                                        const adimlar = contentResult.content;
+                                        
+                                        // Satırdaki URL hücresini asıl hedef_url ile güncelliyoruz kanka!
+                                        const urlCell = row.querySelector(".target-url-cell");
+                                        if (urlCell && adimlar.targetUrl) {
+                                            urlCell.innerHTML = `
+                                                <a href="${adimlar.targetUrl}" target="_blank" onclick="event.stopPropagation();" class="text-[#3b82f6] hover:underline flex items-center gap-1 select-text">
+                                                    ${adimlar.targetUrl} <i data-lucide="external-link" class="w-3 h-3"></i>
+                                                </a>
+                                            `;
+                                        }
+
+                                        // Test adımlarını şık bir liste halinde basıyoruz
+                                        let stepsHtml = "";
+                                        if (adimlar.steps && adimlar.steps.length > 0) {
+                                            adimlar.steps.forEach((step, stepIdx) => {
+                                                let badgeClass = "bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/20";
+                                                if (step.type === "observe") badgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                                                if (step.type === "extract") badgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+
+                                                stepsHtml += `
+                                                    <div class="flex items-start gap-3 bg-[#27272a]/20 p-2.5 rounded-lg border border-[rgba(255,255,255,0.02)]">
+                                                        <span class="font-mono text-[10px] text-zinc-600 mt-0.5">${String(stepIdx + 1).padStart(2, '0')}.</span>
+                                                        <div class="flex-1">
+                                                            <div class="font-medium text-zinc-200 select-text">${step.instruction}</div>
+                                                            ${step.field ? `<div class="text-[10px] text-zinc-500 mt-1 font-mono">Çıktı Kolonu: ${step.field}</div>` : ''}
+                                                        </div>
+                                                        <span class="text-[9px] px-1.5 py-0.5 rounded border ${badgeClass} font-mono font-bold uppercase shrink-0">${step.type}</span>
+                                                    </div>
+                                                `;
+                                            });
+                                        } else {
+                                            stepsHtml = `<div class="text-zinc-500 italic text-[11px]">Bu senaryoda tanımlanmış test adımı bulunmuyor.</div>`;
+                                        }
+
+                                        detailsContainer.innerHTML = stepsHtml;
+                                        detailsContainer.setAttribute("data-loaded", "true");
+                                        lucide.createIcons();
+                                    } else {
+                                        detailsContainer.innerHTML = `<div class="text-rose-400 text-[11px]">Adımlar buluttan getirilemedi!</div>`;
+                                    }
+                                } catch (err) {
+                                    detailsContainer.innerHTML = `<div class="text-rose-400 text-[11px]">Bağlantı hatası oluştu!</div>`;
+                                }
+                            }
+                        }
+                    });
                 });
 
-                // A. SİLME BUTONLARI
+                // A. SİLME BUTONLARI (Olay yayılımını engellemek için stopPropagation ile güvene aldık kanka!)
                 const deleteButtons = document.querySelectorAll(".delete-scenario-btn");
                 deleteButtons.forEach(btn => {
-                    btn.addEventListener("click", async () => {
+                    btn.addEventListener("click", async (e) => {
+                        e.stopPropagation(); // Satır tıklama akordeon olayını tetiklemesin kilit! 🔒
                         const scenarioName = btn.getAttribute("data-name");
                         const selectedProjName = projectDropdown.value;
                         
@@ -197,7 +435,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 // B. TEKİL TESTİ KOŞTUR BUTONLARI
                 const runButtons = document.querySelectorAll(".run-single-btn");
                 runButtons.forEach(btn => {
-                    btn.addEventListener("click", async () => {
+                    btn.addEventListener("click", async (e) => {
+                        e.stopPropagation(); // Akordeonu tetiklemesin!
                         const scenarioName = btn.getAttribute("data-name");
                         const selectedProjName = projectDropdown.value;
 
@@ -228,6 +467,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         } finally {
                             btn.disabled = false;
                             btn.innerHTML = originalHtml;
+                            await loadReports(); // Rapor listesini otomatik yenile kanka!
                         }
                     });
                 });

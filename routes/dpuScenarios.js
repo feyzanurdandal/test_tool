@@ -127,36 +127,81 @@ router.get('/list', async (req, res) => {
     }
 });
 
-// ─── 4. API: SENARYO JSON İÇERİĞİNİ OKUMA ───
+// // ─── 4. API: SENARYO JSON İÇERİĞİNİ OKUMA ───
+// router.get('/content', async (req, res) => {
+//     const { scenarioName, project } = req.query;
+//     const selectedProj = project || 'Varsayılan Proje';
+
+//     if (!scenarioName) return res.status(400).json({ error: "scenarioName parametresi zorunlu!" });
+
+//     try {
+//         const projectRes = await dpu.select('projeler', 1, `proje_adi:eq:${selectedProj}`);
+//         if (!projectRes.success || projectRes.data.length === 0) {
+//             return res.status(404).json({ error: "Proje bulunamadı." });
+//         }
+//         const projectId = projectRes.data[0].id;
+
+//         const scenarioRes = await dpu.select('senaryolar', 1, `project_id:eq:${projectId}&senaryo_adi:eq:${scenarioName}`);
+//         if (scenarioRes.success && scenarioRes.data.length > 0) {
+//             const scenario = scenarioRes.data[0];
+//             const adimlarContent = typeof scenario.adimlar === 'string' 
+//                 ? JSON.parse(scenario.adimlar) 
+//                 : scenario.adimlar;
+
+//             return res.json({ success: true, content: adimlarContent });
+//         }
+//         return res.status(404).json({ error: "Senaryo bulunamadı." });
+//     } catch (error) {
+//         return res.status(500).json({ error: error.message });
+//     }
+// });
+
+// ─── 4. API: SENARYO JSON İÇERİĞİNİ OKUMA (BELLEKTE GÜVENLİ FİLTRELEME! 🔒) ───
 router.get('/content', async (req, res) => {
     const { scenarioName, project } = req.query;
-    const selectedProj = project || 'Varsayılan Proje';
+    const selectedProj = (project || 'Varsayılan Proje').trim();
 
     if (!scenarioName) return res.status(400).json({ error: "scenarioName parametresi zorunlu!" });
 
     try {
-        const projectRes = await dpu.select('projeler', 1, `proje_adi:eq:${selectedProj}`);
-        if (!projectRes.success || projectRes.data.length === 0) {
+        console.log(`🔍 [Content] "${scenarioName}" senaryosunun içeriği buluttan talep ediliyor...`);
+
+        // 1. Projeleri filtresiz çekip bellekte eşleştiriyoruz kanka!
+        const projectRes = await dpu.select('projeler', 100);
+        if (!projectRes.success || !projectRes.data) {
+            return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
+        }
+
+        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
+        if (!foundProj) {
             return res.status(404).json({ error: "Proje bulunamadı." });
         }
-        const projectId = projectRes.data[0].id;
+        const projectId = foundProj.id;
 
-        const scenarioRes = await dpu.select('senaryolar', 1, `project_id:eq:${projectId}&senaryo_adi:eq:${scenarioName}`);
-        if (scenarioRes.success && scenarioRes.data.length > 0) {
-            const scenario = scenarioRes.data[0];
-            const adimlarContent = typeof scenario.adimlar === 'string' 
-                ? JSON.parse(scenario.adimlar) 
-                : scenario.adimlar;
+        // 2. Senaryoları da filtresiz çekip bellekte tam eşleşme arıyoruz 🚀
+        const scenarioRes = await dpu.select('senaryolar', 100);
+        if (scenarioRes.success && scenarioRes.data) {
+            const scenario = scenarioRes.data.find(s => 
+                String(s.project_id) === String(projectId) && 
+                s.senaryo_adi === scenarioName
+            );
 
-            return res.json({ success: true, content: adimlarContent });
+            if (scenario) {
+                const adimlarContent = typeof scenario.adimlar === 'string' 
+                    ? JSON.parse(scenario.adimlar) 
+                    : scenario.adimlar;
+
+                return res.json({ success: true, content: adimlarContent });
+            }
         }
         return res.status(404).json({ error: "Senaryo bulunamadı." });
     } catch (error) {
+        console.error("💥 Senaryo içeriği okunurken hata patladı:", error.message);
         return res.status(500).json({ error: error.message });
     }
 });
 
-// ─── 5. API: SENARYO KAYDETME VE MANTIKLI ÇEVİRİSİ ───
+// ─── 5. API: SENARYO KAYDETME VE MANTIKLI ÇEVİRİSİ (BELLEKTE GÜVENLİ FİLTRELEME! 🔒) ───
 router.post('/create-and-save', async (req, res) => {
     const { scenarioName, turkishInstructions, targetUrl, projectName } = req.body;
     const selectedProj = (projectName || 'Varsayılan Proje').trim();
@@ -166,16 +211,32 @@ router.post('/create-and-save', async (req, res) => {
     }
 
     try {
-        const projectRes = await dpu.select('projeler', 1, `proje_adi:eq:${selectedProj}`);
-        if (!projectRes.success || projectRes.data.length === 0) {
+        console.log(`🔍 [Create] Projeler çekiliyor...`);
+        
+        // 1. Projeleri filtresiz çekip bellekte esnek (case-insensitive) olarak aratıyoruz kanka!
+        const projectRes = await dpu.select('projeler', 100);
+        if (!projectRes.success || !projectRes.data) {
+            return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
+        }
+
+        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
+        if (!foundProj) {
             return res.status(404).json({ error: "İlgili proje bulunamadı!" });
         }
-        const projectId = projectRes.data[0].id;
+        const projectId = foundProj.id;
 
-        // Çift kayıt kontrolünü tek ve jilet gibi bir sorguyla yapıyoruz
-        const checkScenario = await dpu.select('senaryolar', 1, `project_id:eq:${projectId}&senaryo_adi:eq:${scenarioName}`);
-        if (checkScenario.success && checkScenario.data.length > 0) {
-            return res.status(400).json({ error: "Bu proje altında bu senaryo adı zaten mevcut!" });
+        console.log(`🎯 Proje ID Başarıyla Bulundu: ${projectId}. Çift kayıt kontrolü yapılıyor...`);
+
+        // 2. Çift kayıt kontrolünü bellekte yapıyoruz (API filtresi tıkandığı için!)
+        const checkScenario = await dpu.select('senaryolar', 100);
+        if (checkScenario.success && checkScenario.data) {
+            const isDuplicate = checkScenario.data.some(s => 
+                String(s.project_id) === String(projectId) && 
+                s.senaryo_adi === scenarioName
+            );
+            if (isDuplicate) {
+                return res.status(400).json({ error: "Bu proje altında bu senaryo adı zaten mevcut!" });
+            }
         }
 
         console.log(`🧠 AI Translator: Türkçe talimatlar çözümleniyor...`);
@@ -197,6 +258,7 @@ router.post('/create-and-save', async (req, res) => {
 
         const result = await dpu.insert('senaryolar', insertData);
         if (result.success) {
+            console.log(`✅ Senaryo "${scenarioName}" başarıyla DPU Base'e yazıldı.`);
             return res.status(200).json({ success: true, status: "SUCCESS", message: "Senaryo başarıyla buluta mühürlendi!" });
         }
         return res.status(500).json({ error: "DPU Base senaryo kayıt hatası", details: result });
@@ -206,7 +268,7 @@ router.post('/create-and-save', async (req, res) => {
     }
 });
 
-// ─── 6. API: SENARYO SİLME ───
+// ─── 6. API: SENARYO SİLME (BELLEKTE GÜVENLİ FİLTRELEME! 🔒) ───
 router.post('/delete', async (req, res) => {
     const { scenarioName, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
@@ -216,18 +278,34 @@ router.post('/delete', async (req, res) => {
     }
 
     try {
-        const projectRes = await dpu.select('projeler', 1, `proje_adi:eq:${selectedProj}`);
-        if (!projectRes.success || projectRes.data.length === 0) {
+        // 1. Projeleri bellekte esnek aratıyoruz kanka!
+        const projectRes = await dpu.select('projeler', 100);
+        if (!projectRes.success || !projectRes.data) {
+            return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
+        }
+
+        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
+        if (!foundProj) {
             return res.status(404).json({ error: "Proje bulunamadı." });
         }
-        const projectId = projectRes.data[0].id;
+        const projectId = foundProj.id;
 
-        const scenarioRes = await dpu.select('senaryolar', 1, `project_id:eq:${projectId}&senaryo_adi:eq:${scenarioName}`);
-        if (!scenarioRes.success || scenarioRes.data.length === 0) {
+        // 2. Senaryoyu da bellekte buluyoruz
+        const scenarioRes = await dpu.select('senaryolar', 100);
+        if (!scenarioRes.success || !scenarioRes.data) {
+            return res.status(404).json({ error: "Senaryolar tablosuna erişilemedi." });
+        }
+
+        const foundScenario = scenarioRes.data.find(s => 
+            String(s.project_id) === String(projectId) && 
+            s.senaryo_adi === scenarioName
+        );
+
+        if (!foundScenario) {
             return res.status(404).json({ error: "Silinecek senaryo bulunamadı." });
         }
 
-        const deleteResult = await dpu.delete('senaryolar', scenarioRes.data[0].id);
+        const deleteResult = await dpu.delete('senaryolar', foundScenario.id);
         if (deleteResult.success) {
             return res.status(200).json({ success: true, message: "Senaryo başarıyla silindi!" });
         }
