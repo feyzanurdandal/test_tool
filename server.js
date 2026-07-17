@@ -1,6 +1,6 @@
+// server.js
 import express from 'express';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { CONSTANTS } from './config/constants.js'; 
 import { translateToStagehandJson } from './utils/translator.js';
@@ -18,36 +18,19 @@ app.use(express.urlencoded({ extended: true }));
  */
 export async function translateScenario(turkishInstructions, targetUrl) {
     const stagehandJson = await translateToStagehandJson(turkishInstructions, targetUrl);
-    if (!stagehandJson) throw new Error("Gemini çevirisi başarısız oldu.");
+    if (!stagehandJson) throw new Error("Yapay zeka çevirisi başarısız oldu.");
     stagehandJson.targetUrl = targetUrl;
     return stagehandJson;
 }
 
-/**
- * ESKİ OTOMATİK ÇEVİRİ VE KAYIT FONKSİYONU (YENİ MEKANİZMAYI KULLANACAK ŞEKİLDE)
- */
-export async function processAndSaveScenario(scenarioName, turkishInstructions, targetUrl, projectName) {
-    const stagehandJson = await translateScenario(turkishInstructions, targetUrl);
-    const selectedProj = projectName || 'Proje Seçin';
-    const dirPath = path.join(process.cwd(), CONSTANTS.SCENARIOS_FOLDER || 'scenarios', selectedProj);
-    if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
-
-    const sanitizedName = scenarioName.replace(/[^a-zA-Z0-9_-]/g, '');
-    const filePath = path.join(dirPath, `${sanitizedName}.json`);
-    
-    fs.writeFileSync(filePath, JSON.stringify(stagehandJson, null, 2));
-    return filePath;
-}
-
 // ─── ROTA IMPORTLARI ───
+// Sadece bizim yeni ve dinamik bulut tabanlı rotamız aktif kalıyor kanka! 🔒
 import dpuScenariosRouter from './routes/dpuScenarios.js';
-import reportRoutes from './routes/reports.js';
 
 // ─── 1. API ROTALARI ───
 app.use('/api/scenarios', dpuScenariosRouter);
-app.use('/api/reports', reportRoutes);
 
-// ─── 2. STATIC FILES & HTML BINDINGS 
+// ─── 2. STATIC FILES & HTML BINDINGS ───
 app.use(express.static(path.join(process.cwd(), 'public')));
 
 // API istekleri dışındaki tüm istekleri bizim public/index.html dosyamıza yönlendir
@@ -55,6 +38,7 @@ app.get(/^(?!\/api).*$/, (req, res) => {
     res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
 });
 
+// Sunucuyu ateşleme noktası
 app.listen(CONSTANTS.PORT, () => {
     console.log(`🚀 Sunucu http://localhost:${CONSTANTS.PORT} üzerinde aktif`);
 });

@@ -853,17 +853,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const apiKeysContainer = document.getElementById("api-keys-container");
     const addApiKeyBtn = document.getElementById("add-api-key-btn");
 
-    //  Dropdown Listesini En Baştakiler Sabit Kalacak Şekilde Güncelleyen Fonksiyon
+    // 🌟 ÇÖZÜM: Statik dizi kirliliğini temizledik, dropdown sadece senin eklediğin anahtarlarla dolacak! 🔒
     function refreshApiDropdowns(selectedRunner = "", selectedTranslator = "") {
         const runnerSelect = document.getElementById("setting-test-runner-api");
         const translatorSelect = document.getElementById("setting-translator-api");
         if (!runnerSelect || !translatorSelect) return;
 
-        const currentRunner = selectedRunner || runnerSelect.value || "openai";
-        const currentTranslator = selectedTranslator || translatorSelect.value || "gemini";
+        const currentRunner = selectedRunner || runnerSelect.value || "";
+        const currentTranslator = selectedTranslator || translatorSelect.value || "";
 
-        const providers = ["openai", "gemini"];
+        // Statik "openai" ve "gemini" başlangıçlarını uçurduk. Tamamen boş başlıyor!
+        const providers = [];
 
+        // Sadece ekranda aktif olarak ekli olan API sağlayıcı adlarını diziye dolduruyoruz
         document.querySelectorAll(".api-provider-input").forEach(input => {
             const val = input.value.trim().toLowerCase();
             if (val && !providers.includes(val)) {
@@ -871,27 +873,36 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
+        // Test Çalıştırıcı dropdown'ını tamamen dinamik olarak render ediyoruz
         runnerSelect.innerHTML = "";
         providers.forEach(p => {
             const opt = document.createElement("option");
             opt.value = p;
-            if (p === "openai") opt.textContent = "OpenAI (ChatGPT)";
-            else if (p === "gemini") opt.textContent = "Google Gemini";
-            else opt.textContent = p.toUpperCase();
+            opt.textContent = p.toUpperCase(); // Örn: OPENAI_API_KEY, GEMINI_API_KEY veya QWEN3:1.7B
             runnerSelect.appendChild(opt);
         });
-        runnerSelect.value = providers.includes(currentRunner) ? currentRunner : "openai";
+        
+        // Eğer daha önce seçilen değer listede varsa onu seçili yap, yoksa listenin ilk elemanını seç
+        if (providers.includes(currentRunner)) {
+            runnerSelect.value = currentRunner;
+        } else if (providers.length > 0) {
+            runnerSelect.value = providers[0];
+        }
 
+        // Çeviri Sağlayıcı dropdown'ını tamamen dinamik olarak render ediyoruz
         translatorSelect.innerHTML = "";
         providers.forEach(p => {
             const opt = document.createElement("option");
             opt.value = p;
-            if (p === "openai") opt.textContent = "OpenAI (ChatGPT)";
-            else if (p === "gemini") opt.textContent = "Google Gemini";
-            else opt.textContent = p.toUpperCase();
+            opt.textContent = p.toUpperCase();
             translatorSelect.appendChild(opt);
         });
-        translatorSelect.value = providers.includes(currentTranslator) ? currentTranslator : "gemini";
+
+        if (providers.includes(currentTranslator)) {
+            translatorSelect.value = currentTranslator;
+        } else if (providers.length > 0) {
+            translatorSelect.value = providers[0];
+        }
     }
 
     // A. Ayarları Sunucudan Çekip Formu Kilitleyen Fonksiyon
