@@ -717,34 +717,6 @@ document.addEventListener("DOMContentLoaded", () => {
         loadBatchScenarios();
     }
 
-    // async function loadProjects() {
-    //     try {
-    //         console.log("Veritabanaından projeler yükleniyor...");
-    //         const res = await fetch("/api/scenarios/projects/list");
-    //         const result = await res.json();
-            
-    //         if (result.success && result.projects && result.projects.length > 0) {
-    //             projectDropdown.innerHTML = "";
-    //             result.projects.forEach(projName => {
-    //                 const opt = document.createElement("option");
-    //                 opt.value = projName;
-    //                 opt.textContent = projName;
-    //                 projectDropdown.appendChild(opt);
-    //             });
-                
-    //             currentProject = result.projects[0];
-    //             projectDropdown.value = currentProject;
-    //             updateProjectLabels();
-    //         } else {
-    //             projectDropdown.innerHTML = `<option value="dpu">dpu</option>`;
-    //             currentProject = "dpu";
-    //             updateProjectLabels();
-    //         }
-    //     } catch (err) {
-    //         console.error("Projeler yüklenirken hata oluştu:", err);
-    //     }
-    // }
-
 
     // 📂 DPU Base'deki Projeleri Çekip Dropdown'a ve Modallere Dolduran Fonksiyon 🔒
     async function loadProjects() {
@@ -842,6 +814,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         await loadProjects(); 
+
+            // 🛡️ SİBER GÜVENLİK YAMASI: Giriş yapan herkesi zorunlu olarak senaryolar sekmesinden başlat!
+        navButtons.forEach(b => b.classList.remove("text-[#3b82f6]", "bg-[#3b82f6]/10"));
+        const scenarioNavBtn = document.querySelector('[data-target="view-scenarios"]');
+        if (scenarioNavBtn) scenarioNavBtn.classList.add("text-[#3b82f6]", "bg-[#3b82f6]/10");
+
+        views.forEach(v => v.classList.add("hidden"));
+        const scenarioView = document.getElementById("view-scenarios");
+        if (scenarioView) scenarioView.classList.remove("hidden");
     }
 
     const savedUser = localStorage.getItem("test_user");
@@ -1303,127 +1284,185 @@ document.addEventListener("DOMContentLoaded", () => {
     const userForm = document.getElementById("user-form");
     const usersList = document.getElementById("users-list");
     const userProjectsCheckboxes = document.getElementById("user-projects-checkboxes");
+    // ─── KULLANICI YÖNETİMİ DEĞİŞKENLERİ (EKSİK REFERANSLAR BURAYA! 🎯) ───
+    const userModalTitle = document.getElementById("user-modal-title");
+    const userModalSubmitBtn = document.getElementById("user-modal-submit-btn");
+    // ─── KULLANICI YÖNETİMİ ŞİFRE İPUCU REFERANSI (SON CANAVAR! 🎯) ───
+    const passwordHint = document.getElementById("password-hint");
 
+    // ─── 👨‍💼 KULLANICI YÖNETİMİ FRONTEND ORGANİZASYONU (GÜVENLİ & İZOLE SÜRÜM) ───
     const usersTabBtn = document.getElementById("nav-users-btn");
-    if (usersTabBtn) {
-        usersTabBtn.addEventListener("click", loadUsers);
-    }
+    if (usersTabBtn) usersTabBtn.addEventListener("click", loadUsers);
 
     async function loadUsers() {
         const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
         try {
-            const res = await fetch("/api/scenarios/users/list", {
-                headers: { "X-User-Token": userSession.token || "" }
-            });
+            const res = await fetch("/api/scenarios/users/list", { headers: { "X-User-Token": userSession.token || "" } });
             const result = await res.json();
 
             if (result.success && result.users) {
                 usersList.innerHTML = "";
+                cachedAllProjects = result.allProjects || [];
                 
                 result.users.forEach(user => {
                     const row = document.createElement("tr");
-                    row.className = "border-b border-[rgba(255,255,255,0.04)] hover:bg-[#18181b]/40 transition h-12";
+                    row.className = "border-b border-[rgba(255,255,255,0.04)] h-12";
                     
                     const pBadges = user.rol === 'ADMIN' 
-                        ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#3b82f6]/10 text-[#3b82f6] border border-[#3b82f6]/20">TÜMÜ (ADMIN)</span>`
+                        ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#3b82f6]/10 text-[#3b82f6] border border-[#3b82f6]/20">TÜMÜ (ADMIN)</span>' 
                         : (user.projeler.length > 0 
                             ? user.projeler.map(p => `<span class="px-2 py-0.5 mr-1 rounded text-[10px] bg-zinc-500/10 text-zinc-300 border border-zinc-500/20 font-mono">${p}</span>`).join('')
                             : `<span class="text-zinc-500 italic text-[10px]">Atanmış proje yok</span>`);
 
+                    // 🛠️ Düzenle butonuna data özniteliklerini mühürledik ve çöp adam ikonunu şık Lucide kalemiyle değiştirdik kanka!
                     row.innerHTML = `
-                        <td class="py-3 px-4 font-semibold text-white">${user.kullanici_adi}</td>
-                        <td class="py-3 px-4 font-mono text-zinc-400">${user.rol}</td>
-                        <td class="py-3 px-4">${pBadges}</td>
-                        <td class="py-3 px-4 text-right">
-                            <button class="delete-user-btn text-zinc-500 hover:text-red-400 transition" data-id="${user.id}" data-username="${user.kullanici_adi}">
-                                <i data-lucide="user-minus" class="w-4 h-4 inline"></i>
+                        <td class="py-3 px-4 text-white font-medium">${user.kullanici_adi}</td>
+                        <td class="py-3 px-4 text-zinc-400 font-mono">${user.rol}</td>
+                        <td class="py-3 px-4 text-zinc-400">${pBadges}</td>
+                        <td class="py-3 px-4 text-right flex items-center justify-end gap-2 h-12">
+                            <button class="edit-user-btn text-zinc-500 hover:text-amber-400 transition p-1 rounded hover:bg-amber-500/10" 
+                                    data-id="${user.id}" 
+                                    data-username="${user.kullanici_adi}" 
+                                    data-rol="${user.rol}" 
+                                    data-projeler="${encodeURIComponent(JSON.stringify(user.projeler))}">
+                                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                            </button>
+                            <button class="delete-user-btn text-zinc-500 hover:text-red-400 transition p-1 rounded hover:bg-red-500/10" 
+                                    data-id="${user.id}" data-username="${user.kullanici_adi}">
+                                <i data-lucide="user-minus" class="w-4 h-4"></i>
                             </button>
                         </td>
                     `;
                     usersList.appendChild(row);
                 });
 
-                // Silme olayları
+                // 🗑️ KULLANICI SİLME TETİKLEYİCİSİ
                 document.querySelectorAll(".delete-user-btn").forEach(btn => {
-                    btn.addEventListener("click", async () => {
+                    btn.onclick = async function() {
                         const id = btn.getAttribute("data-id");
                         const username = btn.getAttribute("data-username");
-                        if (confirm(`"${username}" isimli kullanıcıyı tamamen silmek istiyor musunuz?`)) {
-                            const delRes = await fetch("/api/scenarios/users/delete", {
+                        if (confirm(`"${username}" silinsin mi?`)) {
+                            await fetch("/api/scenarios/users/delete", {
                                 method: "POST",
-                                headers: { 
-                                    "Content-Type": "application/json",
-                                    "X-User-Token": userSession.token || ""
-                                },
+                                headers: { "Content-Type": "application/json", "X-User-Token": userSession.token || "" },
                                 body: JSON.stringify({ id, username })
                             });
-                            if (delRes.ok) {
-                                alert("Kullanıcı başarıyla silindi!");
-                                await loadUsers();
-                            }
+                            await loadUsers();
                         }
-                    });
+                    };
                 });
 
-                // Projeler checkbox alanını doldurma
-                userProjectsCheckboxes.innerHTML = "";
-                result.allProjects.forEach(proj => {
-                    userProjectsCheckboxes.innerHTML += `
-                        <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-                            <input type="checkbox" value="${proj}" class="user-proj-cb w-3.5 h-3.5 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0">
-                            <span>${proj}</span>
-                        </label>
-                    `;
-                });
+                // ✏️ KULLANICI DÜZENLEME TETİKLEYİCİSİ (HAYATA DÖNDÜRDÜĞÜMÜZ KISIM!)
+                document.querySelectorAll(".edit-user-btn").forEach(btn => {
+                    btn.onclick = function() {
+                        globalEditUserId = btn.getAttribute("data-id"); // ID JavaScript belleğine mühürlendi! 🔒
+                        const username = btn.getAttribute("data-username");
+                        const rol = btn.getAttribute("data-rol");
+                        const userProjects = JSON.parse(decodeURIComponent(btn.getAttribute("data-projeler") || "[]"));
 
+                        // Eski satır: userModalTitle.textContent = `Kullanıcı Yetkilerini Düzenle: ${username}`;
+                        document.getElementById("user-modal-title").textContent = `Kullanıcı Yetkilerini Düzenle: ${username}`;
+                        // Eski satır: userModalSubmitBtn.textContent = "Değişiklikleri Kaydet";
+                        document.getElementById("user-modal-submit-btn").textContent = "Değişiklikleri Kaydet";
+                        
+                        document.getElementById("new-user-username").value = username;
+                        document.getElementById("new-user-username").disabled = true; // Güvenlik katmanı: Kullanıcı adı değiştirilemez!
+                        
+                        // 🔒 Şifre kutusu tamamen boş gelir, required=false yaptık, siber güvenlik açığı kapatıldı!
+                        document.getElementById("new-user-password").value = "";
+                        document.getElementById("new-user-password").required = false; 
+                        if (passwordHint) passwordHint.classList.remove("hidden");
+                        
+                        document.getElementById("new-user-role").value = rol;
+
+                        renderCheckboxList(userProjects);
+                        userModal.classList.remove("hidden");
+                    };
+                });
                 lucide.createIcons();
             }
         } catch (err) {
-            console.error("Kullanıcılar yüklenirken hata:", err);
+            console.error("Kullanıcı listesi yüklenirken hata oluştu:", err);
         }
     }
 
+    function renderCheckboxList(selectedList = []) {
+        if (!userProjectsCheckboxes) return;
+        userProjectsCheckboxes.innerHTML = "";
+        cachedAllProjects.forEach(proj => {
+            const isChecked = selectedList.includes(proj) ? "checked" : "";
+            userProjectsCheckboxes.innerHTML += `
+                <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer hover:text-white transition mb-1">
+                    <input type="checkbox" value="${proj}" ${isChecked} class="user-proj-cb w-3.5 h-3.5 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0">
+                    <span>${proj}</span>
+                </label>
+            `;
+        });
+    }
+
+    // 🌟 YENİ KULLANICI OLUŞTURMA TETİKLEYİCİSİ
     if (openNewUserModalBtn) {
         openNewUserModalBtn.addEventListener("click", () => {
+            globalEditUserId = ""; // ID sıfırlanarak ekleme moduna geçilir!
             userForm.reset();
+            // Eski satır: userModalTitle.textContent = "Yeni Kullanıcı Oluştur";
+            // Eski satır: userModalSubmitBtn.textContent = "Kullanıcıyı Kaydet";
+            document.getElementById("user-modal-title").textContent = "Yeni Kullanıcı Oluştur";
+            document.getElementById("user-modal-submit-btn").textContent = "Kullanıcıyı Kaydet";
+            
+            document.getElementById("new-user-username").disabled = false;
+            document.getElementById("new-user-password").required = true; // Yeni kullanıcıda şifre zorunlu!
+            if (passwordHint) passwordHint.classList.add("hidden");
+            
+            renderCheckboxList([]);
             userModal.classList.remove("hidden");
         });
     }
 
-    if (closeUserModal) {
-        closeUserModal.addEventListener("click", () => userModal.classList.add("hidden"));
-    }
+    if (closeUserModal) closeUserModal.addEventListener("click", () => userModal.classList.add("hidden"));
 
+    // 🎯 TEK, GERÇEK VE ARAPSAÇINA DÖNMEYEN FORM SUBMIT HANDLER'I
     if (userForm) {
         userForm.addEventListener("submit", async (e) => {
             e.preventDefault();
+            
+            const isEditMode = globalEditUserId !== ""; 
             const username = document.getElementById("new-user-username").value.trim();
             const password = document.getElementById("new-user-password").value;
             const role = document.getElementById("new-user-role").value;
             const selectedProjects = Array.from(document.querySelectorAll(".user-proj-cb:checked")).map(cb => cb.value);
 
+            if (!username || (!isEditMode && !password)) {
+                alert("Lütfen zorunlu alanları doldurun!");
+                return;
+            }
+
+            const endpoint = isEditMode ? "/api/scenarios/users/update" : "/api/scenarios/users/create";
+            const bodyData = { username, password, role, selectedProjects };
+            
+            if (isEditMode) bodyData.id = globalEditUserId;
+
             const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
             try {
-                const res = await fetch("/api/scenarios/users/create", {
+                const res = await fetch(endpoint, {
                     method: "POST",
-                    headers: { 
-                        "Content-Type": "application/json",
-                        "X-User-Token": userSession.token || ""
-                    },
-                    body: JSON.stringify({ username, password, role, selectedProjects })
+                    headers: { "Content-Type": "application/json", "X-User-Token": userSession.token || "" },
+                    body: JSON.stringify(bodyData)
                 });
 
                 const result = await res.json();
                 if (res.ok && result.success) {
-                    alert("Kullanıcı başarıyla oluşturuldu!");
+                    alert(isEditMode ? "🎉 Kullanıcı yetkileri başarıyla güncellendi!" : "🎉 Kullanıcı başarıyla oluşturuldu!");
                     userModal.classList.add("hidden");
-                    await loadUsers();
+                    globalEditUserId = ""; 
+                    await loadUsers(); 
                 } else {
-                    alert(`Hata: ${result.error}`);
+                    alert(`❌ Hata: ${result.error || "İşlem başarısız"}`);
                 }
             } catch (err) {
                 console.error(err);
+                alert("❌ Sunucu bağlantı hatası!");
             }
         });
     }

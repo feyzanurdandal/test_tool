@@ -240,21 +240,24 @@
                     </div>
                 </div>
 
-                <!-- Yeni Kullanıcı Ekleme Modali -->
+                                <!-- index.html içindeki kullanıcı modalı - app.js ile %100 Uyuşan Sürüm -->
                 <div id="user-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div class="w-full max-w-md bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-4">
-                        <div class="flex items-center justify-between">
-                            <h3 class="text-sm font-semibold text-white">Yeni Kullanıcı Oluştur</h3>
-                            <button id="close-user-modal" class="text-zinc-500 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
-                        </div>
+                    <div class="w-full max-w-md bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl">
+                        
                         <form id="user-form" class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <!-- 🚨 BİRİNCİ KRİTİK ID: app.js'in textContent bastığı yer -->
+                                <h3 id="user-modal-title" class="text-sm font-semibold text-white">Kullanıcı İşlemi</h3>
+                                <button type="button" id="close-user-modal" class="text-zinc-500 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+                            </div>
+                            
                             <div>
                                 <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Kullanıcı Adı</label>
                                 <input type="text" id="new-user-username" required class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
                             </div>
                             <div>
-                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Şifre</label>
-                                <input type="password" id="new-user-password" required class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Şifre <span id="password-hint" class="text-[9px] text-zinc-500 lowercase hidden">(Değiştirmek istemiyorsanız boş bırakın)</span></label>
+                                <input type="password" id="new-user-password" class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
                             </div>
                             <div>
                                 <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Rolü</label>
@@ -265,12 +268,12 @@
                             </div>
                             <div>
                                 <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Çalışabileceği Projeler</label>
-                                <div id="user-projects-checkboxes" class="space-y-1.5 max-h-[120px] overflow-y-auto bg-[#27272a]/40 p-3 rounded-lg border border-[rgba(255,255,255,0.04)]">
-                                    <!-- Dinamik olarak dolacak -->
-                                </div>
+                                <div id="user-projects-checkboxes" class="space-y-1.5 max-h-[120px] overflow-y-auto bg-[#27272a]/40 p-3 rounded-lg border border-[rgba(255,255,255,0.04)]"></div>
                             </div>
-                            <button type="submit" class="w-full py-2 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition">
-                                Kullanıcıyı Kaydet
+                            
+                            <!-- 🚨 İKİNCİ KRİTİK ID: app.js'in metnini değiştirdiği kaydetme butonu -->
+                            <button type="submit" id="user-modal-submit-btn" class="w-full py-2 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition">
+                                Kaydet
                             </button>
                         </form>
                     </div>
