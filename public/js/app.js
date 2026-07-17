@@ -243,7 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // 📊 DPU Base'den Raporları Çekip İç İçe Akordeon Yapan Fonksiyon (Silme Özellikli)! 🔒
+// 📊 DPU Base'den Raporları Çekip İç İçe Akordeon Yapan Fonksiyon (Silme Özellikli)! 🔒
     async function loadReports() {
         const reportsEmpty = document.getElementById("reports-empty");
         const accordionContainer = document.getElementById("reports-list-accordion");
@@ -261,10 +261,38 @@ document.addEventListener("DOMContentLoaded", () => {
                 accordionContainer.innerHTML = "";
 
                 result.reports.forEach((report) => {
-                    const isSuccess = report.status === "SUCCESS";
+                    // 🌟 GÜVENLİK: Durum eşleştirmesini case-insensitive ve tam uyumlu yapıyoruz kanka!
+                    const reportStatus = (report.status || '').toUpperCase();
+                    const isSuccess = reportStatus === "SUCCESS" || reportStatus === "PASSED";
+
                     const scenarioName = report.scenario_name || "Bilinmeyen Senaryo";
                     const logContent = report.log_content || "Log kaydı bulunmuyor.";
                     const formattedDate = new Date(report.created_at).toLocaleString("tr-TR");
+
+                    // 🚨 DİNAMİK HATA ANALİZİ: Logların içindeki asıl can sıkan hata satırını cımbızlıyoruz
+                    let errorSummaryHtml = "";
+                    if (!isSuccess) {
+                        const linesForError = logContent.split('\n');
+                        const errorLine = linesForError.find(line => 
+                            line.toLowerCase().includes('error:') || 
+                            line.toLowerCase().includes('failed') || 
+                            line.toLowerCase().includes('exception:') ||
+                            line.toLowerCase().includes('cannot find') ||
+                            line.toLowerCase().includes('incorrect api key') ||
+                            line.toLowerCase().includes('failed to launch')
+                        ) || "Test çalıştırılırken beklenmeyen bir hata ile karşılaşıldı.";
+
+                        // En üste ekleyeceğimiz kırmızı şık hata kutusu tasarımı
+                        errorSummaryHtml = `
+                            <div class="bg-rose-500/10 border border-rose-500/20 rounded-lg p-3.5 mb-4 text-rose-400 animate-fade-in">
+                                <div class="flex items-center gap-2 mb-1.5">
+                                    <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400 shrink-0"></i>
+                                    <span class="text-xs font-bold uppercase tracking-wider">Kritik Hata Detayı</span>
+                                </div>
+                                <pre class="text-[11px] font-mono whitespace-pre-wrap leading-relaxed select-text select-none">${errorLine.trim()}</pre>
+                            </div>
+                        `;
+                    }
 
                     const lines = logContent.split('\n');
                     const steps = [];
@@ -365,6 +393,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
                         <div class="accordion-content max-h-0 overflow-hidden transition-all duration-300 ease-in-out bg-[#09090b]/50 border-t border-[rgba(255,255,255,0)]">
                             <div class="p-4 space-y-3">
+                                <!-- 🔴 HATA UYARI KUTUSU BURAYA GELİYOR -->
+                                ${errorSummaryHtml}
+
                                 <div class="flex items-center justify-between">
                                     <span class="text-[10px] uppercase font-semibold tracking-wider text-zinc-500">Adım Bazlı Test Akışı</span>
                                     <button class="copy-log-btn text-[10px] text-zinc-500 hover:text-white transition flex items-center gap-1" data-log="${encodeURIComponent(logContent)}">
@@ -467,7 +498,6 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Raporlar listelenirken hata oluştu:", err.message);
         }
     }
-
     // ⚡ Toplu Testleri Checkbox ve Tıklama Sırasıyla Listeyip Yöneten Fonksiyon
     async function loadBatchScenarios() {
         const batchEmpty = document.getElementById("batch-empty");

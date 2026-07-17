@@ -237,30 +237,54 @@ router.post('/delete', async (req, res) => {
     }
 });
 
-// ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA (MODERN ASYNC YAPIDA!) ───
+// ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA (MODERN & ESNEK ASYNC YAPIDA!) ───
 router.post('/run', async (req, res) => {
     const { scenarioName, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 
     if (!scenarioName || !selectedProj) {
-        return res.status(400).json({ error: "Eksik parametre var!" });
+        return res.status(400).json({ error: "Eksik parametre var! Senaryo veya proje adı gelmedi." });
     }
 
     try {
-        const projectRes = await dpu.select('projeler', 1, `proje_adi:eq:${selectedProj}`);
-        if (!projectRes.success || projectRes.data.length === 0) {
+        console.log(`=========================================`);
+        console.log(`🚀 PLAYWRIGHT TEST ÇALIŞTIRMA İSTEĞİ GELDİ!`);
+        console.log(`Senaryo: "${scenarioName}" | Proje: "${selectedProj}"`);
+
+        // 1. Projeleri filtresiz çekip bellekte esnek (case-insensitive) olarak aratıyoruz kanka! 🔑
+        const projectRes = await dpu.select('projeler', 100);
+        if (!projectRes.success || !projectRes.data) {
+            return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
+        }
+
+        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
+        if (!foundProj) {
+            console.log(`❌ HATA: "${selectedProj}" isimli proje veritabanında bulunamadı.`);
             return res.status(404).json({ error: "Proje bulunamadı." });
         }
-        const projectId = projectRes.data[0].id;
+        const projectId = foundProj.id;
+        console.log(`🎯 Bulunan Proje ID: ${projectId}`);
 
-        const scenarioRes = await dpu.select('senaryolar', 1, `project_id:eq:${projectId}&senaryo_adi:eq:${scenarioName}`);
-        if (!scenarioRes.success || scenarioRes.data.length === 0) {
-            return res.status(404).json({ error: "Çabilacak senaryo bulutta bulunamadı." });
+        // 2. Senaryolar tablosundan adımları (adimlar) filtresiz çekip bellekte ayıklıyoruz
+        const scenariosRes = await dpu.select('senaryolar', 100);
+        if (!scenariosRes.success || !scenariosRes.data) {
+            return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
         }
 
-        const rawSteps = scenarioRes.data[0].adimlar;
+        const foundScenario = scenariosRes.data.find(s => 
+            String(s.project_id) === String(projectId) && 
+            s.senaryo_adi === scenarioName
+        );
 
-        // Geçici dosya yazma işlemleri
+        if (!foundScenario) {
+            return res.status(404).json({ error: "Çalıştırılacak senaryo veritabanında bulunamadı." });
+        }
+
+        // Adımları alıyoruz (Stagehand JSON)
+        const rawSteps = foundScenario.adimlar;
+        console.log(`📦 Çekilen Ham Adımlar:`, rawSteps);
+
+        // 3. Playwright testinin okuyabilmesi için adımları geçici bir dosyaya yazıyoruz
         const cacheDir = path.join(process.cwd(), 'cache');
         if (!fs.existsSync(cacheDir)) {
             fs.mkdirSync(cacheDir, { recursive: true });
@@ -269,10 +293,12 @@ router.post('/run', async (req, res) => {
         const runtimeStepsPath = path.join(cacheDir, 'runtime_steps.json');
         const stepsString = typeof rawSteps === 'string' ? rawSteps : JSON.stringify(rawSteps, null, 2);
         fs.writeFileSync(runtimeStepsPath, stepsString, 'utf-8');
+        console.log(`💾 Geçici test adımları yazıldı: ${runtimeStepsPath}`);
 
-        // Playwright testini asenkron olarak çalıştırıp sonucunu bekliyoruz kanka 🚀
+        // 4. Playwright'ı asenkron olarak arka planda ateşliyoruz 🚀
         const testResult = await runPlaywrightTest();
 
+        // 📝 Rapor verisini hazırlayıp DPU Base'e mühürlüyoruz
         const reportData = {
             project_id: projectId,
             scenario_name: scenarioName,
@@ -281,22 +307,29 @@ router.post('/run', async (req, res) => {
             created_at: new Date().toISOString()
         };
 
-        await dpu.insert('raporlar', reportData);
+        try {
+            console.log("💾 Test raporu DPU Base'e kaydediliyor...");
+            await dpu.insert('raporlar', reportData);
+            console.log("✅ Rapor başarıyla mühürlendi!");
+        } catch (dbErr) {
+            console.error("⚠️ Rapor veritabanına yazılırken hata oluştu:", dbErr.message);
+        }
 
         if (!testResult.isSuccess) {
             return res.status(500).json({ 
                 success: false, 
-                error: "Test koşturulurken bir hata oluştu!", 
+                error: "Test koşturulurken bir hata patladı!", 
                 output: testResult.logContent 
             });
         }
 
         return res.status(200).json({ 
             success: true, 
-            message: "Test başarıyla tamamlandı ve rapora mühürlendi!" 
+            message: "Test başarıyla koşturuldu ve tamamlandı!"
         });
 
     } catch (error) {
+        console.error("💥 Test koşturma endpoint'inde büyük hata:", error.message);
         return res.status(500).json({ error: error.message });
     }
 });
