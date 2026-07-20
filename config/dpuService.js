@@ -5,8 +5,8 @@ class DpuService {
         this.baseUrl = process.env.DPU_BASE_URL;
         this.projectCode = process.env.DPU_PROJECT_CODE;
         this.apiKey = process.env.DPU_API_KEY;
-        this.email = process.env.DPU_USER_EMAIL; // Admin yerine User Email kanka
-        this.password = process.env.DPU_USER_PASSWORD; // Admin yerine User Password kanka
+        this.email = process.env.DPU_USER_EMAIL; // Admin yerine User Email 
+        this.password = process.env.DPU_USER_PASSWORD; // Admin yerine User Password 
 
         this.token = null;
         this.tokenExpiresAt = null;
@@ -45,7 +45,7 @@ class DpuService {
                 throw new Error(result.message || "Token alınamadı.");
             }
         } catch (error) {
-            console.error("❌ DPU Base Bağlantı Hatası kanka! Değerleri kontrol et:", error.message);
+            console.error("❌ DPU Base Bağlantı Hatası ! Değerleri kontrol et:", error.message);
             throw error;
         }
     }

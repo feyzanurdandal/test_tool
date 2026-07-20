@@ -139,7 +139,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 scenariosList.innerHTML = "";
                 scenarioCountLabel.textContent = result.scenarios.length;
 
-                // Tablo başlıklarındaki "Durum" sütununu "Hedef URL" olarak güncelliyoruz kanka 🎨
+                // Tablo başlıklarındaki "Durum" sütununu "Hedef URL" olarak güncelliyoruz  🎨
                 const tableHeader = scenariosTable.querySelector("thead tr");
                 if (tableHeader) {
                     tableHeader.innerHTML = `
@@ -219,7 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     if (contentResult.success && contentResult.content) {
                                         const adimlar = contentResult.content;
                                         
-                                        // Satırdaki URL hücresini asıl hedef_url ile güncelliyoruz kanka!
+                                        // Satırdaki URL hücresini asıl hedef_url ile güncelliyoruz !
                                         const urlCell = row.querySelector(".target-url-cell");
                                         if (urlCell && adimlar.targetUrl) {
                                             urlCell.innerHTML = `
@@ -266,7 +266,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 });
 
-                // A. SİLME BUTONLARI (Olay yayılımını engellemek için stopPropagation ile güvene aldık kanka!)
+                // A. SİLME BUTONLARI (Olay yayılımını engellemek için stopPropagation ile güvene aldık !)
                 const deleteButtons = document.querySelectorAll(".delete-scenario-btn");
                 deleteButtons.forEach(btn => {
                     btn.addEventListener("click", async (e) => {
@@ -338,7 +338,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         } finally {
                             btn.disabled = false;
                             btn.innerHTML = originalHtml;
-                            await loadReports(); // Rapor listesini otomatik yenile kanka!
+                            await loadReports(); // Rapor listesini otomatik yenile !
                         }
                     });
                 });
@@ -372,7 +372,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 accordionContainer.innerHTML = "";
 
                 result.reports.forEach((report) => {
-                    // 🌟 GÜVENLİK: Durum eşleştirmesini case-insensitive ve tam uyumlu yapıyoruz kanka!
+                    // 🌟 GÜVENLİK: Durum eşleştirmesini case-insensitive ve tam uyumlu yapıyoruz !
                     const reportStatus = (report.status || '').toUpperCase();
                     const isSuccess = reportStatus === "SUCCESS" || reportStatus === "PASSED";
 
@@ -807,7 +807,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (settingsNavBtn) settingsNavBtn.classList.add("hidden");
             if (usersNavBtn) usersNavBtn.classList.add("hidden"); // PM ise kullanıcı yönetimini gizle!
         } else {
-            // ADMIN ise her yeri aç kanka!
+            // ADMIN ise her yeri aç !
             if (addProjectBtn) addProjectBtn.classList.remove("hidden");
             if (settingsNavBtn) settingsNavBtn.classList.remove("hidden");
             if (usersNavBtn) usersNavBtn.classList.remove("hidden"); // ADMIN ise göster!
@@ -1314,7 +1314,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             ? user.projeler.map(p => `<span class="px-2 py-0.5 mr-1 rounded text-[10px] bg-zinc-500/10 text-zinc-300 border border-zinc-500/20 font-mono">${p}</span>`).join('')
                             : `<span class="text-zinc-500 italic text-[10px]">Atanmış proje yok</span>`);
 
-                    // 🛠️ Düzenle butonuna data özniteliklerini mühürledik ve çöp adam ikonunu şık Lucide kalemiyle değiştirdik kanka!
+                    // 🛠️ Düzenle butonuna data özniteliklerini mühürledik ve çöp adam ikonunu şık Lucide kalemiyle değiştirdik !
                     row.innerHTML = `
                         <td class="py-3 px-4 text-white font-medium">${user.kullanici_adi}</td>
                         <td class="py-3 px-4 text-zinc-400 font-mono">${user.rol}</td>

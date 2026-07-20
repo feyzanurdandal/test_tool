@@ -7,7 +7,7 @@ import { translateScenario } from '../server.js';
 
 const router = express.Router();
 
-// Yardımcı Fonksiyon: Playwright testini asenkron Promise ile sarmalayıp koşturur kanka 🎭
+// Yardımcı Fonksiyon: Playwright testini asenkron Promise ile sarmalayıp koşturur  🎭
 const runPlaywrightTest = () => {
     return new Promise((resolve) => {
         console.log(`🔥 Playwright motoru asenkron olarak tetikleniyor...`);
@@ -20,9 +20,9 @@ const runPlaywrightTest = () => {
     });
 };
 
-// routes/dpuScenarios.js dosyasının en üstüne ekle kanka:
+// routes/dpuScenarios.js dosyasının en üstüne ekle :
 import crypto from 'crypto';
-const SECRET_KEY = 'djheschoeschsojcosdj';
+const SECRET_KEY = process.env.JWT_SECRET || 'fallback_secret_key_dpu';
 
 // Token'ı çözen ve imza doğruluğunu kontrol eden sihirli fonksiyonumuz 🔒
 function getRoleFromToken(token) {
@@ -74,7 +74,7 @@ router.get('/projects/list', async (req, res) => {
         if (userRole !== 'ADMIN' && username) {
             const permissionsRes = await dpu.select('kullanici_projeleri', 100);
             if (permissionsRes.success && permissionsRes.data) {
-                // Sadece bu kullanıcıya atanan proje adlarını filtreliyoruz kanka 🔑
+                // Sadece bu kullanıcıya atanan proje adlarını filtreliyoruz  🔑
                 const allowedProjects = permissionsRes.data
                     .filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase())
                     .map(p => p.proje_adi);
@@ -98,7 +98,7 @@ router.get('/projects/list', async (req, res) => {
 
 // ─── 2. API: YENİ PROJE OLUŞTURMA (Sadece ADMIN Yetkili) ───
 router.post('/projects/create', async (req, res) => {
-    // const userRole = req.headers['x-user-role'];
+    const userToken = req.headers['x-user-token'];
     const userRole = getRoleFromToken(userToken);
 
     if (userRole !== 'ADMIN') {
@@ -192,7 +192,7 @@ router.get('/content', async (req, res) => {
     try {
         console.log(`🔍 [Content] "${scenarioName}" senaryosunun içeriği buluttan talep ediliyor...`);
 
-        // 1. Projeleri filtresiz çekip bellekte eşleştiriyoruz kanka!
+        // 1. Projeleri filtresiz çekip bellekte eşleştiriyoruz !
         const projectRes = await dpu.select('projeler', 100);
         if (!projectRes.success || !projectRes.data) {
             return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
@@ -239,7 +239,7 @@ router.post('/create-and-save', async (req, res) => {
     try {
         console.log(`🔍 [Create] Projeler çekiliyor...`);
         
-        // 1. Projeleri filtresiz çekip bellekte esnek (case-insensitive) olarak aratıyoruz kanka!
+        // 1. Projeleri filtresiz çekip bellekte esnek (case-insensitive) olarak aratıyoruz !
         const projectRes = await dpu.select('projeler', 100);
         if (!projectRes.success || !projectRes.data) {
             return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
@@ -304,7 +304,7 @@ router.post('/delete', async (req, res) => {
     }
 
     try {
-        // 1. Projeleri bellekte esnek aratıyoruz kanka!
+        // 1. Projeleri bellekte esnek aratıyoruz !
         const projectRes = await dpu.select('projeler', 100);
         if (!projectRes.success || !projectRes.data) {
             return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
@@ -355,7 +355,7 @@ router.post('/run', async (req, res) => {
         console.log(`🚀 PLAYWRIGHT TEST ÇALIŞTIRMA İSTEĞİ GELDİ!`);
         console.log(`Senaryo: "${scenarioName}" | Proje: "${selectedProj}"`);
 
-        // 1. Projeleri filtresiz çekip bellekte esnek (case-insensitive) olarak aratıyoruz kanka! 🔑
+        // 1. Projeleri filtresiz çekip bellekte esnek (case-insensitive) olarak aratıyoruz ! 🔑
         const projectRes = await dpu.select('projeler', 100);
         if (!projectRes.success || !projectRes.data) {
             return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
@@ -509,7 +509,7 @@ router.post('/run-batch', async (req, res) => {
             message: "Toplu test pipeline akışı arka planda başlatıldı! Raporlar sekmesinden takip edebilirsiniz." 
         });
 
-        // Arka planda sıralı (sequential) asenkron döngü koşturuyoruz kanka! ⚡
+        // Arka planda sıralı (sequential) asenkron döngü koşturuyoruz ! ⚡
         (async () => {
             for (const scenario of batchScenarios) {
                 console.log(`\n➡️ Pipeline Sıradaki Test: "${scenario.senaryo_adi}"`);
@@ -579,7 +579,7 @@ router.get('/settings/get', async (req, res) => {
 
 // ─── 11. API: DPU BASE ÜZERİNE İLİŞKİSEL AYARLARI KAYDETME ───
 router.post('/settings/save', async (req, res) => {
-    // const userRole = req.headers['x-user-role'];
+    const userToken = req.headers['x-user-token'];
     const userRole = getRoleFromToken(userToken);
 
 
@@ -671,7 +671,7 @@ router.get('/users/list', async (req, res) => {
         const permsRes = await dpu.select('kullanici_projeleri', 100);
 
         if (usersRes.success) {
-            // Kullanıcıları ve atandıkları projeleri birleştirip gönderiyoruz kanka
+            // Kullanıcıları ve atandıkları projeleri birleştirip gönderiyoruz 
             const formattedUsers = usersRes.data.map(user => {
                 const userProjects = permsRes.success && permsRes.data
                     ? permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === user.kullanici_adi.toLowerCase()).map(p => p.proje_adi)

@@ -7,7 +7,7 @@ import { translateToStagehandJson } from './utils/translator.js';
 import crypto from 'crypto';
 import dpu from './config/dpuService.js';
 
-const SECRET_KEY = 'djheschoeschsojcosdj'; // Sadece backend'in bildiği anahtar
+const SECRET_KEY = process.env.JWT_SECRET || 'fallback_secret_key_dpu';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -28,7 +28,7 @@ export async function translateScenario(turkishInstructions, targetUrl) {
 }
 
 // ─── ROTA IMPORTLARI ───
-// Sadece bizim yeni ve dinamik bulut tabanlı rotamız aktif kalıyor kanka! 🔒
+// Sadece bizim yeni ve dinamik bulut tabanlı rotamız aktif kalıyor ! 🔒
 import dpuScenariosRouter from './routes/dpuScenarios.js';
 
 // ─── 1. API ROTALARI ───

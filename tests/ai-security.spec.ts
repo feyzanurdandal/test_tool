@@ -34,7 +34,7 @@ test('Yapay Zeka Test Otomasyonu', async () => {
         console.log("🔄 [Test Runner] Aktif test çalıştırıcı sağlayıcı DPU Base'den sorgulanıyor...");
         
         const dpuClient = dpu as any;
-        const dbResult = await dpuClient.select('ayarlar', 100); // Filtre göndermeden çekerek API tıkanıklığını aşıyoruz kanka!
+        const dbResult = await dpuClient.select('ayarlar', 100); // Filtre göndermeden çekerek API tıkanıklığını aşıyoruz !
 
         if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
             const settingsRows = dbResult.data;

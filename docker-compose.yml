@@ -16,6 +16,7 @@ services:
       - DPU_USER_PASSWORD=${DPU_USER_PASSWORD}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       - ./cache:/app/cache # Test adımları ve runtime_steps.json için kalıcı hacim
     ports:
