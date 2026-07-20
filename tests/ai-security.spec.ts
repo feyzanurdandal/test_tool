@@ -93,13 +93,31 @@ test('Yapay Zeka Test Otomasyonu', async () => {
 
     console.log(`⚙️ [Test Runner] Stagehand Başlatılıyor. Sağlayıcı: ${chosenApi} | Model: ${activeModel}`);
 
+    // const stagehand = new Stagehand({
+    //     env: 'LOCAL',
+    //     model: activeModel as any,
+    //     cacheDir: path.resolve(__dirname, '../cache/ai-security'),
+    //     domSettleTimeout: 10000,
+    //     localBrowserLaunchOptions: { headless: false },
+    //     // DPU Qwen seçildiyse yerel yapılandırmayı doğrudan enjekte ediyoruz
+    //     ...(customBaseUrl ? { 
+    //         configuration: localConfig
+    //     } : {})
+    // });
+
+    // 🛡️ DOCKER / LINUX SESSİZ MOD (HEADLESS) AYARI
+    const isDockerEnv = process.env.DOCKER_ENV === 'true';
+
     const stagehand = new Stagehand({
         env: 'LOCAL',
         model: activeModel as any,
         cacheDir: path.resolve(__dirname, '../cache/ai-security'),
         domSettleTimeout: 10000,
-        localBrowserLaunchOptions: { headless: false },
-        // DPU Qwen seçildiyse yerel yapılandırmayı doğrudan enjekte ediyoruz
+        // 🚨 KRİTİK DÜZELTME: Docker içindeyken headless: true, localdeyken false olsun!
+        localBrowserLaunchOptions: { 
+            headless: isDockerEnv ? true : false,
+            args: isDockerEnv ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'] : []
+        },
         ...(customBaseUrl ? { 
             configuration: localConfig
         } : {})

@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # 1. SERVİS: Node.js + Playwright API Sunucusu
+  node-backend:
+    build: .
+    container_name: test_tool_backend
+    restart: always
+    environment:
+      - PORT=3000
+      - DOCKER_ENV=true
+      - DPU_BASE_URL=${DPU_BASE_URL}
+      - DPU_PROJECT_CODE=${DPU_PROJECT_CODE}
+      - DPU_API_KEY=${DPU_API_KEY}
+      - DPU_USER_EMAIL=${DPU_USER_EMAIL}
+      - DPU_USER_PASSWORD=${DPU_USER_PASSWORD}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./cache:/app/cache # Test adımları ve runtime_steps.json için kalıcı hacim
+    ports:
+      - "3000:3000"
+
+  # 2. SERVİS: Nginx Reverse Proxy (Ön Yüz Kapı Görevlisi & Zırh)
+  nginx:
+    image: nginx:alpine
+    container_name: test_tool_nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./public:/usr/share/nginx/html # Statik Arayüz dosyalarını Nginx'e bağlıyoruz
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro # Nginx ayar dosyamızı bağlıyoruz
+    depends_on:
+      - node-backend

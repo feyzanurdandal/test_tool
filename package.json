@@ -1,16 +1,17 @@
 {
   "name": "test-tool",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "AI Supported Playwright Security Testing Pipeline",
+  "main": "server.js",
+  "type": "module",
   "scripts": {
+    "start": "tsx server.js",
     "test:ai-local": "playwright test tests/ai-security.spec.ts",
     "n8n:start": "cross-env NODE_FUNCTION_ALLOW_BUILTIN=fs,path npx n8n@2.27.5 start"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "module",
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.0",
