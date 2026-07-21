@@ -128,54 +128,119 @@ router.post('/projects/create', async (req, res) => {
     }
 });
 
-// ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME (BELLEKTE GÜVENLİ FİLTRELEME! 🔒) ───
+// // ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME (BELLEKTE GÜVENLİ FİLTRELEME! 🔒) ───
+// router.get('/list', async (req, res) => {
+//     const { project } = req.query;
+//     const selectedProj = (project || '').trim();
+
+//     if (!selectedProj) return res.json({ scenarios: [] });
+
+//     try {
+//         console.log(`=========================================`);
+//         console.log(`🔍 LİSTELEME SORGUSU BAŞLADI !`);
+//         console.log(`Aranan Proje Adı: "${selectedProj}"`);
+        
+//         // 1. Önce projeleri filtresiz çekelim (API tıkanmasın diye)
+//         const projectRes = await dpu.select('projeler', 100);
+//         if (!projectRes.success || !projectRes.data) {
+//             console.log("❌ DPU Base 'projeler' tablosuna erişemedi!");
+//             return res.json({ scenarios: [] });
+//         }
+
+//         // Bellekte küçük/büyük harfe duyarsız eşleştirme yapıyoruz
+//         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
+//         if (!foundProj) {
+//             console.log(`⚠️ "${selectedProj}" isimli proje veritabanında yok.`);
+//             console.log("Mevcut Projeler:", projectRes.data.map(p => p.proje_adi));
+//             return res.json({ scenarios: [] });
+//         }
+        
+//         const projectId = foundProj.id;
+//         console.log(`🎯 Eşleşen Proje ID: ${projectId}`);
+
+//         // 2. Senaryoları da filtresiz çekip bellekte filtreliyoruz! 🚀
+//         const scenariosRes = await dpu.select('senaryolar', 100);
+        
+//         if (scenariosRes.success && scenariosRes.data) {
+//             console.log(`📂 Toplam Senaryo Kayıt Sayısı: ${scenariosRes.data.length}`);
+            
+//             // API filtresi yerine güvenli Javascript filtrelemesi kilit! 🔑
+//             const filteredScenarios = scenariosRes.data
+//                 .filter(s => String(s.project_id) === String(projectId))
+//                 .map(s => s.senaryo_adi);
+            
+//             console.log(`✅ Eşleşen ve Gönderilen Senaryolar:`, filteredScenarios);
+//             console.log(`=========================================`);
+//             return res.json({ scenarios: filteredScenarios });
+//         }
+        
+//         console.log("❌ Senaryolar tablosundan veri çekilemedi:", scenariosRes);
+//         return res.status(500).json({ error: "Senaryolar yüklenemedi" });
+//     } catch (error) {
+//         console.error("💥 Senaryo listeleme hatası:", error.message);
+//         return res.status(500).json({ error: error.message });
+//     }
+// });
+
+// ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME (GÜVENLİK & YETKİ FİLTRELİ! 🔒) ───
 router.get('/list', async (req, res) => {
     const { project } = req.query;
     const selectedProj = (project || '').trim();
+
+    // 🌟 GÜVENLİK: İstekten kullanıcı token'ını alıyoruz
+    const userToken = req.headers['x-user-token'];
+    const userRole = getRoleFromToken(userToken);
+    const username = getUsernameFromToken(userToken);
 
     if (!selectedProj) return res.json({ scenarios: [] });
 
     try {
         console.log(`=========================================`);
-        console.log(`🔍 LİSTELEME SORGUSU BAŞLADI !`);
+        console.log(`🔍 LİSTELEME SORGUSU BAŞLADI (Kullanıcı: ${username || 'Anonim'}, Rol: ${userRole})`);
         console.log(`Aranan Proje Adı: "${selectedProj}"`);
         
-        // 1. Önce projeleri filtresiz çekelim (API tıkanmasın diye)
+        // 1. Kullanıcı ADMIN değilse bu projeye erişim yetkisi var mı kontrol et!
+        if (userRole !== 'ADMIN' && username) {
+            const permissionsRes = await dpu.select('kullanici_projeleri', 100);
+            if (permissionsRes.success && permissionsRes.data) {
+                const allowedProjects = permissionsRes.data
+                    .filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase())
+                    .map(p => p.proje_adi.toLowerCase());
+
+                if (!allowedProjects.includes(selectedProj.toLowerCase())) {
+                    console.log(`⛔ YETKİSİZ ERİŞİM: "${username}" kullanıcısının "${selectedProj}" projesine yetkisi yok!`);
+                    return res.json({ scenarios: [] });
+                }
+            } else {
+                return res.json({ scenarios: [] });
+            }
+        }
+
+        // 2. Projeleri filtresiz çekip bellekte eşleştiriyoruz
         const projectRes = await dpu.select('projeler', 100);
         if (!projectRes.success || !projectRes.data) {
-            console.log("❌ DPU Base 'projeler' tablosuna erişemedi!");
             return res.json({ scenarios: [] });
         }
 
-        // Bellekte küçük/büyük harfe duyarsız eşleştirme yapıyoruz
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
         if (!foundProj) {
-            console.log(`⚠️ "${selectedProj}" isimli proje veritabanında yok.`);
-            console.log("Mevcut Projeler:", projectRes.data.map(p => p.proje_adi));
             return res.json({ scenarios: [] });
         }
         
         const projectId = foundProj.id;
-        console.log(`🎯 Eşleşen Proje ID: ${projectId}`);
 
-        // 2. Senaryoları da filtresiz çekip bellekte filtreliyoruz! 🚀
+        // 3. Senaryoları çek ve sadece ilgili projenin senaryolarını dön!
         const scenariosRes = await dpu.select('senaryolar', 100);
         
         if (scenariosRes.success && scenariosRes.data) {
-            console.log(`📂 Toplam Senaryo Kayıt Sayısı: ${scenariosRes.data.length}`);
-            
-            // API filtresi yerine güvenli Javascript filtrelemesi kilit! 🔑
             const filteredScenarios = scenariosRes.data
                 .filter(s => String(s.project_id) === String(projectId))
                 .map(s => s.senaryo_adi);
             
-            console.log(`✅ Eşleşen ve Gönderilen Senaryolar:`, filteredScenarios);
-            console.log(`=========================================`);
             return res.json({ scenarios: filteredScenarios });
         }
         
-        console.log("❌ Senaryolar tablosundan veri çekilemedi:", scenariosRes);
-        return res.status(500).json({ error: "Senaryolar yüklenemedi" });
+        return res.json({ scenarios: [] });
     } catch (error) {
         console.error("💥 Senaryo listeleme hatası:", error.message);
         return res.status(500).json({ error: error.message });

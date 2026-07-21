@@ -609,18 +609,38 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Raporlar listelenirken hata oluştu:", err.message);
         }
     }
-    // ⚡ Toplu Testleri Checkbox ve Tıklama Sırasıyla Listeyip Yöneten Fonksiyon
+    
+// ⚡ Toplu Testleri Checkbox ve Tıklama Sırasıyla Listeyip Yöneten Fonksiyon
     async function loadBatchScenarios() {
         const batchEmpty = document.getElementById("batch-empty");
         const batchTable = document.getElementById("batch-table");
         const batchList = document.getElementById("batch-list");
         const startBatchBtn = document.getElementById("start-batch-btn");
+        const projectDropdown = document.getElementById("project-dropdown");
 
         if (!batchEmpty || !batchTable || !batchList || !startBatchBtn) return;
 
+        // 🌟 KRİTİK GÜVENCE: Eğer currentProject boşsa, dropdown'daki aktif seçili projeyi al!
+        const activeProjectName = currentProject || (projectDropdown ? projectDropdown.value : "");
+
+        if (!activeProjectName) {
+            console.warn("⚠️ Toplu testler için aktif bir proje seçilmemiş.");
+            batchTable.classList.add("hidden");
+            batchEmpty.classList.remove("hidden");
+            return;
+        }
+
+        // 🌟 GÜVENLİK ZIRHI: Oturum token'ını alıyoruz
+        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
         try {
-            console.log(`🔄 "${currentProject}" projesi için toplu test senaryoları çekiliyor...`);
-            const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}`);
+            console.log(`🔄 "${activeProjectName}" projesi için toplu test senaryoları çekiliyor...`);
+            
+            const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(activeProjectName)}`, {
+                headers: {
+                    "X-User-Token": userSession.token || ""
+                }
+            });
             const result = await res.json();
 
             batchQueue = [];
@@ -785,6 +805,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Senaryoları ve raporları yeni kısıtlı proje listesine göre tetikle!
                 await loadScenarios();
                 await loadReports();
+                await loadBatchScenarios();
             }
         } catch (err) {
             console.error("Projeler yüklenirken hata oluştu:", err.message);
@@ -877,6 +898,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 alert("⚠️ Bu alana erişim yetkiniz bulunmamaktadır!");
                 return;
             }
+
+            if (targetViewId === "view-batch") {
+            loadBatchScenarios();
+        }
 
             navButtons.forEach(b => {
                 b.classList.remove("text-[#3b82f6]", "bg-[#3b82f6]/10");
