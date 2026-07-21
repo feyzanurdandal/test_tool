@@ -3,9 +3,9 @@ import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import dpu from '../config/dpuService.js';
-import { translateScenario } from '../server.js';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { translateScenario } from '../services/scenarioService.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -22,39 +22,10 @@ const runPlaywrightTest = () => {
     });
 };
 
-// routes/dpuScenarios.js dosyasının en üstüne ekle :
-import crypto from 'crypto';
-const SECRET_KEY = process.env.JWT_SECRET || 'dpu_secure_production_secret_key_2026_x89f';
-
-// 🛡️ Token'ı doğrulayan ve Payload'u dönen yardımcı fonksiyon
-function verifyTokenPayload(token) {
-    if (!token) return null;
-    try {
-        // jwt.verify süresi dolmuş (expired) veya sahte token'ları otomatik reddeder!
-        return jwt.verify(token, SECRET_KEY);
-    } catch (e) {
-        // Token süresi dolduysa veya imza hatalıysa buraya düşer
-        return null;
-    }
-}
-
-// Token'dan Güvenli Rol Çıkarma
-function getRoleFromToken(token) {
-    const payload = verifyTokenPayload(token);
-    return payload ? payload.role : 'GUEST';
-}
-
-// Token'dan Güvenli Kullanıcı Adı Çıkarma
-function getUsernameFromToken(token) {
-    const payload = verifyTokenPayload(token);
-    return payload ? payload.username : null;
-}
-
 // ─── 1. API: PROJELERİ LİSTELEME (ROL BAZLI FİLTRELİ!) ───
-router.get('/projects/list', async (req, res) => {
-    const userToken = req.headers['x-user-token'];
-    const userRole = getRoleFromToken(userToken);
-    const username = getUsernameFromToken(userToken);
+router.get('/projects/list', requireAuth, async (req, res) => {
+    const userRole = req.user.role;
+    const username = req.user.username;
 
     try {
         const result = await dpu.select('projeler', 100);
@@ -64,18 +35,16 @@ router.get('/projects/list', async (req, res) => {
 
         let projectNames = result.data.map(p => p.proje_adi);
 
-        //  SİBER GÜVENLİK FİLTRESİ: Eğer kullanıcı ADMIN değilse sadece atandığı projeleri görebilir!
         if (userRole !== 'ADMIN' && username) {
             const permissionsRes = await dpu.select('kullanici_projeleri', 100);
             if (permissionsRes.success && permissionsRes.data) {
-                // Sadece bu kullanıcıya atanan proje adlarını filtreliyoruz  🔑
                 const allowedProjects = permissionsRes.data
                     .filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase())
                     .map(p => p.proje_adi);
 
                 projectNames = projectNames.filter(name => allowedProjects.includes(name));
             } else {
-                projectNames = []; // Atanmış izin tablosu yoksa hiçbir projeyi göremez!
+                projectNames = [];
             }
         }
         
@@ -91,14 +60,7 @@ router.get('/projects/list', async (req, res) => {
 });
 
 // ─── 2. API: YENİ PROJE OLUŞTURMA (Sadece ADMIN Yetkili) ───
-router.post('/projects/create', async (req, res) => {
-    const userToken = req.headers['x-user-token'];
-    const userRole = getRoleFromToken(userToken);
-
-    if (userRole !== 'ADMIN') {
-        return res.status(403).json({ error: "Bu işlem için yetkiniz yok! Sadece ADMIN yetkilidir." });
-    }
-
+router.post('/projects/create', requireAuth, requireAdmin, async (req, res) => {
     const { projectName } = req.body;
     if (!projectName) return res.status(400).json({ error: "Proje adı boş olamaz!" });
 
@@ -106,7 +68,6 @@ router.post('/projects/create', async (req, res) => {
     if (!sanitizedProjName) return res.status(400).json({ error: "Geçersiz proje adı!" });
 
     try {
-        // Bellekte dönmek yerine doğrudan DPU Base filtreleme sorgusu atıyoruz! 🔑
         const checkExist = await dpu.select('projeler', 1, `proje_adi:eq:${sanitizedProjName}`);
         if (checkExist.success && checkExist.data.length > 0) {
             return res.status(400).json({ error: "Bu isimde bir proje zaten mevcut!" });
@@ -122,26 +83,16 @@ router.post('/projects/create', async (req, res) => {
     }
 });
 
-
-
-// ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME (GÜVENLİK & YETKİ FİLTRELİ! 🔒) ───
-router.get('/list', async (req, res) => {
+// ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME ───
+router.get('/list', requireAuth, async (req, res) => {
     const { project } = req.query;
     const selectedProj = (project || '').trim();
-
-    // 🌟 GÜVENLİK: İstekten kullanıcı token'ını alıyoruz
-    const userToken = req.headers['x-user-token'];
-    const userRole = getRoleFromToken(userToken);
-    const username = getUsernameFromToken(userToken);
+    const userRole = req.user.role;
+    const username = req.user.username;
 
     if (!selectedProj) return res.json({ scenarios: [] });
 
     try {
-        console.log(`=========================================`);
-        console.log(`🔍 LİSTELEME SORGUSU BAŞLADI (Kullanıcı: ${username || 'Anonim'}, Rol: ${userRole})`);
-        console.log(`Aranan Proje Adı: "${selectedProj}"`);
-        
-        // 1. Kullanıcı ADMIN değilse bu projeye erişim yetkisi var mı kontrol et!
         if (userRole !== 'ADMIN' && username) {
             const permissionsRes = await dpu.select('kullanici_projeleri', 100);
             if (permissionsRes.success && permissionsRes.data) {
@@ -150,7 +101,6 @@ router.get('/list', async (req, res) => {
                     .map(p => p.proje_adi.toLowerCase());
 
                 if (!allowedProjects.includes(selectedProj.toLowerCase())) {
-                    console.log(`⛔ YETKİSİZ ERİŞİM: "${username}" kullanıcısının "${selectedProj}" projesine yetkisi yok!`);
                     return res.json({ scenarios: [] });
                 }
             } else {
@@ -158,20 +108,13 @@ router.get('/list', async (req, res) => {
             }
         }
 
-        // 2. Projeleri filtresiz çekip bellekte eşleştiriyoruz
         const projectRes = await dpu.select('projeler', 100);
-        if (!projectRes.success || !projectRes.data) {
-            return res.json({ scenarios: [] });
-        }
+        if (!projectRes.success || !projectRes.data) return res.json({ scenarios: [] });
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-        if (!foundProj) {
-            return res.json({ scenarios: [] });
-        }
+        if (!foundProj) return res.json({ scenarios: [] });
         
         const projectId = foundProj.id;
-
-        // 3. Senaryoları çek ve sadece ilgili projenin senaryolarını dön!
         const scenariosRes = await dpu.select('senaryolar', 100);
         
         if (scenariosRes.success && scenariosRes.data) {
@@ -184,34 +127,25 @@ router.get('/list', async (req, res) => {
         
         return res.json({ scenarios: [] });
     } catch (error) {
-        console.error("💥 Senaryo listeleme hatası:", error.message);
         return res.status(500).json({ error: error.message });
     }
 });
 
-// ─── 4. API: SENARYO JSON İÇERİĞİNİ OKUMA (BELLEKTE GÜVENLİ FİLTRELEME! 🔒) ───
-router.get('/content', async (req, res) => {
+// ─── 4. API: SENARYO JSON İÇERİĞİNİ OKUMA ───
+router.get('/content', requireAuth, async (req, res) => {
     const { scenarioName, project } = req.query;
     const selectedProj = (project || 'Varsayılan Proje').trim();
 
     if (!scenarioName) return res.status(400).json({ error: "scenarioName parametresi zorunlu!" });
 
     try {
-        console.log(`🔍 [Content] "${scenarioName}" senaryosunun içeriği buluttan talep ediliyor...`);
-
-        // 1. Projeleri filtresiz çekip bellekte eşleştiriyoruz !
         const projectRes = await dpu.select('projeler', 100);
-        if (!projectRes.success || !projectRes.data) {
-            return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
-        }
+        if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-        if (!foundProj) {
-            return res.status(404).json({ error: "Proje bulunamadı." });
-        }
+        if (!foundProj) return res.status(404).json({ error: "Proje bulunamadı." });
         const projectId = foundProj.id;
 
-        // 2. Senaryoları da filtresiz çekip bellekte tam eşleşme arıyoruz 🚀
         const scenarioRes = await dpu.select('senaryolar', 100);
         if (scenarioRes.success && scenarioRes.data) {
             const scenario = scenarioRes.data.find(s => 
@@ -229,13 +163,12 @@ router.get('/content', async (req, res) => {
         }
         return res.status(404).json({ error: "Senaryo bulunamadı." });
     } catch (error) {
-        console.error("💥 Senaryo içeriği okunurken hata patladı:", error.message);
         return res.status(500).json({ error: error.message });
     }
 });
 
-// ─── 5. API: SENARYO KAYDETME VE MANTIKLI ÇEVİRİSİ (BELLEKTE GÜVENLİ FİLTRELEME! 🔒) ───
-router.post('/create-and-save', async (req, res) => {
+// ─── 5. API: SENARYO KAYDETME VE MANTIKLI ÇEVİRİSİ ───
+router.post('/create-and-save', requireAuth, async (req, res) => {
     const { scenarioName, turkishInstructions, targetUrl, projectName } = req.body;
     const selectedProj = (projectName || 'Varsayılan Proje').trim();
 
@@ -244,40 +177,24 @@ router.post('/create-and-save', async (req, res) => {
     }
 
     try {
-        console.log(`🔍 [Create] Projeler çekiliyor...`);
-        
-        // 1. Projeleri filtresiz çekip bellekte esnek (case-insensitive) olarak aratıyoruz !
         const projectRes = await dpu.select('projeler', 100);
-        if (!projectRes.success || !projectRes.data) {
-            return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
-        }
+        if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-        if (!foundProj) {
-            return res.status(404).json({ error: "İlgili proje bulunamadı!" });
-        }
+        if (!foundProj) return res.status(404).json({ error: "İlgili proje bulunamadı!" });
         const projectId = foundProj.id;
 
-        console.log(`🎯 Proje ID Başarıyla Bulundu: ${projectId}. Çift kayıt kontrolü yapılıyor...`);
-
-        // 2. Çift kayıt kontrolünü bellekte yapıyoruz (API filtresi tıkandığı için!)
         const checkScenario = await dpu.select('senaryolar', 100);
         if (checkScenario.success && checkScenario.data) {
             const isDuplicate = checkScenario.data.some(s => 
                 String(s.project_id) === String(projectId) && 
                 s.senaryo_adi === scenarioName
             );
-            if (isDuplicate) {
-                return res.status(400).json({ error: "Bu proje altında bu senaryo adı zaten mevcut!" });
-            }
+            if (isDuplicate) return res.status(400).json({ error: "Bu proje altında bu senaryo adı zaten mevcut!" });
         }
 
-        console.log(`🧠 AI Translator: Türkçe talimatlar çözümleniyor...`);
         const stagehandJson = await translateScenario(turkishInstructions, targetUrl);
-
-        if (!stagehandJson) {
-            return res.status(500).json({ error: "Senaryo çevirisi esnasında yapay zeka hata döndürdü." });
-        }
+        if (!stagehandJson) return res.status(500).json({ error: "Senaryo çevirisi esnasında yapay zeka hata döndürdü." });
 
         const nowIso = new Date().toISOString();
         const insertData = {
@@ -291,52 +208,38 @@ router.post('/create-and-save', async (req, res) => {
 
         const result = await dpu.insert('senaryolar', insertData);
         if (result.success) {
-            console.log(`✅ Senaryo "${scenarioName}" başarıyla DPU Base'e yazıldı.`);
             return res.status(200).json({ success: true, status: "SUCCESS", message: "Senaryo başarıyla buluta mühürlendi!" });
         }
         return res.status(500).json({ error: "DPU Base senaryo kayıt hatası", details: result });
     } catch (error) {
-        console.error("💥 Senaryo kaydında hata:", error.message);
         return res.status(500).json({ error: error.message });
     }
 });
 
-// ─── 6. API: SENARYO SİLME (BELLEKTE GÜVENLİ FİLTRELEME! 🔒) ───
-router.post('/delete', async (req, res) => {
+// ─── 6. API: SENARYO SİLME ───
+router.post('/delete', requireAuth, async (req, res) => {
     const { scenarioName, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 
-    if (!scenarioName || !selectedProj) {
-        return res.status(400).json({ error: "Eksik parametre var!" });
-    }
+    if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var!" });
 
     try {
-        // 1. Projeleri bellekte esnek aratıyoruz !
         const projectRes = await dpu.select('projeler', 100);
-        if (!projectRes.success || !projectRes.data) {
-            return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
-        }
+        if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-        if (!foundProj) {
-            return res.status(404).json({ error: "Proje bulunamadı." });
-        }
+        if (!foundProj) return res.status(404).json({ error: "Proje bulunamadı." });
         const projectId = foundProj.id;
 
-        // 2. Senaryoyu da bellekte buluyoruz
         const scenarioRes = await dpu.select('senaryolar', 100);
-        if (!scenarioRes.success || !scenarioRes.data) {
-            return res.status(404).json({ error: "Senaryolar tablosuna erişilemedi." });
-        }
+        if (!scenarioRes.success || !scenarioRes.data) return res.status(404).json({ error: "Senaryolar tablosuna erişilemedi." });
 
         const foundScenario = scenarioRes.data.find(s => 
             String(s.project_id) === String(projectId) && 
             s.senaryo_adi === scenarioName
         );
 
-        if (!foundScenario) {
-            return res.status(404).json({ error: "Silinecek senaryo bulunamadı." });
-        }
+        if (!foundScenario) return res.status(404).json({ error: "Silinecek senaryo bulunamadı." });
 
         const deleteResult = await dpu.delete('senaryolar', foundScenario.id);
         if (deleteResult.success) {
@@ -348,68 +251,41 @@ router.post('/delete', async (req, res) => {
     }
 });
 
-// ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA (MODERN & ESNEK ASYNC YAPIDA!) ───
-router.post('/run', async (req, res) => {
+// ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA ───
+router.post('/run', requireAuth, async (req, res) => {
     const { scenarioName, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 
-    if (!scenarioName || !selectedProj) {
-        return res.status(400).json({ error: "Eksik parametre var! Senaryo veya proje adı gelmedi." });
-    }
+    if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var! Senaryo veya proje adı gelmedi." });
 
     try {
-        console.log(`=========================================`);
-        console.log(`🚀 PLAYWRIGHT TEST ÇALIŞTIRMA İSTEĞİ GELDİ!`);
-        console.log(`Senaryo: "${scenarioName}" | Proje: "${selectedProj}"`);
-
-        // 1. Projeleri filtresiz çekip bellekte esnek (case-insensitive) olarak aratıyoruz ! 🔑
         const projectRes = await dpu.select('projeler', 100);
-        if (!projectRes.success || !projectRes.data) {
-            return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
-        }
+        if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-        if (!foundProj) {
-            console.log(`❌ HATA: "${selectedProj}" isimli proje veritabanında bulunamadı.`);
-            return res.status(404).json({ error: "Proje bulunamadı." });
-        }
+        if (!foundProj) return res.status(404).json({ error: "Proje bulunamadı." });
         const projectId = foundProj.id;
-        console.log(`🎯 Bulunan Proje ID: ${projectId}`);
 
-        // 2. Senaryolar tablosundan adımları (adimlar) filtresiz çekip bellekte ayıklıyoruz
         const scenariosRes = await dpu.select('senaryolar', 100);
-        if (!scenariosRes.success || !scenariosRes.data) {
-            return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
-        }
+        if (!scenariosRes.success || !scenariosRes.data) return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
 
         const foundScenario = scenariosRes.data.find(s => 
             String(s.project_id) === String(projectId) && 
             s.senaryo_adi === scenarioName
         );
 
-        if (!foundScenario) {
-            return res.status(404).json({ error: "Çalıştırılacak senaryo veritabanında bulunamadı." });
-        }
+        if (!foundScenario) return res.status(404).json({ error: "Çalıştırılacak senaryo veritabanında bulunamadı." });
 
-        // Adımları alıyoruz (Stagehand JSON)
         const rawSteps = foundScenario.adimlar;
-        console.log(`📦 Çekilen Ham Adımlar:`, rawSteps);
-
-        // 3. Playwright testinin okuyabilmesi için adımları geçici bir dosyaya yazıyoruz
         const cacheDir = path.join(process.cwd(), 'cache');
-        if (!fs.existsSync(cacheDir)) {
-            fs.mkdirSync(cacheDir, { recursive: true });
-        }
+        if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
         
         const runtimeStepsPath = path.join(cacheDir, 'runtime_steps.json');
         const stepsString = typeof rawSteps === 'string' ? rawSteps : JSON.stringify(rawSteps, null, 2);
         fs.writeFileSync(runtimeStepsPath, stepsString, 'utf-8');
-        console.log(`💾 Geçici test adımları yazıldı: ${runtimeStepsPath}`);
 
-        // 4. Playwright'ı asenkron olarak arka planda ateşliyoruz 🚀
         const testResult = await runPlaywrightTest();
 
-        // 📝 Rapor verisini hazırlayıp DPU Base'e mühürlüyoruz
         const reportData = {
             project_id: projectId,
             scenario_name: scenarioName,
@@ -419,73 +295,52 @@ router.post('/run', async (req, res) => {
         };
 
         try {
-            console.log("💾 Test raporu DPU Base'e kaydediliyor...");
             await dpu.insert('raporlar', reportData);
-            console.log("✅ Rapor başarıyla mühürlendi!");
         } catch (dbErr) {
             console.error("⚠️ Rapor veritabanına yazılırken hata oluştu:", dbErr.message);
         }
 
         if (!testResult.isSuccess) {
-            return res.status(500).json({ 
-                success: false, 
-                error: "Test koşturulurken bir hata patladı!", 
-                output: testResult.logContent 
-            });
+            return res.status(500).json({ success: false, error: "Test koşturulurken bir hata patladı!", output: testResult.logContent });
         }
 
-        return res.status(200).json({ 
-            success: true, 
-            message: "Test başarıyla koşturuldu ve tamamlandı!"
-        });
-
+        return res.status(200).json({ success: true, message: "Test başarıyla koşturuldu ve tamamlandı!" });
     } catch (error) {
-        console.error("💥 Test koşturma endpoint'inde büyük hata:", error.message);
         return res.status(500).json({ error: error.message });
     }
 });
 
-// ─── 8. API: PROJE BAZLI RAPORLARI LİSTELEME (BELLEKTE GÜVENLİ FİLTRELEME! 🔒) ───
-router.get('/reports/list', async (req, res) => {
+// ─── 8. API: PROJE BAZLI RAPORLARI LİSTELEME ───
+router.get('/reports/list', requireAuth, async (req, res) => {
     const { project } = req.query;
     const selectedProj = (project || '').trim();
 
     if (!selectedProj) return res.json({ reports: [] });
 
     try {
-        console.log(`🔍 [Reports] "${selectedProj}" projesi için raporlar sorgulanıyor...`);
-        
-        // 1. Projeyi filtresiz çekip bellekte eşleştiriyoruz (API tıkanmasın diye)
         const projectRes = await dpu.select('projeler', 100);
         if (!projectRes.success || projectRes.data.length === 0) return res.json({ reports: [] });
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
         if (!foundProj) return res.json({ reports: [] });
-        
         const projectId = foundProj.id;
 
-        // 2. Raporları da filtresiz çekip bellekte proje_id'ye göre ayıklıyoruz! 🚀
         const reportsRes = await dpu.select('raporlar', 100);
-        
         if (reportsRes.success && reportsRes.data) {
-            // API filtresi yerine güvenli JS filtrelemesi kilit! 🔑
             const filteredReports = reportsRes.data
                 .filter(r => String(r.project_id) === String(projectId))
-                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); // Yeniden eskiye sıralama
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-            console.log(`📊 [Reports] Eşleşen ${filteredReports.length} adet rapor listelendi.`);
             return res.json({ success: true, reports: filteredReports });
         }
-        
         return res.json({ reports: [] });
     } catch (error) {
-        console.error("💥 Rapor listeleme hatası:", error.message);
         return res.json({ reports: [] });
     }
 });
 
 // ─── 9. API: SIRALI TOPLU TEST KOŞTURMA (BATCH PIPELINE) ───
-router.post('/run-batch', async (req, res) => {
+router.post('/run-batch', requireAuth, async (req, res) => {
     const { scenarioNames, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 
@@ -495,32 +350,19 @@ router.post('/run-batch', async (req, res) => {
 
     try {
         const projectRes = await dpu.select('projeler', 1, `proje_adi:eq:${selectedProj}`);
-        if (!projectRes.success || projectRes.data.length === 0) {
-            return res.status(404).json({ error: "Proje bulunamadı." });
-        }
+        if (!projectRes.success || projectRes.data.length === 0) return res.status(404).json({ error: "Proje bulunamadı." });
         const projectId = projectRes.data[0].id;
 
         const scenariosRes = await dpu.select('senaryolar', 100, `project_id:eq:${projectId}`);
-        if (!scenariosRes.success || !scenariosRes.data) {
-            return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
-        }
+        if (!scenariosRes.success || !scenariosRes.data) return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
 
         const batchScenarios = scenariosRes.data.filter(s => scenarioNames.includes(s.senaryo_adi));
-        if (batchScenarios.length === 0) {
-            return res.status(404).json({ error: "Kuyruktaki hiçbir senaryo bulunamadı!" });
-        }
+        if (batchScenarios.length === 0) return res.status(404).json({ error: "Kuyruktaki hiçbir senaryo bulunamadı!" });
 
-        // Express istemcisini bekletmeden kuyruk emrini kabul ediyoruz
-        res.status(202).json({ 
-            success: true, 
-            message: "Toplu test pipeline akışı arka planda başlatıldı! Raporlar sekmesinden takip edebilirsiniz." 
-        });
+        res.status(202).json({ success: true, message: "Toplu test pipeline akışı arka planda başlatıldı!" });
 
-        // Arka planda sıralı (sequential) asenkron döngü koşturuyoruz ! ⚡
         (async () => {
             for (const scenario of batchScenarios) {
-                console.log(`\n➡️ Pipeline Sıradaki Test: "${scenario.senaryo_adi}"`);
-                
                 const cacheDir = path.join(process.cwd(), 'cache');
                 if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
 
@@ -540,34 +382,17 @@ router.post('/run-batch', async (req, res) => {
 
                 await dpu.insert('raporlar', reportData);
             }
-            console.log(`\n⚡ BATCH PIPELINE BAŞARIYLA TAMAMLANDI!`);
         })();
-
     } catch (error) {
-        if (!res.headersSent) {
-            return res.status(500).json({ error: error.message });
-        }
+        if (!res.headersSent) return res.status(500).json({ error: error.message });
     }
 });
 
-// ─── 10. API: DPU BASE'DEN İLİŞKİSEL AYARLARI GETİRME (Sadece ADMIN Yetkili) 🔒 ───
-router.get('/settings/get', async (req, res) => {
-    // 🛡️ SİBER GÜVENLİK ZIRHI: İstekten token'ı okuyup sadece ADMIN erişimine izin veriyoruz!
-    const userToken = req.headers['x-user-token'];
-    const userRole = getRoleFromToken(userToken);
-
-    if (userRole !== 'ADMIN') {
-        return res.status(403).json({ error: "Yetkisiz işlem! Sistem ayarlarını ve API anahtarlarını sadece ADMIN görüntüleyebilir." });
-    }
-
+// ─── 10. API: AYARLARI GETİRME ───
+router.get('/settings/get', requireAuth, requireAdmin, async (req, res) => {
     try {
         const dbResult = await dpu.select('ayarlar', 100);
-
-        const settings = {
-            testRunnerApi: "openai",
-            translatorApi: "gemini",
-            apiKeys: {}
-        };
+        const settings = { testRunnerApi: "openai", translatorApi: "gemini", apiKeys: {} };
 
         if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
             const testRunnerRow = dbResult.data.find(r => r.ayar_anahtar === 'test_runner_api');
@@ -585,23 +410,14 @@ router.get('/settings/get', async (req, res) => {
                 }
             });
         }
-
         return res.json({ success: true, settings });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
 });
 
-// ─── 11. API: DPU BASE ÜZERİNE İLİŞKİSEL AYARLARI KAYDETME ───
-router.post('/settings/save', async (req, res) => {
-    const userToken = req.headers['x-user-token'];
-    const userRole = getRoleFromToken(userToken);
-
-
-    if (userRole !== 'ADMIN') {
-        return res.status(403).json({ error: "Bu işlem için yetkiniz yok! Sadece ADMIN sistem ayarlarını değiştirebilir." });
-    }
-
+// ─── 11. API: AYARLARI KAYDETME ───
+router.post('/settings/save', requireAuth, requireAdmin, async (req, res) => {
     const { testRunnerApi, translatorApi, apiKeys } = req.body;
     
     try {
@@ -657,9 +473,8 @@ router.post('/settings/save', async (req, res) => {
 });
 
 // ─── 12. API: TEKİL TEST RAPORUNU SİLME ───
-router.post('/reports/delete', async (req, res) => {
+router.post('/reports/delete', requireAuth, async (req, res) => {
     const { id } = req.body;
-
     if (!id) return res.status(400).json({ error: "Eksik parametre! Rapor ID değeri gelmedi." });
 
     try {
@@ -673,20 +488,16 @@ router.post('/reports/delete', async (req, res) => {
     }
 });
 
-// ─── 👨‍💼 KULLANICI YÖNETİMİ API ENDPOINT'LERİ (Sadece ADMIN Yetkili) ───
+// ─── KULLANICI YÖNETİMİ ───
 
 // 1. Kullanıcıları Listeleme
-router.get('/users/list', async (req, res) => {
-    const userToken = req.headers['x-user-token'];
-    if (getRoleFromToken(userToken) !== 'ADMIN') return res.status(403).json({ error: "Yetkisiz işlem!" });
-
+router.get('/users/list', requireAuth, requireAdmin, async (req, res) => {
     try {
         const usersRes = await dpu.select('kullanicilar', 100);
         const projectsRes = await dpu.select('projeler', 100);
         const permsRes = await dpu.select('kullanici_projeleri', 100);
 
         if (usersRes.success) {
-            // Kullanıcıları ve atandıkları projeleri birleştirip gönderiyoruz 
             const formattedUsers = usersRes.data.map(user => {
                 const userProjects = permsRes.success && permsRes.data
                     ? permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === user.kullanici_adi.toLowerCase()).map(p => p.proje_adi)
@@ -708,16 +519,10 @@ router.get('/users/list', async (req, res) => {
     }
 });
 
-// 2. Yeni Kullanıcı Oluşturma & Proje Atama
-router.post('/users/create', async (req, res) => {
-    const userToken = req.headers['x-user-token'];
-    if (getRoleFromToken(userToken) !== 'ADMIN') return res.status(403).json({ error: "Yetkisiz işlem!" });
-
+// 2. Yeni Kullanıcı Oluşturma
+router.post('/users/create', requireAuth, requireAdmin, async (req, res) => {
     const { username, password, role, selectedProjects } = req.body;
-
-    if (!username || !password || !role) {
-        return res.status(400).json({ error: "Eksik alanlar var!" });
-    }
+    if (!username || !password || !role) return res.status(400).json({ error: "Eksik alanlar var!" });
 
     try {
         const usersCheck = await dpu.select('kullanicilar', 100);
@@ -725,12 +530,10 @@ router.post('/users/create', async (req, res) => {
             return res.status(400).json({ error: "Bu kullanıcı adı zaten mevcut!" });
         }
 
-        // 🛡️ BCRYPT: Şifreyi veritabanına yazmadan önce 10 tur salt ile hash'liyoruz!
         const hashedPassword = await bcrypt.hash(password, 10);
-
         const userInsert = await dpu.insert('kullanicilar', {
             kullanici_adi: username,
-            sifre: hashedPassword, // Hash'lenmiş şifre mühürleniyor!
+            sifre: hashedPassword,
             rol: role.toUpperCase()
         });
 
@@ -752,17 +555,12 @@ router.post('/users/create', async (req, res) => {
 });
 
 // 3. Kullanıcı Silme
-router.post('/users/delete', async (req, res) => {
-    const userToken = req.headers['x-user-token'];
-    if (getRoleFromToken(userToken) !== 'ADMIN') return res.status(403).json({ error: "Yetkisiz işlem!" });
-
+router.post('/users/delete', requireAuth, requireAdmin, async (req, res) => {
     const { id, username } = req.body;
 
     try {
-        // 1. Kullanıcıyı sil
         const deleteUser = await dpu.delete('kullanicilar', id);
         if (deleteUser.success) {
-            // 2. Kullanıcının proje ilişkilerini temizle
             const permsRes = await dpu.select('kullanici_projeleri', 100);
             if (permsRes.success && permsRes.data) {
                 const userPerms = permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase());
@@ -778,31 +576,18 @@ router.post('/users/delete', async (req, res) => {
     }
 });
 
-// 4. Kullanıcı Bilgilerini ve Proje Yetkilerini Güncelleme (Sadece ADMIN Yetkili) 🔒
-router.post('/users/update', async (req, res) => {
-    const userToken = req.headers['x-user-token'];
-    if (getRoleFromToken(userToken) !== 'ADMIN') {
-        return res.status(403).json({ error: "Yetkisiz işlem! Sadece ADMIN kullanıcıları güncelleyebilir." });
-    }
-
+// 4. Kullanıcı Güncelleme
+router.post('/users/update', requireAuth, requireAdmin, async (req, res) => {
     const { id, username, password, role, selectedProjects } = req.body;
-
-    if (!id || !username) {
-        return res.status(400).json({ error: "Eksik parametre! Kullanıcı ID ve Kullanıcı Adı zorunludur." });
-    }
+    if (!id || !username) return res.status(400).json({ error: "Eksik parametre!" });
 
     try {
         const usersRes = await dpu.select('kullanicilar', 100);
-        if (!usersRes.success || !usersRes.data) {
-            return res.status(500).json({ error: "Veritabanı erişim hatası." });
-        }
+        if (!usersRes.success || !usersRes.data) return res.status(500).json({ error: "Veritabanı erişim hatası." });
 
         const existingUser = usersRes.data.find(u => String(u.id) === String(id));
-        if (!existingUser) {
-            return res.status(404).json({ error: "Güncellenecek kullanıcı bulunamadı." });
-        }
+        if (!existingUser) return res.status(404).json({ error: "Güncellenecek kullanıcı bulunamadı." });
 
-        // 🛡️ BCRYPT MANTIĞI: Eğer yeni şifre yazıldıysa hash'le, yazılmadıysa eski hash'i koru!
         let finalPassword = existingUser.sifre;
         if (password && password.trim() !== '') {
             finalPassword = await bcrypt.hash(password, 10);
@@ -811,16 +596,13 @@ router.post('/users/update', async (req, res) => {
         const finalRole = role ? role.toUpperCase() : existingUser.rol;
 
         await dpu.delete('kullanicilar', existingUser.id);
-        
         const insertUserRes = await dpu.insert('kullanicilar', {
             kullanici_adi: username,
             sifre: finalPassword,
             rol: finalRole
         });
 
-        if (!insertUserRes.success) {
-            return res.status(500).json({ error: "Kullanıcı bilgileri güncellenemedi." });
-        }
+        if (!insertUserRes.success) return res.status(500).json({ error: "Kullanıcı bilgileri güncellenemedi." });
 
         const permsRes = await dpu.select('kullanici_projeleri', 100);
         if (permsRes.success && permsRes.data) {
@@ -840,12 +622,9 @@ router.post('/users/update', async (req, res) => {
         }
 
         return res.json({ success: true, message: "Kullanıcı bilgileri ve yetkileri başarıyla güncellendi!" });
-
     } catch (err) {
-        console.error("Kullanıcı güncelleme hatası:", err);
         return res.status(500).json({ error: err.message });
     }
 });
-
 
 export default router;

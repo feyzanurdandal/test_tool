@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import dpu from './config/dpuService.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { translateScenario } from './services/scenarioService.js';
 
 // Güvenli Secret Katmanı: Env değişkeni yoksa rastgele güçlü key üretilir veya uyarı verilir
 if (!process.env.JWT_SECRET) {
@@ -23,15 +24,6 @@ const __dirname = path.dirname(__filename);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/**
- * SADECE AI ÇEVİRİSİ YAPIP NET JSON DÖNEN YENİ FONKSİYON
- */
-export async function translateScenario(turkishInstructions, targetUrl) {
-    const stagehandJson = await translateToStagehandJson(turkishInstructions, targetUrl);
-    if (!stagehandJson) throw new Error("Yapay zeka çevirisi başarısız oldu.");
-    stagehandJson.targetUrl = targetUrl;
-    return stagehandJson;
-}
 
 // ─── ROTA IMPORTLARI ───
 // Sadece bizim yeni ve dinamik bulut tabanlı rotamız aktif kalıyor ! 🔒

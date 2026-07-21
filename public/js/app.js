@@ -130,7 +130,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             console.log(` "${currentProject}" projesi için senaryolar buluttan isteniyor...`);
-            const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}`);
+            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
+            const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}`, {
+                headers: {
+                    "X-User-Token": userSession.token || "" // 👈 HEADER EKLENDİ
+                }
+            });
             const result = await res.json();
 
             if (result.scenarios && result.scenarios.length > 0) {
@@ -213,7 +219,12 @@ document.addEventListener("DOMContentLoaded", () => {
                             const detailsContainer = contentRow.querySelector(".steps-details-container");
                             if (detailsContainer.getAttribute("data-loaded") !== "true") {
                                 try {
-                                    const contentRes = await fetch(`/api/scenarios/content?scenarioName=${encodeURIComponent(scenarioName)}&project=${encodeURIComponent(currentProject)}`);
+                                    // loadScenarios içinde akordeon tıklama kısmındaki fetch isteği:
+                                    const contentRes = await fetch(`/api/scenarios/content?scenarioName=${encodeURIComponent(scenarioName)}&project=${encodeURIComponent(currentProject)}`, {
+                                        headers: {
+                                            "X-User-Token": userSession.token || "" // 👈 HEADER EKLENDİ
+                                        }
+                                    });
                                     const contentResult = await contentRes.json();
 
                                     if (contentResult.success && contentResult.content) {
@@ -363,7 +374,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             console.log(`🔄 "${currentProject}" projesi için raporlar buluttan getiriliyor...`);
-            const res = await fetch(`/api/scenarios/reports/list?project=${encodeURIComponent(currentProject)}`);
+            // app.js içindeki loadReports fonksiyonu
+            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
+            const res = await fetch(`/api/scenarios/reports/list?project=${encodeURIComponent(currentProject)}`, {
+                headers: {
+                    "X-User-Token": userSession.token || "" // 👈 HEADER EKLENDİ
+                }
+            });
             const result = await res.json();
 
             if (result.reports && result.reports.length > 0) {

@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { OpenAI } from "openai"; 
 import * as dotenv from 'dotenv';
+import dpu from '../config/dpuService.js';
 
 dotenv.config();
 
