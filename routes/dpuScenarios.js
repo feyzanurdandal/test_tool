@@ -70,7 +70,7 @@ router.get('/projects/list', async (req, res) => {
 
         let projectNames = result.data.map(p => p.proje_adi);
 
-        // 🛡️ SİBER GÜVENLİK FİLTRESİ: Eğer kullanıcı ADMIN değilse sadece atandığı projeleri görebilir!
+        //  SİBER GÜVENLİK FİLTRESİ: Eğer kullanıcı ADMIN değilse sadece atandığı projeleri görebilir!
         if (userRole !== 'ADMIN' && username) {
             const permissionsRes = await dpu.select('kullanici_projeleri', 100);
             if (permissionsRes.success && permissionsRes.data) {
@@ -762,5 +762,80 @@ router.post('/users/delete', async (req, res) => {
         return res.status(500).json({ error: err.message });
     }
 });
+
+// 4. Kullanıcı Bilgilerini ve Proje Yetkilerini Güncelleme (Sadece ADMIN Yetkili) 🔒
+router.post('/users/update', async (req, res) => {
+    const userToken = req.headers['x-user-token'];
+    
+    // 🛡️ 1. ZIRH: Admin Yetki Kontrolü
+    if (getRoleFromToken(userToken) !== 'ADMIN') {
+        return res.status(403).json({ error: "Yetkisiz işlem! Sadece ADMIN kullanıcıları güncelleyebilir." });
+    }
+
+    const { id, username, password, role, selectedProjects } = req.body;
+
+    if (!id || !username) {
+        return res.status(400).json({ error: "Eksik parametre! Kullanıcı ID ve Kullanıcı Adı zorunludur." });
+    }
+
+    try {
+        // 1. Mevcut kullanıcıyı veritabanından bul
+        const usersRes = await dpu.select('kullanicilar', 100);
+        if (!usersRes.success || !usersRes.data) {
+            return res.status(500).json({ error: "Veritabanı erişim hatası." });
+        }
+
+        const existingUser = usersRes.data.find(u => String(u.id) === String(id));
+        if (!existingUser) {
+            return res.status(404).json({ error: "Güncellenecek kullanıcı bulunamadı." });
+        }
+
+        // 2. Yeni Şifre / Eski Şifre Mantığı
+        const finalPassword = (password && password.trim() !== '') ? password : existingUser.sifre;
+        const finalRole = role ? role.toUpperCase() : existingUser.rol;
+
+        console.log(`🔄 [User Update] "${username}" kullanıcısı yenileniyor...`);
+
+        // 3. Garanti Çözüm: Eski kullanıcı kaydını sil ve güncel verilerle yeniden ekle!
+        await dpu.delete('kullanicilar', existingUser.id);
+        
+        const insertUserRes = await dpu.insert('kullanicilar', {
+            kullanici_adi: username,
+            sifre: finalPassword,
+            rol: finalRole
+        });
+
+        if (!insertUserRes.success) {
+            console.error("❌ Kullanıcı yeniden eklenirken hata verdi:", insertUserRes);
+            return res.status(500).json({ error: "Kullanıcı bilgileri güncellenemedi." });
+        }
+
+        // 4. Proje Yetkilerini Atomik Olarak Yenile (Eskileri sil, yenileri bas)
+        const permsRes = await dpu.select('kullanici_projeleri', 100);
+        if (permsRes.success && permsRes.data) {
+            const oldUserPerms = permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase());
+            for (const perm of oldUserPerms) {
+                await dpu.delete('kullanici_projeleri', perm.id);
+            }
+        }
+
+        if (Array.isArray(selectedProjects)) {
+            for (const proj of selectedProjects) {
+                await dpu.insert('kullanici_projeleri', {
+                    kullanici_adi: username,
+                    proje_adi: proj
+                });
+            }
+        }
+
+        console.log(`✅ [User Update] "${username}" kullanıcısı ve yetkileri başarıyla güncellendi!`);
+        return res.json({ success: true, message: "Kullanıcı bilgileri ve yetkileri başarıyla güncellendi!" });
+
+    } catch (err) {
+        console.error("Kullanıcı güncelleme hatası:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 
 export default router;
