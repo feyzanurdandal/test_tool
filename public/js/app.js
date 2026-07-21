@@ -1140,9 +1140,16 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadSystemSettings() {
         if (!settingsForm) return;
 
+        // 🌟 GÜVENLİK ZIRHI: Admin Token'ı alınıyor
+        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
         try {
             console.log("Dinamik sistem ayarları yükleniyor...");
-            const res = await fetch("/api/scenarios/settings/get");
+            const res = await fetch("/api/scenarios/settings/get", {
+                headers: {
+                    "X-User-Token": userSession.token || "" // 👈 HEADER EKLENDİ!
+                }
+            });
             const result = await res.json();
 
             if (result.success && result.settings) {
@@ -1151,7 +1158,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 apiKeysContainer.innerHTML = "";
                 if (s.apiKeys) {
                     Object.entries(s.apiKeys).forEach(([provider, details]) => {
-                        // Eğer eski sürümden kalan düz string varsa kaza çıkmasın diye fallback yapıyoruz 
                         const keyVal = typeof details === "object" ? details.key : details;
                         const modelVal = typeof details === "object" ? details.model : "";
                         addApiKeyRow(provider, keyVal, modelVal);

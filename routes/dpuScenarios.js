@@ -4,6 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import dpu from '../config/dpuService.js';
 import { translateScenario } from '../server.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
@@ -22,38 +24,30 @@ const runPlaywrightTest = () => {
 
 // routes/dpuScenarios.js dosyasının en üstüne ekle :
 import crypto from 'crypto';
-const SECRET_KEY = process.env.JWT_SECRET || 'fallback_secret_key_dpu';
+const SECRET_KEY = process.env.JWT_SECRET || 'dpu_secure_production_secret_key_2026_x89f';
 
-// Token'ı çözen ve imza doğruluğunu kontrol eden sihirli fonksiyonumuz 🔒
-function getRoleFromToken(token) {
-    if (!token) return 'GUEST';
-    try {
-        const [username, role, signature] = token.split(':');
-        
-        // Gelen bilgilerle sunucu tarafında yeniden imza hesaplıyoruz
-        const expectedSignature = crypto.createHmac('sha256', SECRET_KEY)
-                                        .update(`${username}:${role}`)
-                                        .digest('hex');
-
-        // Eğer imzalar uyuşuyorsa rol güvenlidir!
-        if (signature === expectedSignature) {
-            return role;
-        }
-    } catch (e) {
-        console.error("Güvenlik Duvarı: Token doğrulanamadı!", e.message);
-    }
-    return 'GUEST';
-}
-
-// Kullanıcının adını token'dan güvenle çıkaran fonksiyon 🔒
-function getUsernameFromToken(token) {
+// 🛡️ Token'ı doğrulayan ve Payload'u dönen yardımcı fonksiyon
+function verifyTokenPayload(token) {
     if (!token) return null;
     try {
-        const [username, role, signature] = token.split(':');
-        return username;
+        // jwt.verify süresi dolmuş (expired) veya sahte token'ları otomatik reddeder!
+        return jwt.verify(token, SECRET_KEY);
     } catch (e) {
+        // Token süresi dolduysa veya imza hatalıysa buraya düşer
         return null;
     }
+}
+
+// Token'dan Güvenli Rol Çıkarma
+function getRoleFromToken(token) {
+    const payload = verifyTokenPayload(token);
+    return payload ? payload.role : 'GUEST';
+}
+
+// Token'dan Güvenli Kullanıcı Adı Çıkarma
+function getUsernameFromToken(token) {
+    const payload = verifyTokenPayload(token);
+    return payload ? payload.username : null;
 }
 
 // ─── 1. API: PROJELERİ LİSTELEME (ROL BAZLI FİLTRELİ!) ───
@@ -128,59 +122,7 @@ router.post('/projects/create', async (req, res) => {
     }
 });
 
-// // ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME (BELLEKTE GÜVENLİ FİLTRELEME! 🔒) ───
-// router.get('/list', async (req, res) => {
-//     const { project } = req.query;
-//     const selectedProj = (project || '').trim();
 
-//     if (!selectedProj) return res.json({ scenarios: [] });
-
-//     try {
-//         console.log(`=========================================`);
-//         console.log(`🔍 LİSTELEME SORGUSU BAŞLADI !`);
-//         console.log(`Aranan Proje Adı: "${selectedProj}"`);
-        
-//         // 1. Önce projeleri filtresiz çekelim (API tıkanmasın diye)
-//         const projectRes = await dpu.select('projeler', 100);
-//         if (!projectRes.success || !projectRes.data) {
-//             console.log("❌ DPU Base 'projeler' tablosuna erişemedi!");
-//             return res.json({ scenarios: [] });
-//         }
-
-//         // Bellekte küçük/büyük harfe duyarsız eşleştirme yapıyoruz
-//         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-//         if (!foundProj) {
-//             console.log(`⚠️ "${selectedProj}" isimli proje veritabanında yok.`);
-//             console.log("Mevcut Projeler:", projectRes.data.map(p => p.proje_adi));
-//             return res.json({ scenarios: [] });
-//         }
-        
-//         const projectId = foundProj.id;
-//         console.log(`🎯 Eşleşen Proje ID: ${projectId}`);
-
-//         // 2. Senaryoları da filtresiz çekip bellekte filtreliyoruz! 🚀
-//         const scenariosRes = await dpu.select('senaryolar', 100);
-        
-//         if (scenariosRes.success && scenariosRes.data) {
-//             console.log(`📂 Toplam Senaryo Kayıt Sayısı: ${scenariosRes.data.length}`);
-            
-//             // API filtresi yerine güvenli Javascript filtrelemesi kilit! 🔑
-//             const filteredScenarios = scenariosRes.data
-//                 .filter(s => String(s.project_id) === String(projectId))
-//                 .map(s => s.senaryo_adi);
-            
-//             console.log(`✅ Eşleşen ve Gönderilen Senaryolar:`, filteredScenarios);
-//             console.log(`=========================================`);
-//             return res.json({ scenarios: filteredScenarios });
-//         }
-        
-//         console.log("❌ Senaryolar tablosundan veri çekilemedi:", scenariosRes);
-//         return res.status(500).json({ error: "Senaryolar yüklenemedi" });
-//     } catch (error) {
-//         console.error("💥 Senaryo listeleme hatası:", error.message);
-//         return res.status(500).json({ error: error.message });
-//     }
-// });
 
 // ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME (GÜVENLİK & YETKİ FİLTRELİ! 🔒) ───
 router.get('/list', async (req, res) => {
@@ -608,8 +550,16 @@ router.post('/run-batch', async (req, res) => {
     }
 });
 
-// ─── 10. API: DPU BASE'DEN İLİŞKİSEL AYARLARI GETİRME ───
+// ─── 10. API: DPU BASE'DEN İLİŞKİSEL AYARLARI GETİRME (Sadece ADMIN Yetkili) 🔒 ───
 router.get('/settings/get', async (req, res) => {
+    // 🛡️ SİBER GÜVENLİK ZIRHI: İstekten token'ı okuyup sadece ADMIN erişimine izin veriyoruz!
+    const userToken = req.headers['x-user-token'];
+    const userRole = getRoleFromToken(userToken);
+
+    if (userRole !== 'ADMIN') {
+        return res.status(403).json({ error: "Yetkisiz işlem! Sistem ayarlarını ve API anahtarlarını sadece ADMIN görüntüleyebilir." });
+    }
+
     try {
         const dbResult = await dpu.select('ayarlar', 100);
 
@@ -770,21 +720,21 @@ router.post('/users/create', async (req, res) => {
     }
 
     try {
-        // Çift kayıt kontrolü
         const usersCheck = await dpu.select('kullanicilar', 100);
         if (usersCheck.success && usersCheck.data.some(u => u.kullanici_adi.toLowerCase() === username.toLowerCase())) {
             return res.status(400).json({ error: "Bu kullanıcı adı zaten mevcut!" });
         }
 
-        // Kullanıcıyı ekle
+        // 🛡️ BCRYPT: Şifreyi veritabanına yazmadan önce 10 tur salt ile hash'liyoruz!
+        const hashedPassword = await bcrypt.hash(password, 10);
+
         const userInsert = await dpu.insert('kullanicilar', {
             kullanici_adi: username,
-            sifre: password,
+            sifre: hashedPassword, // Hash'lenmiş şifre mühürleniyor!
             rol: role.toUpperCase()
         });
 
         if (userInsert.success) {
-            // Proje yetkilerini ekle
             if (Array.isArray(selectedProjects)) {
                 for (const proj of selectedProjects) {
                     await dpu.insert('kullanici_projeleri', {
@@ -831,8 +781,6 @@ router.post('/users/delete', async (req, res) => {
 // 4. Kullanıcı Bilgilerini ve Proje Yetkilerini Güncelleme (Sadece ADMIN Yetkili) 🔒
 router.post('/users/update', async (req, res) => {
     const userToken = req.headers['x-user-token'];
-    
-    // 🛡️ 1. ZIRH: Admin Yetki Kontrolü
     if (getRoleFromToken(userToken) !== 'ADMIN') {
         return res.status(403).json({ error: "Yetkisiz işlem! Sadece ADMIN kullanıcıları güncelleyebilir." });
     }
@@ -844,7 +792,6 @@ router.post('/users/update', async (req, res) => {
     }
 
     try {
-        // 1. Mevcut kullanıcıyı veritabanından bul
         const usersRes = await dpu.select('kullanicilar', 100);
         if (!usersRes.success || !usersRes.data) {
             return res.status(500).json({ error: "Veritabanı erişim hatası." });
@@ -855,13 +802,14 @@ router.post('/users/update', async (req, res) => {
             return res.status(404).json({ error: "Güncellenecek kullanıcı bulunamadı." });
         }
 
-        // 2. Yeni Şifre / Eski Şifre Mantığı
-        const finalPassword = (password && password.trim() !== '') ? password : existingUser.sifre;
+        // 🛡️ BCRYPT MANTIĞI: Eğer yeni şifre yazıldıysa hash'le, yazılmadıysa eski hash'i koru!
+        let finalPassword = existingUser.sifre;
+        if (password && password.trim() !== '') {
+            finalPassword = await bcrypt.hash(password, 10);
+        }
+
         const finalRole = role ? role.toUpperCase() : existingUser.rol;
 
-        console.log(`🔄 [User Update] "${username}" kullanıcısı yenileniyor...`);
-
-        // 3. Garanti Çözüm: Eski kullanıcı kaydını sil ve güncel verilerle yeniden ekle!
         await dpu.delete('kullanicilar', existingUser.id);
         
         const insertUserRes = await dpu.insert('kullanicilar', {
@@ -871,11 +819,9 @@ router.post('/users/update', async (req, res) => {
         });
 
         if (!insertUserRes.success) {
-            console.error("❌ Kullanıcı yeniden eklenirken hata verdi:", insertUserRes);
             return res.status(500).json({ error: "Kullanıcı bilgileri güncellenemedi." });
         }
 
-        // 4. Proje Yetkilerini Atomik Olarak Yenile (Eskileri sil, yenileri bas)
         const permsRes = await dpu.select('kullanici_projeleri', 100);
         if (permsRes.success && permsRes.data) {
             const oldUserPerms = permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase());
@@ -893,7 +839,6 @@ router.post('/users/update', async (req, res) => {
             }
         }
 
-        console.log(`✅ [User Update] "${username}" kullanıcısı ve yetkileri başarıyla güncellendi!`);
         return res.json({ success: true, message: "Kullanıcı bilgileri ve yetkileri başarıyla güncellendi!" });
 
     } catch (err) {

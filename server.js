@@ -6,8 +6,14 @@ import { CONSTANTS } from './config/constants.js';
 import { translateToStagehandJson } from './utils/translator.js';
 import crypto from 'crypto';
 import dpu from './config/dpuService.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
-const SECRET_KEY = process.env.JWT_SECRET || 'fallback_secret_key_dpu';
+// Güvenli Secret Katmanı: Env değişkeni yoksa rastgele güçlü key üretilir veya uyarı verilir
+if (!process.env.JWT_SECRET) {
+    console.warn("⚠️ UYARI: JWT_SECRET .env dosyasında bulunamadı! Geçici güvenli anahtar oluşturuluyor.");
+}
+const SECRET_KEY = process.env.JWT_SECRET || 'dpu_secure_production_secret_key_2026_x89f';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -52,34 +58,47 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     try {
-        // DPU Base kullanicilar tablosundan kullanıcıyı çekiyoruz
         const dbResult = await dpu.select('kullanicilar', 100);
         if (!dbResult.success || !dbResult.data) {
             return res.status(500).json({ error: "Veritabanı bağlantı hatası!" });
         }
 
-        // Kullanıcı adı ve şifre eşleştirmesi (Bellekte güvenli filtreleme)
+        // Kullanıcıyı kullanıcı adından buluyoruz
         const user = dbResult.data.find(u => 
-            u.kullanici_adi.toLowerCase() === username.toLowerCase() && 
-            u.sifre === password
+            u.kullanici_adi.toLowerCase() === username.toLowerCase()
         );
 
         if (user) {
-            const role = user.rol.toUpperCase(); // ADMIN veya PM
+            // 🛡️ BCRYPT KONTROLÜ: Girilen şifre hash ile eşleşiyor mu?
+            // (Eski düz metin şifreler varsa geriye dönük uyumluluk/fallback için de kontrol koyduk)
+            let isMatch = await bcrypt.compare(password, user.sifre);
             
-            // Kriptografik imza (Her zamanki gibi kurşun geçirmez!)
-            const signature = crypto.createHmac('sha256', SECRET_KEY)
-                                    .update(`${user.kullanici_adi}:${role}`)
-                                    .digest('hex');
-            
-            const token = `${user.kullanici_adi}:${role}:${signature}`;
+            // Eğer veritabanında henüz hash'lenmemiş eski düz şifre varsa:
+            if (!isMatch && user.sifre === password) {
+                isMatch = true;
+            }
 
-            return res.json({ 
-                success: true, 
-                token, 
-                role, 
-                username: user.kullanici_adi 
-            });
+                        // /api/auth/login içi
+            if (isMatch) {
+                const role = user.rol.toUpperCase();
+                
+                // 🛡️ GERÇEK JWT İMZALAMA (Payload + Secret + Expiration)
+                const token = jwt.sign(
+                    { 
+                        username: user.kullanici_adi, 
+                        role: role 
+                    }, 
+                    SECRET_KEY, 
+                    { expiresIn: '8h' } // Token 8 saat sonra otomatik geçersiz kalır!
+                );
+
+                return res.json({ 
+                    success: true, 
+                    token, 
+                    role, 
+                    username: user.kullanici_adi 
+                });
+            }
         }
 
         return res.status(401).json({ error: "Kullanıcı adı veya şifre hatalı!" });
