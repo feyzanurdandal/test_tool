@@ -341,15 +341,21 @@ router.get('/reports/list', requireAuth, async (req, res) => {
     if (!selectedProj) return res.json({ reports: [] });
 
     try {
+        // 1. Projeleri çekip esnek (case-insensitive) aratıyoruz
         const projectRes = await dpu.select('projeler', 100);
-        if (!projectRes.success || projectRes.data.length === 0) return res.json({ reports: [] });
+        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
+            return res.json({ reports: [] });
+        }
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
         if (!foundProj) return res.json({ reports: [] });
+        
         const projectId = foundProj.id;
 
+        // 2. Raporları çekiyoruz
         const reportsRes = await dpu.select('raporlar', 100);
         if (reportsRes.success && reportsRes.data) {
+            // String/Number tip farkı yaşamamak için String dönüşümü ile güvenli filtreleme! 🔑
             const filteredReports = reportsRes.data
                 .filter(r => String(r.project_id) === String(projectId))
                 .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -358,6 +364,7 @@ router.get('/reports/list', requireAuth, async (req, res) => {
         }
         return res.json({ reports: [] });
     } catch (error) {
+        console.error("💥 Rapor listeleme hatası:", error.message);
         return res.json({ reports: [] });
     }
 });
