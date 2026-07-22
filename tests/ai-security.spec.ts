@@ -8,6 +8,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { CONSTANTS } from '../config/constants.js'; 
 
+
 // @ts-ignore
 import dpu from '../config/dpuService.js';
 
@@ -16,13 +17,14 @@ test('Yapay Zeka Test Otomasyonu', async () => {
     const __dirname = path.dirname(__filename);
     
     const scenarioName = process.env.SCENARIO_NAME || 'ai-prompts';
-    const promptFilePath = path.join(process.cwd(), 'cache', 'runtime_steps.json');
+    // const promptFilePath = path.join(process.cwd(), 'cache', 'runtime_steps.json');
+    const stepsFilePath = process.env.RUNTIME_STEPS_PATH || path.join(process.cwd(), 'cache', 'runtime_steps.json');
 
-    if (!fs.existsSync(promptFilePath)) {
-        throw new Error(`🚨 Test dosyası belirtilen proje klasöründe bulunamadı: ${promptFilePath}`);
+    if (!fs.existsSync(stepsFilePath)) {
+        throw new Error(`🚨 Test dosyası belirtilen proje klasöründe bulunamadı: ${stepsFilePath}`);
     }
 
-    const promptData = JSON.parse(fs.readFileSync(promptFilePath, 'utf-8'));
+    const promptData = JSON.parse(fs.readFileSync(stepsFilePath, 'utf-8'));
 
     // ─── ⚙️ DİNAMİK AYARLARI OKUMA SİHRİ (DPU Base Jilet Gibi JS Filtreleme Sürümü! 🔒) ───
     let activeModel = 'openai/gpt-4o-mini';
@@ -93,17 +95,6 @@ test('Yapay Zeka Test Otomasyonu', async () => {
 
     console.log(`⚙️ [Test Runner] Stagehand Başlatılıyor. Sağlayıcı: ${chosenApi} | Model: ${activeModel}`);
 
-    // const stagehand = new Stagehand({
-    //     env: 'LOCAL',
-    //     model: activeModel as any,
-    //     cacheDir: path.resolve(__dirname, '../cache/ai-security'),
-    //     domSettleTimeout: 10000,
-    //     localBrowserLaunchOptions: { headless: false },
-    //     // DPU Qwen seçildiyse yerel yapılandırmayı doğrudan enjekte ediyoruz
-    //     ...(customBaseUrl ? { 
-    //         configuration: localConfig
-    //     } : {})
-    // });
 
     // 🛡️ DOCKER / LINUX SESSİZ MOD (HEADLESS) AYARI
     const isDockerEnv = process.env.DOCKER_ENV === 'true';

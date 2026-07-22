@@ -28,93 +28,100 @@ document.addEventListener("DOMContentLoaded", () => {
     const stepsContainer = document.getElementById("steps-container");
     const addStepFieldBtn = document.getElementById("add-step-field-btn");
 
-    
     let currentProject = "";
     let batchQueue = [];
+    let cachedAllProjects = [];
+    let globalEditUserId = "";
 
     // ─── TOPLU TEST KUYRUĞUNU ADIM ADIM ÇALIŞTIRMA ETKİNLİĞİ ───
     const startBatchBtn = document.getElementById("start-batch-btn");
-    startBatchBtn.addEventListener("click", async () => {
-        if (batchQueue.length === 0) return;
+    if (startBatchBtn) {
+        startBatchBtn.addEventListener("click", async () => {
+            if (batchQueue.length === 0) return;
 
-        const totalTests = batchQueue.length;
-        const confirmBatch = confirm(`Seçtiğiniz ${totalTests} senaryo sırasıyla canlı olarak çalıştırılacak. `);
-        if (!confirmBatch) return;
+            const totalTests = batchQueue.length;
+            const confirmBatch = confirm(`Seçtiğiniz ${totalTests} senaryo sırasıyla canlı olarak çalıştırılacak.`);
+            if (!confirmBatch) return;
 
-        startBatchBtn.disabled = true;
-        startBatchBtn.className = "bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm animate-pulse cursor-wait";
-        
-        const activeQueue = [...batchQueue]; 
-        console.log(" Canlı Pipeline Başlatıldı. Sıralama:", activeQueue);
-
-        for (let i = 0; i < activeQueue.length; i++) {
-            const scenarioName = activeQueue[i];
-            const remainingCount = activeQueue.length - i; 
-
-            startBatchBtn.textContent = `Çalışacak Test Sayısı: ${remainingCount}...`;
-
-            const rows = document.querySelectorAll("#batch-list tr");
-            let targetOrderCell = null;
+            startBatchBtn.disabled = true;
+            startBatchBtn.className = "bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm animate-pulse cursor-wait";
             
-            rows.forEach(row => {
-                const checkbox = row.querySelector(".batch-checkbox");
-                if (checkbox && checkbox.value === scenarioName) {
-                    targetOrderCell = row.querySelector(".batch-order-cell");
-                    row.className = "border-b border-amber-500/30 bg-amber-500/5 transition h-12";
-                    targetOrderCell.innerHTML = `<span class="text-amber-400 animate-pulse font-bold">Çalışıyor...</span>`;
-                }
-            });
+            const activeQueue = [...batchQueue]; 
+            console.log("Canlı Pipeline Başlatıldı. Sıralama:", activeQueue);
 
-            try {
-                console.log(`[Pipeline] ${scenarioName} başlatılıyor... (${remainingCount} test kaldı)`);
-                
-                const res = await fetch("/api/scenarios/run", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        scenarioName,
-                        projectName: projectDropdown.value
-                    })
-                });
+            for (let i = 0; i < activeQueue.length; i++) {
+                const scenarioName = activeQueue[i];
+                const remainingCount = activeQueue.length - i; 
 
-                const result = await res.json();
+                startBatchBtn.textContent = `Çalışacak Test Sayısı: ${remainingCount}...`;
+
+                const rows = document.querySelectorAll("#batch-list tr");
                 
                 rows.forEach(row => {
                     const checkbox = row.querySelector(".batch-checkbox");
                     if (checkbox && checkbox.value === scenarioName) {
-                        const orderCell = row.querySelector(".batch-order-cell");
-                        if (res.ok && result.success) {
-                            row.className = "border-b border-emerald-500/20 bg-emerald-500/5 transition h-12";
-                            orderCell.innerHTML = `<span class="text-emerald-400 font-bold">Tamamlandı</span>`;
-                        } else {
-                            row.className = "border-b border-rose-500/20 bg-rose-500/5 transition h-12";
-                            orderCell.innerHTML = `<span class="text-rose-400 font-bold">Başarısız</span>`;
+                        const targetOrderCell = row.querySelector(".batch-order-cell");
+                        row.className = "border-b border-amber-500/30 bg-amber-500/5 transition h-12";
+                        if (targetOrderCell) {
+                            targetOrderCell.innerHTML = `<span class="text-amber-400 animate-pulse font-bold">Çalışıyor...</span>`;
                         }
                     }
                 });
 
-            } catch (err) {
-                console.error(` [Pipeline] ${scenarioName} hata verdi:`, err);
-                rows.forEach(row => {
-                    const checkbox = row.querySelector(".batch-checkbox");
-                    if (checkbox && checkbox.value === scenarioName) {
-                        const orderCell = row.querySelector(".batch-order-cell");
-                        row.className = "border-b border-rose-500/20 bg-rose-500/5 transition h-12";
-                        orderCell.innerHTML = `<span class="text-rose-400 font-bold">Bağlantı Hatası</span>`;
-                    }
-                });
+                try {
+                    console.log(`[Pipeline] ${scenarioName} başlatılıyor... (${remainingCount} test kaldı)`);
+                    const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
+                    const res = await fetch("/api/scenarios/run", {
+                        method: "POST",
+                        headers: { 
+                            "Content-Type": "application/json",
+                            "X-User-Token": userSession.token || ""
+                        },
+                        body: JSON.stringify({
+                            scenarioName,
+                            projectName: projectDropdown ? projectDropdown.value : currentProject
+                        })
+                    });
+
+                    const result = await res.json();
+                    
+                    rows.forEach(row => {
+                        const checkbox = row.querySelector(".batch-checkbox");
+                        if (checkbox && checkbox.value === scenarioName) {
+                            const orderCell = row.querySelector(".batch-order-cell");
+                            if (res.ok && result.success) {
+                                row.className = "border-b border-emerald-500/20 bg-emerald-500/5 transition h-12";
+                                if (orderCell) orderCell.innerHTML = `<span class="text-emerald-400 font-bold">Tamamlandı</span>`;
+                            } else {
+                                row.className = "border-b border-rose-500/20 bg-rose-500/5 transition h-12";
+                                if (orderCell) orderCell.innerHTML = `<span class="text-rose-400 font-bold">Başarısız</span>`;
+                            }
+                        }
+                    });
+
+                } catch (err) {
+                    console.error(`[Pipeline] ${scenarioName} hata verdi:`, err);
+                    rows.forEach(row => {
+                        const checkbox = row.querySelector(".batch-checkbox");
+                        if (checkbox && checkbox.value === scenarioName) {
+                            const orderCell = row.querySelector(".batch-order-cell");
+                            row.className = "border-b border-rose-500/20 bg-rose-500/5 transition h-12";
+                            if (orderCell) orderCell.innerHTML = `<span class="text-rose-400 font-bold">Bağlantı Hatası</span>`;
+                        }
+                    });
+                }
             }
-        }
 
-        alert(" Seçilen tüm testler çalıştırıldı ve sonuçlar raporlara kaydedildi.");
-        
-        batchQueue = []; 
-        updateBatchButtonState(); 
-        await loadReports(); 
-    });
+            alert("Seçilen tüm testler çalıştırıldı ve sonuçlar raporlara kaydedildi.");
+            
+            batchQueue = []; 
+            updateBatchButtonState(); 
+            await loadReports(); 
+        });
+    }
 
-
-    // 1. Senaryoları Çekip Şık Birer Akordeon Kartı Olarak Döken Fonksiyon 🚀
+    // 1. Senaryoları Çekip Akordeon Kartı Yapan Fonksiyon
     async function loadScenarios() {
         if (!currentProject || currentProject === "Varsayılan Proje") {
             console.log("⚠️ Geçerli bir proje seçilmediği için senaryo isteği iptal edildi.");
@@ -129,12 +136,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!scenariosTable || !scenariosEmpty || !scenariosList) return;
 
         try {
-            console.log(` "${currentProject}" projesi için senaryolar buluttan isteniyor...`);
+            console.log(`"${currentProject}" projesi için senaryolar buluttan isteniyor...`);
             const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
             const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}`, {
                 headers: {
-                    "X-User-Token": userSession.token || "" // 👈 HEADER EKLENDİ
+                    "X-User-Token": userSession.token || ""
                 }
             });
             const result = await res.json();
@@ -143,9 +150,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 scenariosEmpty.classList.add("hidden");
                 scenariosTable.classList.remove("hidden");
                 scenariosList.innerHTML = "";
-                scenarioCountLabel.textContent = result.scenarios.length;
+                if (scenarioCountLabel) scenarioCountLabel.textContent = result.scenarios.length;
 
-                // Tablo başlıklarındaki "Durum" sütununu "Hedef URL" olarak güncelliyoruz  🎨
                 const tableHeader = scenariosTable.querySelector("thead tr");
                 if (tableHeader) {
                     tableHeader.innerHTML = `
@@ -157,16 +163,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 result.scenarios.forEach((scenarioName, index) => {
-                    // Her bir senaryo için iki parçalı bir yapı oluşturuyoruz: Satır ve gizli akordeon içeriği!
-                    const rowId = `scenario-row-${index}`;
                     const contentId = `scenario-content-${index}`;
 
-                    // 1. Ana Senaryo Satırı
                     const row = document.createElement("tr");
                     row.className = "border-b border-[rgba(255,255,255,0.04)] hover:bg-[#18181b]/40 transition cursor-pointer select-none";
                     row.setAttribute("data-target", contentId);
                     
-                    // Geçici olarak "Yükleniyor..." yazıp, content çekildiğinde gerçek URL'i buraya basacağız
                     row.innerHTML = `
                         <td class="py-3 px-4 font-mono text-zinc-500">${String(index + 1).padStart(2, '0')}</td>
                         <td class="py-3 px-4 font-medium text-white flex items-center gap-2">
@@ -181,7 +183,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     `;
                     scenariosList.appendChild(row);
 
-                    // 2. Akordeon İçerik Satırı (Başlangıçta gizli)
                     const contentRow = document.createElement("tr");
                     contentRow.id = contentId;
                     contentRow.className = "hidden bg-[#09090b]/50";
@@ -202,7 +203,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     `;
                     scenariosList.appendChild(contentRow);
 
-                    // 💥 TIKLAMA VE AKORDEON AÇILMA SİHRİ!
                     row.addEventListener("click", async () => {
                         const contentEl = document.getElementById(contentId);
                         const chevronIcon = row.querySelector(".chevron-icon-scen");
@@ -215,14 +215,12 @@ document.addEventListener("DOMContentLoaded", () => {
                             contentEl.classList.remove("hidden");
                             if (chevronIcon) chevronIcon.style.transform = "rotate(90deg)";
 
-                            // Akordeon açıldığında eğer adımlar henüz çekilmediyse buluttan talep ediyoruz
                             const detailsContainer = contentRow.querySelector(".steps-details-container");
                             if (detailsContainer.getAttribute("data-loaded") !== "true") {
                                 try {
-                                    // loadScenarios içinde akordeon tıklama kısmındaki fetch isteği:
                                     const contentRes = await fetch(`/api/scenarios/content?scenarioName=${encodeURIComponent(scenarioName)}&project=${encodeURIComponent(currentProject)}`, {
                                         headers: {
-                                            "X-User-Token": userSession.token || "" // 👈 HEADER EKLENDİ
+                                            "X-User-Token": userSession.token || ""
                                         }
                                     });
                                     const contentResult = await contentRes.json();
@@ -230,7 +228,6 @@ document.addEventListener("DOMContentLoaded", () => {
                                     if (contentResult.success && contentResult.content) {
                                         const adimlar = contentResult.content;
                                         
-                                        // Satırdaki URL hücresini asıl hedef_url ile güncelliyoruz !
                                         const urlCell = row.querySelector(".target-url-cell");
                                         if (urlCell && adimlar.targetUrl) {
                                             urlCell.innerHTML = `
@@ -240,7 +237,6 @@ document.addEventListener("DOMContentLoaded", () => {
                                             `;
                                         }
 
-                                        // Test adımlarını şık bir liste halinde basıyoruz
                                         let stepsHtml = "";
                                         if (adimlar.steps && adimlar.steps.length > 0) {
                                             adimlar.steps.forEach((step, stepIdx) => {
@@ -277,22 +273,26 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 });
 
-                // A. SİLME BUTONLARI (Olay yayılımını engellemek için stopPropagation ile güvene aldık !)
-                const deleteButtons = document.querySelectorAll(".delete-scenario-btn");
-                deleteButtons.forEach(btn => {
+                // A. SİLME BUTONLARI
+                document.querySelectorAll(".delete-scenario-btn").forEach(btn => {
                     btn.addEventListener("click", async (e) => {
-                        e.stopPropagation(); // Satır tıklama akordeon olayını tetiklemesin kilit! 🔒
+                        e.stopPropagation();
                         const scenarioName = btn.getAttribute("data-name");
-                        const selectedProjName = projectDropdown.value;
+                        const selectedProjName = projectDropdown ? projectDropdown.value : currentProject;
                         
                         const confirmDelete = confirm(`"${scenarioName}" senaryosunu silmek istediğinize emin misiniz?`);
                         if (!confirmDelete) return;
 
                         try {
                             btn.disabled = true;
+                            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
                             const res = await fetch("/api/scenarios/delete", {
                                 method: "POST",
-                                headers: { "Content-Type": "application/json" },
+                                headers: { 
+                                    "Content-Type": "application/json",
+                                    "X-User-Token": userSession.token || ""
+                                },
                                 body: JSON.stringify({
                                     scenarioName,
                                     projectName: selectedProjName
@@ -315,12 +315,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
 
                 // B. TEKİL TESTİ KOŞTUR BUTONLARI
-                const runButtons = document.querySelectorAll(".run-single-btn");
-                runButtons.forEach(btn => {
+                document.querySelectorAll(".run-single-btn").forEach(btn => {
                     btn.addEventListener("click", async (e) => {
-                        e.stopPropagation(); // Akordeonu tetiklemesin!
+                        e.stopPropagation();
                         const scenarioName = btn.getAttribute("data-name");
-                        const selectedProjName = projectDropdown.value;
+                        const selectedProjName = projectDropdown ? projectDropdown.value : currentProject;
+
+                        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
                         const originalHtml = btn.innerHTML;
                         btn.disabled = true;
@@ -330,7 +331,10 @@ document.addEventListener("DOMContentLoaded", () => {
                             console.log(`"${scenarioName}" testi başlatıldı...`);
                             const res = await fetch("/api/scenarios/run", {
                                 method: "POST",
-                                headers: { "Content-Type": "application/json" },
+                                headers: { 
+                                    "Content-Type": "application/json",
+                                    "X-User-Token": userSession.token || ""
+                                },
                                 body: JSON.stringify({
                                     scenarioName,
                                     projectName: selectedProjName
@@ -349,14 +353,14 @@ document.addEventListener("DOMContentLoaded", () => {
                         } finally {
                             btn.disabled = false;
                             btn.innerHTML = originalHtml;
-                            await loadReports(); // Rapor listesini otomatik yenile !
+                            await loadReports();
                         }
                     });
                 });
 
                 lucide.createIcons();
             } else {
-                scenarioCountLabel.textContent = "0";
+                if (scenarioCountLabel) scenarioCountLabel.textContent = "0";
                 scenariosTable.classList.add("hidden");
                 scenariosEmpty.classList.remove("hidden");
             }
@@ -365,7 +369,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-// 📊 DPU Base'den Raporları Çekip İç İçe Akordeon Yapan Fonksiyon (Silme Özellikli)! 🔒
+    // 📊 Raporları Çeken Fonksiyon
     async function loadReports() {
         const reportsEmpty = document.getElementById("reports-empty");
         const accordionContainer = document.getElementById("reports-list-accordion");
@@ -374,12 +378,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             console.log(`🔄 "${currentProject}" projesi için raporlar buluttan getiriliyor...`);
-            // app.js içindeki loadReports fonksiyonu
             const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
             const res = await fetch(`/api/scenarios/reports/list?project=${encodeURIComponent(currentProject)}`, {
                 headers: {
-                    "X-User-Token": userSession.token || "" // 👈 HEADER EKLENDİ
+                    "X-User-Token": userSession.token || ""
                 }
             });
             const result = await res.json();
@@ -390,7 +393,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 accordionContainer.innerHTML = "";
 
                 result.reports.forEach((report) => {
-                    // 🌟 GÜVENLİK: Durum eşleştirmesini case-insensitive ve tam uyumlu yapıyoruz !
                     const reportStatus = (report.status || '').toUpperCase();
                     const isSuccess = reportStatus === "SUCCESS" || reportStatus === "PASSED";
 
@@ -398,7 +400,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     const logContent = report.log_content || "Log kaydı bulunmuyor.";
                     const formattedDate = new Date(report.created_at).toLocaleString("tr-TR");
 
-                    // 🚨 DİNAMİK HATA ANALİZİ: Logların içindeki asıl can sıkan hata satırını cımbızlıyoruz
                     let errorSummaryHtml = "";
                     if (!isSuccess) {
                         const linesForError = logContent.split('\n');
@@ -411,7 +412,6 @@ document.addEventListener("DOMContentLoaded", () => {
                             line.toLowerCase().includes('failed to launch')
                         ) || "Test çalıştırılırken beklenmeyen bir hata ile karşılaşıldı.";
 
-                        // En üste ekleyeceğimiz kırmızı şık hata kutusu tasarımı
                         errorSummaryHtml = `
                             <div class="bg-rose-500/10 border border-rose-500/20 rounded-lg p-3.5 mb-4 text-rose-400 animate-fade-in">
                                 <div class="flex items-center gap-2 mb-1.5">
@@ -435,34 +435,20 @@ document.addEventListener("DOMContentLoaded", () => {
                         const match = trimmedLine.match(infoRegex);
 
                         if (match) {
-                            if (currentStep) {
-                                steps.push(currentStep);
-                            }
+                            if (currentStep) steps.push(currentStep);
                             const logType = match[1].toUpperCase();
                             const logMessage = match[2].trim();
 
-                            currentStep = {
-                                title: logMessage,
-                                type: logType,
-                                rawHeader: trimmedLine,
-                                content: []
-                            };
+                            currentStep = { title: logMessage, type: logType, rawHeader: trimmedLine, content: [] };
                         } else {
                             if (!currentStep) {
-                                currentStep = {
-                                    title: "Sistem ve Altyapı Başlangıç Logları",
-                                    type: "SYSTEM",
-                                    rawHeader: "",
-                                    content: []
-                                };
+                                currentStep = { title: "Sistem ve Altyapı Başlangıç Logları", type: "SYSTEM", rawHeader: "", content: [] };
                             }
                             currentStep.content.push(trimmedLine);
                         }
                     });
 
-                    if (currentStep) {
-                        steps.push(currentStep);
-                    }
+                    if (currentStep) steps.push(currentStep);
 
                     let nestedStepsHtml = "";
                     steps.forEach((step, idx) => {
@@ -522,9 +508,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                         <div class="accordion-content max-h-0 overflow-hidden transition-all duration-300 ease-in-out bg-[#09090b]/50 border-t border-[rgba(255,255,255,0)]">
                             <div class="p-4 space-y-3">
-                                <!-- 🔴 HATA UYARI KUTUSU BURAYA GELİYOR -->
                                 ${errorSummaryHtml}
-
                                 <div class="flex items-center justify-between">
                                     <span class="text-[10px] uppercase font-semibold tracking-wider text-zinc-500">Adım Bazlı Test Akışı</span>
                                     <button class="copy-log-btn text-[10px] text-zinc-500 hover:text-white transition flex items-center gap-1" data-log="${encodeURIComponent(logContent)}">
@@ -541,26 +525,30 @@ document.addEventListener("DOMContentLoaded", () => {
                     const chevron = card.querySelector(".chevron-icon");
                     const deleteReportBtn = card.querySelector(".delete-report-btn");
 
-                    // Rapor Silme Olayı! 🔒
                     deleteReportBtn.addEventListener("click", async (e) => {
-                        e.stopPropagation(); // Butona tıklayınca akordeon açılmasın, kilit!
+                        e.stopPropagation();
                         const reportId = deleteReportBtn.getAttribute("data-id");
 
                         const confirmDelete = confirm(`Bu test raporunu kalıcı olarak silmek istediğinize emin misiniz?`);
                         if (!confirmDelete) return;
 
+                        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
                         try {
                             deleteReportBtn.disabled = true;
                             const deleteRes = await fetch("/api/scenarios/reports/delete", {
                                 method: "POST",
-                                headers: { "Content-Type": "application/json" },
+                                headers: { 
+                                    "Content-Type": "application/json",
+                                    "X-User-Token": userSession.token || ""
+                                },
                                 body: JSON.stringify({ id: reportId })
                             });
 
                             const deleteResult = await deleteRes.json();
                             if (deleteRes.ok && deleteResult.success) {
                                 alert("🎉 Rapor başarıyla buluttan temizlendi!");
-                                await loadReports(); // Listeyi yenileyip güncel durumu çekiyoruz
+                                await loadReports();
                             } else {
                                 alert(`❌ Rapor silinemedi: ${deleteResult.error || "Hata oluştu"}`);
                                 deleteReportBtn.disabled = false;
@@ -628,27 +616,22 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
     
-// ⚡ Toplu Testleri Checkbox ve Tıklama Sırasıyla Listeyip Yöneten Fonksiyon
+    // Toplu Testleri Yöneten Fonksiyon
     async function loadBatchScenarios() {
         const batchEmpty = document.getElementById("batch-empty");
         const batchTable = document.getElementById("batch-table");
         const batchList = document.getElementById("batch-list");
-        const startBatchBtn = document.getElementById("start-batch-btn");
-        const projectDropdown = document.getElementById("project-dropdown");
 
-        if (!batchEmpty || !batchTable || !batchList || !startBatchBtn) return;
+        if (!batchEmpty || !batchTable || !batchList) return;
 
-        // 🌟 KRİTİK GÜVENCE: Eğer currentProject boşsa, dropdown'daki aktif seçili projeyi al!
         const activeProjectName = currentProject || (projectDropdown ? projectDropdown.value : "");
 
         if (!activeProjectName) {
-            console.warn("⚠️ Toplu testler için aktif bir proje seçilmemiş.");
             batchTable.classList.add("hidden");
             batchEmpty.classList.remove("hidden");
             return;
         }
 
-        // 🌟 GÜVENLİK ZIRHI: Oturum token'ını alıyoruz
         const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
         try {
@@ -681,12 +664,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     `;
 
                     const checkbox = row.querySelector(".batch-checkbox");
-
                     checkbox.addEventListener("click", () => {
                         if (checkbox.checked) {
-                            if (!batchQueue.includes(scenarioName)) {
-                                batchQueue.push(scenarioName);
-                            }
+                            if (!batchQueue.includes(scenarioName)) batchQueue.push(scenarioName);
                         } else {
                             batchQueue = batchQueue.filter(name => name !== scenarioName);
                         }
@@ -714,13 +694,17 @@ document.addEventListener("DOMContentLoaded", () => {
             const indexInQueue = batchQueue.indexOf(scenarioName);
             if (indexInQueue !== -1) {
                 checkbox.checked = true;
-                orderCell.textContent = String(indexInQueue + 1).padStart(2, '0');
-                orderCell.className = "py-3 px-4 font-mono text-[#3b82f6] font-bold batch-order-cell";
+                if (orderCell) {
+                    orderCell.textContent = String(indexInQueue + 1).padStart(2, '0');
+                    orderCell.className = "py-3 px-4 font-mono text-[#3b82f6] font-bold batch-order-cell";
+                }
                 row.className = "border-b border-[rgba(59,130,246,0.15)] bg-[#3b82f6]/5 transition h-12";
             } else {
                 checkbox.checked = false;
-                orderCell.textContent = "-";
-                orderCell.className = "py-3 px-4 font-mono text-zinc-500 font-semibold batch-order-cell";
+                if (orderCell) {
+                    orderCell.textContent = "-";
+                    orderCell.className = "py-3 px-4 font-mono text-zinc-500 font-semibold batch-order-cell";
+                }
                 row.className = "border-b border-[rgba(255,255,255,0.04)] hover:bg-[#18181b]/40 transition h-12";
             }
         });
@@ -735,7 +719,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!startBatchBtn) return;
 
         const count = batchQueue.length;
-        selectedBatchCountLabel.textContent = count;
+        if (selectedBatchCountLabel) selectedBatchCountLabel.textContent = count;
 
         if (count > 0) {
             startBatchBtn.disabled = false;
@@ -755,20 +739,13 @@ document.addEventListener("DOMContentLoaded", () => {
         loadBatchScenarios();
     }
 
-
-    // 📂 DPU Base'deki Projeleri Çekip Dropdown'a ve Modallere Dolduran Fonksiyon 🔒
+    // 📂 Projeleri Yükleme
     async function loadProjects() {
-        const projectDropdown = document.getElementById("project-dropdown");
-        const batchProjectDropdown = document.getElementById("batch-project-dropdown");
-        const scenarioProjectDropdown = document.getElementById("scenario-project");
-
         if (!projectDropdown) return;
 
-        // 🌟 GÜVENLİK: Giriş yapmış kullanıcının token'ını local storage'dan alıyoruz!
         const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
         try {
-            // 🚨 KRİTİK DÜZELTME: İsteğin başlığına (header) kullanıcının şifreli token'ını ekliyoruz!
             const res = await fetch("/api/scenarios/projects/list", {
                 headers: {
                     "X-User-Token": userSession.token || ""
@@ -777,21 +754,21 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await res.json();
 
             if (result.success && result.projects) {
-                // Dropdown'ları temizleyip sadece yetkili olunan projelerle dolduruyoruz
                 projectDropdown.innerHTML = "";
+                const batchProjectDropdown = document.getElementById("batch-project-dropdown");
+                const scenarioProjectDropdown = document.getElementById("scenario-project");
+
                 if (batchProjectDropdown) batchProjectDropdown.innerHTML = "";
                 if (scenarioProjectDropdown) {
                     scenarioProjectDropdown.innerHTML = `<option value="" disabled selected>Proje Seçin</option>`;
                 }
 
                 result.projects.forEach((proj) => {
-                    // Ana Proje Dropdown'ı
                     const opt = document.createElement("option");
                     opt.value = proj;
                     opt.textContent = proj;
                     projectDropdown.appendChild(opt);
 
-                    // Toplu Test Proje Dropdown'ı
                     if (batchProjectDropdown) {
                         const optBatch = document.createElement("option");
                         optBatch.value = proj;
@@ -799,7 +776,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         batchProjectDropdown.appendChild(optBatch);
                     }
 
-                    // Yeni Senaryo Ekleme Proje Dropdown'ı
                     if (scenarioProjectDropdown) {
                         const optScen = document.createElement("option");
                         optScen.value = proj;
@@ -808,7 +784,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 });
 
-                // Eğer aktif seçili proje listede yoksa, listedeki ilk projeyi aktif yapıyoruz
                 if (result.projects.length > 0) {
                     if (!result.projects.includes(currentProject)) {
                         currentProject = result.projects[0];
@@ -820,7 +795,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     currentProject = "";
                 }
 
-                // Senaryoları ve raporları yeni kısıtlı proje listesine göre tetikle!
                 await loadScenarios();
                 await loadReports();
                 await loadBatchScenarios();
@@ -830,31 +804,26 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-// Rol bazlı yetkilendirme (ADMIN / PM) 
-    // Rol bazlı dashboard ve menü kilitleri 🔓
     async function showDashboard(user) {
-        loginView.classList.add("hidden");
-        appView.classList.remove("hidden");
-        userBadge.textContent = `${user.username.toUpperCase()} (${user.role})`;
+        if (loginView) loginView.classList.add("hidden");
+        if (appView) appView.classList.remove("hidden");
+        if (userBadge) userBadge.textContent = `${user.username.toUpperCase()} (${user.role})`;
 
-        const addProjectBtn = document.getElementById("add-project-btn");
         const settingsNavBtn = document.querySelector('[data-target="view-settings"]');
-        const usersNavBtn = document.getElementById("nav-users-btn"); // Kullanıcı yönetim sekmesi
+        const usersNavBtn = document.getElementById("nav-users-btn");
 
         if (user.role === "PM") {
             if (addProjectBtn) addProjectBtn.classList.add("hidden");
             if (settingsNavBtn) settingsNavBtn.classList.add("hidden");
-            if (usersNavBtn) usersNavBtn.classList.add("hidden"); // PM ise kullanıcı yönetimini gizle!
+            if (usersNavBtn) usersNavBtn.classList.add("hidden");
         } else {
-            // ADMIN ise her yeri aç !
             if (addProjectBtn) addProjectBtn.classList.remove("hidden");
             if (settingsNavBtn) settingsNavBtn.classList.remove("hidden");
-            if (usersNavBtn) usersNavBtn.classList.remove("hidden"); // ADMIN ise göster!
+            if (usersNavBtn) usersNavBtn.classList.remove("hidden");
         }
 
         await loadProjects(); 
 
-            // 🛡️ SİBER GÜVENLİK YAMASI: Giriş yapan herkesi zorunlu olarak senaryolar sekmesinden başlat!
         navButtons.forEach(b => b.classList.remove("text-[#3b82f6]", "bg-[#3b82f6]/10"));
         const scenarioNavBtn = document.querySelector('[data-target="view-scenarios"]');
         if (scenarioNavBtn) scenarioNavBtn.classList.add("text-[#3b82f6]", "bg-[#3b82f6]/10");
@@ -869,46 +838,51 @@ document.addEventListener("DOMContentLoaded", () => {
         showDashboard(JSON.parse(savedUser));
     }
 
-    loginForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        loginError.classList.add("hidden");
-        const username = document.getElementById("login-username").value.trim();
-        const password = document.getElementById("login-password").value;
+    if (loginForm) {
+        loginForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            if (loginError) loginError.classList.add("hidden");
+            const username = document.getElementById("login-username").value.trim();
+            const password = document.getElementById("login-password").value;
 
-        try {
-            // Artık giriş doğrulaması doğrudan backend'e soruluyor!
-            const res = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, password })
-            });
+            try {
+                const res = await fetch("/api/auth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password })
+                });
 
-            const result = await res.json();
-            if (res.ok && result.success) {
-                // Token ve rol bilgisini session olarak tarayıcıya mühürlüyoruz
-                const session = { username: result.username, role: result.role, token: result.token };
-                localStorage.setItem("test_user", JSON.stringify(session));
-                showDashboard(session);
-            } else {
-                loginError.textContent = result.error || "Giriş başarısız!";
-                loginError.classList.remove("hidden");
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    const session = { username: result.username, role: result.role, token: result.token };
+                    localStorage.setItem("test_user", JSON.stringify(session));
+                    showDashboard(session);
+                } else {
+                    if (loginError) {
+                        loginError.textContent = result.error || "Giriş başarısız!";
+                        loginError.classList.remove("hidden");
+                    }
+                }
+            } catch (err) {
+                if (loginError) {
+                    loginError.textContent = "Sunucu bağlantı hatası!";
+                    loginError.classList.remove("hidden");
+                }
             }
-        } catch (err) {
-            loginError.textContent = "Sunucu bağlantı hatası!";
-            loginError.classList.remove("hidden");
-        }
-    });
+        });
+    }
 
-    logoutBtn.addEventListener("click", () => {
-        localStorage.removeItem("test_user");
-        appView.classList.add("hidden");
-        loginView.classList.remove("hidden");
-        loginForm.reset();
-    });
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", () => {
+            localStorage.removeItem("test_user");
+            if (appView) appView.classList.add("hidden");
+            if (loginView) loginView.classList.remove("hidden");
+            if (loginForm) loginForm.reset();
+        });
+    }
 
     navButtons.forEach(btn => {
         btn.addEventListener("click", () => {
-            // Güvenlik Önlemi: PM eğer bir şekilde Ayarlar butonuna basmaya çalışırsa engelliyoruz
             const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
             const targetViewId = btn.getAttribute("data-target");
 
@@ -918,8 +892,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (targetViewId === "view-batch") {
-            loadBatchScenarios();
-        }
+                loadBatchScenarios();
+            }
 
             navButtons.forEach(b => {
                 b.classList.remove("text-[#3b82f6]", "bg-[#3b82f6]/10");
@@ -929,180 +903,203 @@ document.addEventListener("DOMContentLoaded", () => {
             btn.classList.remove("text-zinc-400", "hover:bg-[#18181b]");
 
             views.forEach(v => v.classList.add("hidden"));
-            document.getElementById(targetViewId).classList.remove("hidden");
+            const targetEl = document.getElementById(targetViewId);
+            if (targetEl) targetEl.classList.remove("hidden");
         });
     });
 
-    addProjectBtn.addEventListener("click", () => {
-        // Son bir UI güvenlik kilidi
-        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
-        if (userSession.role === "PM") {
-            alert("⚠️ Proje oluşturma yetkiniz bulunmamaktadır!");
-            return;
-        }
-        newProjectNameInput.value = "";
-        projectModal.classList.remove("hidden");
-        newProjectNameInput.focus();
-    });
-
-    closeProjectModal.addEventListener("click", () => projectModal.classList.add("hidden"));
-
-    saveProjectBtn.addEventListener("click", async () => {
-        const projectName = newProjectNameInput.value.trim();
-        if (!projectName) return alert("Proje adı boş olamaz.");
-
-        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
-
-        try {
-            const res = await fetch("/api/scenarios/projects/create", {
-                method: "POST",
-                headers: { 
-                    "Content-Type": "application/json",
-                    "X-User-Token": userSession.token || "" // 🌟 Backend'e rolü fırlatıyoruz!
-                },
-                body: JSON.stringify({ projectName })
-            });
-            const result = await res.json();
-            if (result.success) {
-                projectModal.classList.add("hidden");
-                await loadProjects();
-                projectDropdown.value = result.projectName;
-                currentProject = result.projectName;
-                updateProjectLabels();
-            } else {
-                alert(result.error || "Proje oluşturulamadı.");
+    if (addProjectBtn) {
+        addProjectBtn.addEventListener("click", () => {
+            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+            if (userSession.role === "PM") {
+                alert("⚠️ Proje oluşturma yetkiniz bulunmamaktadır!");
+                return;
             }
-        } catch (err) {
-            console.error(err);
-        }
-    });
-
-    saveProjectBtn.addEventListener("click", async () => {
-        const projectName = newProjectNameInput.value.trim();
-        if (!projectName) return alert("Proje adı boş olamaz.");
-
-        try {
-            const res = await fetch("/api/scenarios/projects/create", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ projectName })
-            });
-            const result = await res.json();
-            if (result.success) {
-                projectModal.classList.add("hidden");
-                await loadProjects();
-                projectDropdown.value = result.projectName;
-                currentProject = result.projectName;
-                updateProjectLabels();
-            } else {
-                alert(result.error || "Proje oluşturulamadı.");
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    });
-
-    openNewScenarioBtn.addEventListener("click", () => {
-        scenarioForm.reset();
-        stepsContainer.innerHTML = `
-            <div class="flex items-center gap-3 bg-[#27272a]/40 p-2.5 rounded-lg border border-[rgba(255,255,255,0.04)]">
-                <span class="step-number text-[10px] font-mono text-zinc-500 w-5 text-center">01.</span>
-                <input type="text" required placeholder=" "Giriş" butonunu bul " class="step-input flex-1 bg-transparent text-xs text-white outline-none">
-                <button type="button" class="remove-step-btn text-zinc-600 hover:text-red-400 transition opacity-0 pointer-events-none"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-            </div>
-        `;
-        lucide.createIcons();
-        scenarioModal.classList.remove("hidden");
-    });
-
-    closeScenarioModal.addEventListener("click", () => scenarioModal.classList.add("hidden"));
-    cancelScenarioBtn.addEventListener("click", () => scenarioModal.classList.add("hidden"));
-
-    addStepFieldBtn.addEventListener("click", () => {
-        const nextIndex = stepsContainer.children.length + 1;
-        const paddedIndex = nextIndex < 10 ? `0${nextIndex}.` : `${nextIndex}.`;
-
-        const stepRow = document.createElement("div");
-        stepRow.className = "flex items-center gap-3 bg-[#27272a]/40 p-2.5 rounded-lg border border-[rgba(255,255,255,0.04)] animate-slide-in";
-        stepRow.innerHTML = `
-            <span class="step-number text-[10px] font-mono text-zinc-500 w-5 text-center">${paddedIndex}</span>
-            <input type="text" required placeholder="Yeni talimatı girin." class="step-input flex-1 bg-transparent text-xs text-white outline-none">
-            <button type="button" class="remove-step-btn text-zinc-500 hover:text-red-400 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-        `;
-
-        stepRow.querySelector(".remove-step-btn").addEventListener("click", () => {
-            stepRow.remove();
-            reindexSteps();
-        });
-
-        stepsContainer.appendChild(stepRow);
-        lucide.createIcons();
-        stepsContainer.scrollTop = stepsContainer.scrollHeight;
-    });
-
-    function reindexSteps() {
-        Array.from(stepsContainer.children).forEach((row, i) => {
-            const index = i + 1;
-            row.querySelector(".step-number").textContent = index < 10 ? `0${index}.` : `${index}.`;
+            if (newProjectNameInput) newProjectNameInput.value = "";
+            if (projectModal) projectModal.classList.remove("hidden");
+            if (newProjectNameInput) newProjectNameInput.focus();
         });
     }
 
-    scenarioForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
+    if (closeProjectModal) {
+        closeProjectModal.addEventListener("click", () => {
+            if (projectModal) projectModal.classList.add("hidden");
+        });
+    }
 
-        const scenarioName = document.getElementById("new-scenario-name").value.trim();
-        const targetUrl = document.getElementById("new-scenario-url").value.trim();
-        const submitBtn = document.getElementById("save-scenario-submit-btn");
+    if (saveProjectBtn) {
+        saveProjectBtn.addEventListener("click", async () => {
+            const projectName = newProjectNameInput ? newProjectNameInput.value.trim() : "";
+            if (!projectName) return alert("Proje adı boş olamaz.");
 
-        const stepInputs = Array.from(document.querySelectorAll(".step-input"));
-        const turkishInstructions = stepInputs.map(input => input.value.trim()).join("\n");
+            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
-        if (!turkishInstructions) return alert("Lütfen en az bir adım talimatı ekleyin.");
+            try {
+                const res = await fetch("/api/scenarios/projects/create", {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "X-User-Token": userSession.token || ""
+                    },
+                    body: JSON.stringify({ projectName })
+                });
 
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = `<span>Çevriliyor ve Kaydediliyor...</span>`;
+                const result = await res.json();
+                if (result.success) {
+                    if (projectModal) projectModal.classList.add("hidden");
+                    await loadProjects();
+                    if (projectDropdown) projectDropdown.value = result.projectName;
+                    currentProject = result.projectName;
+                    updateProjectLabels();
+                } else {
+                    alert(result.error || "Proje oluşturulamadı.");
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        });
+    }
 
-        try {
-            const res = await fetch("/api/scenarios/create-and-save", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    scenarioName,
-                    targetUrl,
-                    turkishInstructions,
-                    projectName: projectDropdown.value
-                })
+    if (openNewScenarioBtn) {
+        openNewScenarioBtn.addEventListener("click", () => {
+            if (scenarioForm) scenarioForm.reset();
+            if (stepsContainer) {
+                stepsContainer.innerHTML = `
+                    <div class="flex items-center gap-3 bg-[#27272a]/40 p-2.5 rounded-lg border border-[rgba(255,255,255,0.04)]">
+                        <span class="step-number text-[10px] font-mono text-zinc-500 w-5 text-center">01.</span>
+                        <input type="text" required placeholder='"Giriş" butonunu bul' class="step-input flex-1 bg-transparent text-xs text-white outline-none">
+                        <button type="button" class="remove-step-btn text-zinc-600 hover:text-red-400 transition opacity-0 pointer-events-none"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+            if (scenarioModal) scenarioModal.classList.remove("hidden");
+        });
+    }
+
+    if (closeScenarioModal) closeScenarioModal.addEventListener("click", () => scenarioModal.classList.add("hidden"));
+    if (cancelScenarioBtn) cancelScenarioBtn.addEventListener("click", () => scenarioModal.classList.add("hidden"));
+
+    if (addStepFieldBtn) {
+        addStepFieldBtn.addEventListener("click", () => {
+            if (!stepsContainer) return;
+            const nextIndex = stepsContainer.children.length + 1;
+            const paddedIndex = nextIndex < 10 ? `0${nextIndex}.` : `${nextIndex}.`;
+
+            const stepRow = document.createElement("div");
+            stepRow.className = "flex items-center gap-3 bg-[#27272a]/40 p-2.5 rounded-lg border border-[rgba(255,255,255,0.04)] animate-slide-in";
+            stepRow.innerHTML = `
+                <span class="step-number text-[10px] font-mono text-zinc-500 w-5 text-center">${paddedIndex}</span>
+                <input type="text" required placeholder="Yeni talimatı girin." class="step-input flex-1 bg-transparent text-xs text-white outline-none">
+                <button type="button" class="remove-step-btn text-zinc-500 hover:text-red-400 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            `;
+
+            stepRow.querySelector(".remove-step-btn").addEventListener("click", () => {
+                stepRow.remove();
+                reindexSteps();
             });
 
-            const result = await res.json();
-            if (res.ok && (result.status === "SUCCESS" || result.success)) {
-                scenarioModal.classList.add("hidden");
-                await loadScenarios(); 
-                alert("Başarılı! Senaryo kaydedildi.");
-            } else {
-                alert(`Hata: ${result.error || "Kayıt başarısız"}`);
+            stepsContainer.appendChild(stepRow);
+            lucide.createIcons();
+            stepsContainer.scrollTop = stepsContainer.scrollHeight;
+        });
+    }
+
+    function reindexSteps() {
+        if (!stepsContainer) return;
+        Array.from(stepsContainer.children).forEach((row, i) => {
+            const index = i + 1;
+            const numEl = row.querySelector(".step-number");
+            if (numEl) numEl.textContent = index < 10 ? `0${index}.` : `${index}.`;
+        });
+    }
+
+    // 🎯 SENARYO KAYDETME FORMU (GÜVENLİ & HATA VERMEYEN DÜZELTİLMİŞ SÜRÜM)
+    // 🎯 SENARYO KAYDETME FORMU
+    if (scenarioForm) {
+        scenarioForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            // 1. Input elemanlarını DOM'dan garantiye alarak yakalıyoruz
+            const scenarioNameInput = document.getElementById("new-scenario-name");
+            const targetUrlInput = document.getElementById("new-scenario-url");
+            
+            // 🚨 KRİTİK DÜZELTME: Adım kutucuklarının class'ı 'step-input'
+            const stepInputs = document.querySelectorAll(".step-input");
+            const submitBtn = document.getElementById("save-scenario-submit-btn") || scenarioForm.querySelector('button[type="submit"]');
+
+            const activeProjectName = projectDropdown ? projectDropdown.value : currentProject;
+            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
+            const scenarioName = scenarioNameInput ? scenarioNameInput.value.trim() : "";
+            const targetUrl = targetUrlInput ? targetUrlInput.value.trim() : "";
+            
+            // Adımları topluyoruz (artık hepsini cımbızla çekecek!)
+            const turkishInstructions = Array.from(stepInputs)
+                .map(inp => inp.value.trim())
+                .filter(val => val !== "")
+                .join("\n");
+
+            console.log("🔍 [Form Debug] Çekilen Değerler:", { scenarioName, targetUrl, turkishInstructions, activeProjectName });
+
+            if (!scenarioName || !targetUrl || !turkishInstructions) {
+                alert("Lütfen senaryo adı, hedef URL ve en az bir test adımı girin!");
+                return;
             }
-        } catch (err) {
-            console.error(err);
-            alert("İstek esnasında bağlantı hatası patladı.");
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = `<span>Kaydet ve Çevir</span>`;
-        }
-    });
 
-    projectDropdown.addEventListener("change", (e) => {
-        currentProject = e.target.value;
-        updateProjectLabels();
-    });
+            const originalBtnText = submitBtn ? submitBtn.innerHTML : "";
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `<span>Çevriliyor ve Kaydediliyor...</span>`;
+            }
 
+            try {
+                const res = await fetch("/api/scenarios/create-and-save", {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "X-User-Token": userSession.token || ""
+                    },
+                    body: JSON.stringify({
+                        scenarioName,
+                        turkishInstructions,
+                        targetUrl,
+                        projectName: activeProjectName
+                    })
+                });
 
-// ───  DİNAMİK AYARLAR VE ÇOKLU API ANAHTARLARI YÖNETİMİ ───
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    alert("🎉 Senaryo başarıyla oluşturuldu ve yapay zeka tarafından çevrilip kaydedildi!");
+                    if (scenarioModal) scenarioModal.classList.add("hidden");
+                    await loadScenarios();
+                } else {
+                    alert(`❌ Kayıt Hatası: ${result.error || "Bilinmeyen hata"}`);
+                }
+            } catch (err) {
+                console.error("Senaryo kaydetme isteğinde hata patladı:", err);
+                alert("İstek esnasında bağlantı hatası patladı.");
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                }
+            }
+        });
+    }
+
+    if (projectDropdown) {
+        projectDropdown.addEventListener("change", (e) => {
+            currentProject = e.target.value;
+            updateProjectLabels();
+        });
+    }
+
+    // ─── DİNAMİK AYARLAR VE ÇOKLU API ANAHTARLARI YÖNETİMİ ───
     const settingsForm = document.getElementById("settings-form");
     const apiKeysContainer = document.getElementById("api-keys-container");
     const addApiKeyBtn = document.getElementById("add-api-key-btn");
 
-    // 🌟 ÇÖZÜM: Statik dizi kirliliğini temizledik, dropdown sadece senin eklediğin anahtarlarla dolacak! 🔒
     function refreshApiDropdowns(selectedRunner = "", selectedTranslator = "") {
         const runnerSelect = document.getElementById("setting-test-runner-api");
         const translatorSelect = document.getElementById("setting-translator-api");
@@ -1111,10 +1108,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const currentRunner = selectedRunner || runnerSelect.value || "";
         const currentTranslator = selectedTranslator || translatorSelect.value || "";
 
-        // Statik "openai" ve "gemini" başlangıçlarını uçurduk. Tamamen boş başlıyor!
         const providers = [];
 
-        // Sadece ekranda aktif olarak ekli olan API sağlayıcı adlarını diziye dolduruyoruz
         document.querySelectorAll(".api-provider-input").forEach(input => {
             const val = input.value.trim().toLowerCase();
             if (val && !providers.includes(val)) {
@@ -1122,23 +1117,20 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        // Test Çalıştırıcı dropdown'ını tamamen dinamik olarak render ediyoruz
         runnerSelect.innerHTML = "";
         providers.forEach(p => {
             const opt = document.createElement("option");
             opt.value = p;
-            opt.textContent = p.toUpperCase(); // Örn: OPENAI_API_KEY, GEMINI_API_KEY veya QWEN3:1.7B
+            opt.textContent = p.toUpperCase();
             runnerSelect.appendChild(opt);
         });
         
-        // Eğer daha önce seçilen değer listede varsa onu seçili yap, yoksa listenin ilk elemanını seç
         if (providers.includes(currentRunner)) {
             runnerSelect.value = currentRunner;
         } else if (providers.length > 0) {
             runnerSelect.value = providers[0];
         }
 
-        // Çeviri Sağlayıcı dropdown'ını tamamen dinamik olarak render ediyoruz
         translatorSelect.innerHTML = "";
         providers.forEach(p => {
             const opt = document.createElement("option");
@@ -1154,18 +1146,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // A. Ayarları Sunucudan Çekip Formu Kilitleyen Fonksiyon
     async function loadSystemSettings() {
         if (!settingsForm) return;
 
-        // 🌟 GÜVENLİK ZIRHI: Admin Token'ı alınıyor
         const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
         try {
             console.log("Dinamik sistem ayarları yükleniyor...");
             const res = await fetch("/api/scenarios/settings/get", {
                 headers: {
-                    "X-User-Token": userSession.token || "" // 👈 HEADER EKLENDİ!
+                    "X-User-Token": userSession.token || ""
                 }
             });
             const result = await res.json();
@@ -1173,7 +1163,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (result.success && result.settings) {
                 const s = result.settings;
 
-                apiKeysContainer.innerHTML = "";
+                if (apiKeysContainer) apiKeysContainer.innerHTML = "";
                 if (s.apiKeys) {
                     Object.entries(s.apiKeys).forEach(([provider, details]) => {
                         const keyVal = typeof details === "object" ? details.key : details;
@@ -1189,10 +1179,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-// B. Dinamik Sağlayıcı, API Key (Şifreli/Göz Butonlu) ve Model Satırı Ekleyen Yardımcı Fonksiyon 
     function addApiKeyRow(provider = "", keyVal = "", modelVal = "") {
+        if (!apiKeysContainer) return;
         const row = document.createElement("div");
-        // responsive grid ve ferah paddingler eklendi 
         row.className = "grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-[#27272a]/30 p-3 rounded-xl border border-[rgba(255,255,255,0.04)] animate-slide-in w-full";
         
         row.innerHTML = `
@@ -1224,9 +1213,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const providerInput = row.querySelector(".api-provider-input");
         const passwordInput = row.querySelector(".api-value-input");
         const togglePasswordBtn = row.querySelector(".toggle-password-btn");
-        const eyeIcon = togglePasswordBtn.querySelector("i");
 
-        // Göz butonuna basıldığında input tipini password/text arasında değiştirme sihri 
         togglePasswordBtn.addEventListener("click", () => {
             if (passwordInput.type === "password") {
                 passwordInput.type = "text";
@@ -1235,7 +1222,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 passwordInput.type = "password";
                 togglePasswordBtn.innerHTML = `<i data-lucide="eye" class="w-4 h-4"></i>`;
             }
-            lucide.createIcons(); // İkonu anında yenileyelim
+            lucide.createIcons();
         });
 
         providerInput.addEventListener("input", () => {
@@ -1258,15 +1245,16 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // C. Ayarları Kaydetme Olayı
     if (settingsForm) {
         settingsForm.addEventListener("submit", async (e) => {
             e.preventDefault();
 
             const saveBtn = document.getElementById("save-settings-btn");
-            const originalHtml = saveBtn.innerHTML;
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = `<span>Kaydediliyor...</span>`;
+            const originalHtml = saveBtn ? saveBtn.innerHTML : "";
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = `<span>Kaydediliyor...</span>`;
+            }
 
             const apiKeys = {};
             const providerInputs = document.querySelectorAll(".api-provider-input");
@@ -1275,8 +1263,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             providerInputs.forEach((input, index) => {
                 const provider = input.value.trim().toLowerCase(); 
-                const keyVal = valueInputs[index].value.trim();
-                const modelVal = modelInputs[index].value.trim();
+                const keyVal = valueInputs[index] ? valueInputs[index].value.trim() : "";
+                const modelVal = modelInputs[index] ? modelInputs[index].value.trim() : "";
                 
                 if (provider) {
                     apiKeys[provider] = {
@@ -1286,9 +1274,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
 
+            const testRunnerEl = document.getElementById("setting-test-runner-api");
+            const translatorEl = document.getElementById("setting-translator-api");
+
             const payload = {
-                testRunnerApi: document.getElementById("setting-test-runner-api").value,
-                translatorApi: document.getElementById("setting-translator-api").value,
+                testRunnerApi: testRunnerEl ? testRunnerEl.value : "",
+                translatorApi: translatorEl ? translatorEl.value : "",
                 apiKeys
             };
             
@@ -1297,7 +1288,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const res = await fetch("/api/scenarios/settings/save", {
                     method: "POST",
                     headers: { 
-                        "Content-Type": "application/json", 
+                        "Content-Type": "application/json",
                         "X-User-Token": userSession.token || ""
                     },
                     body: JSON.stringify(payload)
@@ -1305,7 +1296,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const result = await res.json();
                 if (res.ok && result.success) {
-                    alert("Başarılı:Sağlayıcı ayarları ve model isimleri diske başarıyla kaydedildi.");
+                    alert("Başarılı: Sağlayıcı ayarları ve model isimleri diske başarıyla kaydedildi.");
                     await loadSystemSettings();
                 } else {
                     alert(`Ayarlar kaydedilemedi: ${result.error || "Hata oluştu"}`);
@@ -1314,8 +1305,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.error("Ayarlar kaydedilirken ağ hatası:", err);
                 alert("Sunucu bağlantı hatası!");
             } finally {
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = originalHtml;
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalHtml;
+                }
             }
         });
     }
@@ -1325,21 +1318,15 @@ document.addEventListener("DOMContentLoaded", () => {
         settingsTabBtn.addEventListener("click", loadSystemSettings);
     }
 
-
-    // ─── KULLANICI YÖNETİMİ FRONTEND SİHRİ ───
+    // ─── KULLANICI YÖNETİMİ FRONTEND ───
     const openNewUserModalBtn = document.getElementById("open-new-user-modal-btn");
     const userModal = document.getElementById("user-modal");
     const closeUserModal = document.getElementById("close-user-modal");
     const userForm = document.getElementById("user-form");
     const usersList = document.getElementById("users-list");
     const userProjectsCheckboxes = document.getElementById("user-projects-checkboxes");
-    // ─── KULLANICI YÖNETİMİ DEĞİŞKENLERİ (EKSİK REFERANSLAR BURAYA! 🎯) ───
-    const userModalTitle = document.getElementById("user-modal-title");
-    const userModalSubmitBtn = document.getElementById("user-modal-submit-btn");
-    // ─── KULLANICI YÖNETİMİ ŞİFRE İPUCU REFERANSI (SON CANAVAR! 🎯) ───
     const passwordHint = document.getElementById("password-hint");
 
-    // ─── 👨‍💼 KULLANICI YÖNETİMİ FRONTEND ORGANİZASYONU (GÜVENLİ & İZOLE SÜRÜM) ───
     const usersTabBtn = document.getElementById("nav-users-btn");
     if (usersTabBtn) usersTabBtn.addEventListener("click", loadUsers);
 
@@ -1350,7 +1337,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await res.json();
 
             if (result.success && result.users) {
-                usersList.innerHTML = "";
+                if (usersList) usersList.innerHTML = "";
                 cachedAllProjects = result.allProjects || [];
                 
                 result.users.forEach(user => {
@@ -1363,7 +1350,6 @@ document.addEventListener("DOMContentLoaded", () => {
                             ? user.projeler.map(p => `<span class="px-2 py-0.5 mr-1 rounded text-[10px] bg-zinc-500/10 text-zinc-300 border border-zinc-500/20 font-mono">${p}</span>`).join('')
                             : `<span class="text-zinc-500 italic text-[10px]">Atanmış proje yok</span>`);
 
-                    // 🛠️ Düzenle butonuna data özniteliklerini mühürledik ve çöp adam ikonunu şık Lucide kalemiyle değiştirdik !
                     row.innerHTML = `
                         <td class="py-3 px-4 text-white font-medium">${user.kullanici_adi}</td>
                         <td class="py-3 px-4 text-zinc-400 font-mono">${user.rol}</td>
@@ -1382,10 +1368,9 @@ document.addEventListener("DOMContentLoaded", () => {
                             </button>
                         </td>
                     `;
-                    usersList.appendChild(row);
+                    if (usersList) usersList.appendChild(row);
                 });
 
-                // 🗑️ KULLANICI SİLME TETİKLEYİCİSİ
                 document.querySelectorAll(".delete-user-btn").forEach(btn => {
                     btn.onclick = async function() {
                         const id = btn.getAttribute("data-id");
@@ -1401,31 +1386,37 @@ document.addEventListener("DOMContentLoaded", () => {
                     };
                 });
 
-                // ✏️ KULLANICI DÜZENLEME TETİKLEYİCİSİ (HAYATA DÖNDÜRDÜĞÜMÜZ KISIM!)
                 document.querySelectorAll(".edit-user-btn").forEach(btn => {
                     btn.onclick = function() {
-                        globalEditUserId = btn.getAttribute("data-id"); // ID JavaScript belleğine mühürlendi! 🔒
+                        globalEditUserId = btn.getAttribute("data-id");
                         const username = btn.getAttribute("data-username");
                         const rol = btn.getAttribute("data-rol");
                         const userProjects = JSON.parse(decodeURIComponent(btn.getAttribute("data-projeler") || "[]"));
 
-                        // Eski satır: userModalTitle.textContent = `Kullanıcı Yetkilerini Düzenle: ${username}`;
-                        document.getElementById("user-modal-title").textContent = `Kullanıcı Yetkilerini Düzenle: ${username}`;
-                        // Eski satır: userModalSubmitBtn.textContent = "Değişiklikleri Kaydet";
-                        document.getElementById("user-modal-submit-btn").textContent = "Değişiklikleri Kaydet";
+                        const modalTitle = document.getElementById("user-modal-title");
+                        const modalSubmitBtn = document.getElementById("user-modal-submit-btn");
+                        if (modalTitle) modalTitle.textContent = `Kullanıcı Yetkilerini Düzenle: ${username}`;
+                        if (modalSubmitBtn) modalSubmitBtn.textContent = "Değişiklikleri Kaydet";
                         
-                        document.getElementById("new-user-username").value = username;
-                        document.getElementById("new-user-username").disabled = true; // Güvenlik katmanı: Kullanıcı adı değiştirilemez!
+                        const newUserInp = document.getElementById("new-user-username");
+                        const newPassInp = document.getElementById("new-user-password");
+                        const newRoleInp = document.getElementById("new-user-role");
+
+                        if (newUserInp) {
+                            newUserInp.value = username;
+                            newUserInp.disabled = true;
+                        }
                         
-                        // 🔒 Şifre kutusu tamamen boş gelir, required=false yaptık, siber güvenlik açığı kapatıldı!
-                        document.getElementById("new-user-password").value = "";
-                        document.getElementById("new-user-password").required = false; 
+                        if (newPassInp) {
+                            newPassInp.value = "";
+                            newPassInp.required = false;
+                        }
+
                         if (passwordHint) passwordHint.classList.remove("hidden");
-                        
-                        document.getElementById("new-user-role").value = rol;
+                        if (newRoleInp) newRoleInp.value = rol;
 
                         renderCheckboxList(userProjects);
-                        userModal.classList.remove("hidden");
+                        if (userModal) userModal.classList.remove("hidden");
                     };
                 });
                 lucide.createIcons();
@@ -1449,28 +1440,29 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 🌟 YENİ KULLANICI OLUŞTURMA TETİKLEYİCİSİ
     if (openNewUserModalBtn) {
         openNewUserModalBtn.addEventListener("click", () => {
-            globalEditUserId = ""; // ID sıfırlanarak ekleme moduna geçilir!
-            userForm.reset();
-            // Eski satır: userModalTitle.textContent = "Yeni Kullanıcı Oluştur";
-            // Eski satır: userModalSubmitBtn.textContent = "Kullanıcıyı Kaydet";
-            document.getElementById("user-modal-title").textContent = "Yeni Kullanıcı Oluştur";
-            document.getElementById("user-modal-submit-btn").textContent = "Kullanıcıyı Kaydet";
+            globalEditUserId = "";
+            if (userForm) userForm.reset();
+            const modalTitle = document.getElementById("user-modal-title");
+            const modalSubmitBtn = document.getElementById("user-modal-submit-btn");
+            if (modalTitle) modalTitle.textContent = "Yeni Kullanıcı Oluştur";
+            if (modalSubmitBtn) modalSubmitBtn.textContent = "Kullanıcıyı Kaydet";
             
-            document.getElementById("new-user-username").disabled = false;
-            document.getElementById("new-user-password").required = true; // Yeni kullanıcıda şifre zorunlu!
+            const newUserInp = document.getElementById("new-user-username");
+            const newPassInp = document.getElementById("new-user-password");
+
+            if (newUserInp) newUserInp.disabled = false;
+            if (newPassInp) newPassInp.required = true;
             if (passwordHint) passwordHint.classList.add("hidden");
             
             renderCheckboxList([]);
-            userModal.classList.remove("hidden");
+            if (userModal) userModal.classList.remove("hidden");
         });
     }
 
     if (closeUserModal) closeUserModal.addEventListener("click", () => userModal.classList.add("hidden"));
 
-    // 🎯 TEK, GERÇEK VE ARAPSAÇINA DÖNMEYEN FORM SUBMIT HANDLER'I
     if (userForm) {
         userForm.addEventListener("submit", async (e) => {
             e.preventDefault();
@@ -1503,7 +1495,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const result = await res.json();
                 if (res.ok && result.success) {
                     alert(isEditMode ? "🎉 Kullanıcı yetkileri başarıyla güncellendi!" : "🎉 Kullanıcı başarıyla oluşturuldu!");
-                    userModal.classList.add("hidden");
+                    if (userModal) userModal.classList.add("hidden");
                     globalEditUserId = ""; 
                     await loadUsers(); 
                 } else {

@@ -10,10 +10,22 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js';
 const router = express.Router();
 
 // Yardımcı Fonksiyon: Playwright testini asenkron Promise ile sarmalayıp koşturur  🎭
-const runPlaywrightTest = () => {
+// Yardımcı Fonksiyon: Playwright testini dinamik dosya yoluyla çalıştırma 🎭
+const runPlaywrightTest = (stepsFilePath) => {
     return new Promise((resolve) => {
-        console.log(`🔥 Playwright motoru asenkron olarak tetikleniyor...`);
-        exec('npx playwright test tests/ai-security.spec.ts', (error, stdout, stderr) => {
+        console.log(`🔥 Playwright motoru asenkron olarak tetikleniyor... (Dosya: ${stepsFilePath})`);
+        
+        // Environment Variable üzerinden özel adımlar dosya yolunu Playwright'a fırlatıyoruz
+        const env = { ...process.env, RUNTIME_STEPS_PATH: stepsFilePath };
+
+        exec('npx playwright test tests/ai-security.spec.ts', { env }, (error, stdout, stderr) => {
+            // Test bittikten sonra geçici dosyayı temizliyoruz (Garbage Collection) 🗑️
+            try {
+                if (fs.existsSync(stepsFilePath)) fs.unlinkSync(stepsFilePath);
+            } catch (e) {
+                console.error("Geçici dosya silinemedi:", e.message);
+            }
+
             resolve({
                 isSuccess: !error,
                 logContent: stdout + (stderr ? `\n--- Hatalar ---\n${stderr}` : '')
@@ -283,14 +295,19 @@ router.post('/run', requireAuth, async (req, res) => {
         if (!foundScenario) return res.status(404).json({ error: "Çalıştırılacak senaryo veritabanında bulunamadı." });
 
         const rawSteps = foundScenario.adimlar;
+        // /run endpoint'i içindeki dosya oluşturma kısmı:
         const cacheDir = path.join(process.cwd(), 'cache');
         if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
-        
-        const runtimeStepsPath = path.join(cacheDir, 'runtime_steps.json');
+
+        // Benzersiz dosya adı oluşturuluyor 🔑
+        const uniqueFileName = `runtime_steps_${Date.now()}_${Math.random().toString(36).substring(7)}.json`;
+        const runtimeStepsPath = path.join(cacheDir, uniqueFileName);
+
         const stepsString = typeof rawSteps === 'string' ? rawSteps : JSON.stringify(rawSteps, null, 2);
         fs.writeFileSync(runtimeStepsPath, stepsString, 'utf-8');
 
-        const testResult = await runPlaywrightTest();
+        // Dinamik dosya yolu ile çalıştırılıyor 🚀
+        const testResult = await runPlaywrightTest(runtimeStepsPath);
 
         const reportData = {
             project_id: projectId,
@@ -369,14 +386,17 @@ router.post('/run-batch', requireAuth, async (req, res) => {
 
         (async () => {
             for (const scenario of batchScenarios) {
+                // /run-batch döngüsü içindeki dosya oluşturma kısmı:
                 const cacheDir = path.join(process.cwd(), 'cache');
                 if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
 
-                const runtimeStepsPath = path.join(cacheDir, 'runtime_steps.json');
+                const uniqueFileName = `runtime_steps_${Date.now()}_${Math.random().toString(36).substring(7)}.json`;
+                const runtimeStepsPath = path.join(cacheDir, uniqueFileName);
+
                 const stepsString = typeof scenario.adimlar === 'string' ? scenario.adimlar : JSON.stringify(scenario.adimlar, null, 2);
                 fs.writeFileSync(runtimeStepsPath, stepsString, 'utf-8');
 
-                const testResult = await runPlaywrightTest();
+                const testResult = await runPlaywrightTest(runtimeStepsPath);
 
                 const reportData = {
                     project_id: projectId,
