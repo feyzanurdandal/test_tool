@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import dpu from '../config/dpuService.js';
 import bcrypt from 'bcryptjs';
-import { translateScenario } from '../services/scenarioService.js';
+import { translateScenario, validateTargetUrl } from '../services/scenarioService.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -174,6 +174,12 @@ router.post('/create-and-save', requireAuth, async (req, res) => {
 
     if (!scenarioName || !turkishInstructions || !targetUrl) {
         return res.status(400).json({ error: "Eksik alanlar var!" });
+    }
+
+    // 🛡️ SSRF & URL FORMAT DOĞRULAMASI
+    const urlValidation = validateTargetUrl(targetUrl);
+    if (!urlValidation.isValid) {
+        return res.status(400).json({ error: urlValidation.reason });
     }
 
     try {
