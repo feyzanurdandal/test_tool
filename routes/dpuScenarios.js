@@ -148,7 +148,7 @@ router.get('/content', requireAuth, async (req, res) => {
     const { scenarioName, project } = req.query;
     const selectedProj = (project || 'Varsayılan Proje').trim();
 
-    if (!scenarioName) return res.status(400).json({ error: "scenarioName parametresi zorunlu!" });
+    if (!scenarioName) return res.status(400).json({ error: "Senaryo ismi zorunlu!" });
 
     try {
         const projectRes = await dpu.select('projeler', 100);
@@ -226,9 +226,10 @@ router.post('/create-and-save', requireAuth, async (req, res) => {
 
         const result = await dpu.insert('senaryolar', insertData);
         if (result.success) {
-            return res.status(200).json({ success: true, status: "SUCCESS", message: "Senaryo başarıyla buluta mühürlendi!" });
+            return res.status(200).json({ success: true, status: "SUCCESS", message: "Senaryo başarıyla buluta kaydedildi." });
         }
-        return res.status(500).json({ error: "DPU Base senaryo kayıt hatası", details: result });
+        console.error("DPU Base kayıt hatası:", result);
+        return res.status(500).json({ error: "Senaryo kaydedilirken bir veritabanı hatası oluştu." });
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }
@@ -263,7 +264,8 @@ router.post('/delete', requireAuth, async (req, res) => {
         if (deleteResult.success) {
             return res.status(200).json({ success: true, message: "Senaryo başarıyla silindi!" });
         }
-        return res.status(500).json({ error: "Silme işlemi başarısız.", details: deleteResult });
+        console.error("Senaryo silme hatası:", deleteResult);
+        return res.status(500).json({ error: "Senaryo silinirken veritabanı hatası oluştu." });
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }
@@ -287,9 +289,10 @@ router.post('/run', requireAuth, async (req, res) => {
         const scenariosRes = await dpu.select('senaryolar', 100);
         if (!scenariosRes.success || !scenariosRes.data) return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
 
+        // Tip Güvenlikli Arama Kalıbı:
         const foundScenario = scenariosRes.data.find(s => 
             String(s.project_id) === String(projectId) && 
-            s.senaryo_adi === scenarioName
+            String(s.senaryo_adi).trim().toLowerCase() === String(scenarioName).trim().toLowerCase()
         );
 
         if (!foundScenario) return res.status(404).json({ error: "Çalıştırılacak senaryo veritabanında bulunamadı." });
