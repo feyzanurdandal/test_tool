@@ -17,6 +17,9 @@ console.log(`***Playwright Altyapısı Başlatıldı | Aktif Mod: ${TEST_MODE}`)
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
+
+const isHeadless = process.env.HEADLESS === 'true';
+
 export default defineConfig({
   testDir: './tests',
   /* Run tests in files in parallel */
@@ -37,7 +40,7 @@ export default defineConfig({
     // baseURL: 'http://localhost:3000',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    
+    headless: isHeadless,
     video: 'on',
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
