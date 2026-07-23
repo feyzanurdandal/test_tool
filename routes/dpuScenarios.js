@@ -649,18 +649,20 @@ router.post('/users/delete', requireAuth, requireAdmin, async (req, res) => {
     }
 });
 
-// 4. Kullanıcı Güncelleme
+// 4. Kullanıcı Güncelleme (DPU Base PATCH Uyumlu)
 router.post('/users/update', requireAuth, requireAdmin, async (req, res) => {
     const { id, username, password, role, selectedProjects } = req.body;
     if (!id || !username) return res.status(400).json({ error: "Eksik parametre!" });
 
     try {
+        // 1. Güncellenecek kullanıcıyı DPU Base'den doğruluyoruz
         const usersRes = await dpu.select('kullanicilar', 100);
         if (!usersRes.success || !usersRes.data) return res.status(500).json({ error: "Veritabanı erişim hatası." });
 
         const existingUser = usersRes.data.find(u => String(u.id) === String(id));
         if (!existingUser) return res.status(404).json({ error: "Güncellenecek kullanıcı bulunamadı." });
 
+        // 2. Şifre değişmediyse eski hash'li şifreyi koru, değiştiyse bcrypt ile yeni hash üret
         let finalPassword = existingUser.sifre;
         if (password && password.trim() !== '') {
             finalPassword = await bcrypt.hash(password, 10);
@@ -668,16 +670,22 @@ router.post('/users/update', requireAuth, requireAdmin, async (req, res) => {
 
         const finalRole = role ? role.toUpperCase() : existingUser.rol;
 
-        await dpu.delete('kullanicilar', existingUser.id);
-        const insertUserRes = await dpu.insert('kullanicilar', {
+        // 3. DPU Base PATCH isteği için body oluştur
+        const updatePayload = {
             kullanici_adi: username,
             sifre: finalPassword,
             rol: finalRole
-        });
+        };
 
-        if (!insertUserRes.success) return res.status(500).json({ error: "Kullanıcı bilgileri güncellenemedi." });
+        // 4. Doğrudan DPU Base PATCH /api/v1/kullanicilar/{id} çağrısı
+        const updateRes = await dpu.update('kullanicilar', existingUser.id, updatePayload);
+        
+        if (!updateRes || !updateRes.success) {
+            return res.status(500).json({ error: "Kullanıcı bilgileri güncellenirken veritabanı hatası oluştu.", details: updateRes });
+        }
 
-        const permsRes = await dpu.select('kullanici_projeleri', 100);
+        // 5. Kullanıcıya atanmış proje yetkilerini güncelle
+        const permsRes = await dpu.select('kullanici_projeleri', 500);
         if (permsRes.success && permsRes.data) {
             const oldUserPerms = permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase());
             for (const perm of oldUserPerms) {

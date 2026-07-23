@@ -87,9 +87,9 @@ class DpuService {
         return await this.request(tableName, "POST", data);
     }
 
-    // 🔄 3. UPDATE
+    // 🔄 3. UPDATE (request helper'ı kullanılarak güvenli hale getirildi)
     async update(tableName, id, data) {
-        return await this.request(`${tableName}/${id}`, "PUT", data);
+        return await this.request(`${tableName}/${id}`, "PATCH", data);
     }
 
     // 🗑️ 4. DELETE

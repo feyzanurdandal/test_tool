@@ -15,7 +15,6 @@
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.0",
-    "@types/sqlite3": "^3.1.11",
     "cross-env": "^10.1.0",
     "playwright-lighthouse": "^4.0.0",
     "tsx": "^4.22.5"
@@ -31,7 +30,6 @@
     "node-fetch": "^3.3.2",
     "openai": "^6.47.0",
     "playwright-core": "^1.61.1",
-    "sqlite3": "^6.0.1",
     "zod": "^4.4.3"
   }
 }
