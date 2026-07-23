@@ -6,6 +6,7 @@ import dpu from '../config/dpuService.js';
 import bcrypt from 'bcryptjs';
 import { translateScenario, validateTargetUrl } from '../services/scenarioService.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { loginLimiter, aiCallLimiter, testRunLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -180,7 +181,7 @@ router.get('/content', requireAuth, async (req, res) => {
 });
 
 // ─── 5. API: SENARYO KAYDETME VE MANTIKLI ÇEVİRİSİ ───
-router.post('/create-and-save', requireAuth, async (req, res) => {
+router.post('/create-and-save', aiCallLimiter , requireAuth, async (req, res) => {
     const { scenarioName, turkishInstructions, targetUrl, projectName } = req.body;
     const selectedProj = (projectName || 'Varsayılan Proje').trim();
 
@@ -272,7 +273,7 @@ router.post('/delete', requireAuth, async (req, res) => {
 });
 
 // ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA ───
-router.post('/run', requireAuth, async (req, res) => {
+router.post('/run',testRunLimiter, requireAuth, async (req, res) => {
     const { scenarioName, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 

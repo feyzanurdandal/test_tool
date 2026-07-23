@@ -3,12 +3,13 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CONSTANTS } from './config/constants.js'; 
-import { translateToStagehandJson } from './utils/translator.js';
 import crypto from 'crypto';
 import dpu from './config/dpuService.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { translateScenario } from './services/scenarioService.js';
+import { loginLimiter, aiCallLimiter, testRunLimiter } from './middleware/rateLimit.js';
+import { translateToStagehandJson } from './utils/translator.js';
 
 // Güvenli Secret Katmanı: Env değişkeni yoksa rastgele güçlü key üretilir veya uyarı verilir
 if (!process.env.JWT_SECRET) {
@@ -42,7 +43,7 @@ app.get(/^(?!\/api).*$/, (req, res) => {
 
 
 // ─── DİNAMİK DPU BASE GİRİŞ SİSTEMİ ───
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login',loginLimiter, async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
