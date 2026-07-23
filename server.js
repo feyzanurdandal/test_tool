@@ -11,9 +11,11 @@ import { sendServerError } from './middleware/errorHandler.js';
 
 // Güvenli Secret Katmanı
 if (!process.env.JWT_SECRET) {
-    console.warn("⚠️ UYARI: JWT_SECRET .env dosyasında bulunamadı! Geçici güvenli anahtar oluşturuluyor.");
+    console.error("GÜVENLİK HATASI: .env dosyasında JWT_SECRET tanımlı değil!");
+    console.error("Lütfen .env dosyanıza güçlü bir JWT_SECRET ekleyin ve sunucuyu yeniden başlatın.");
+    process.exit(1); // Sunucuyu durdur
 }
-const SECRET_KEY = process.env.JWT_SECRET || 'dpu_secure_production_secret_key_2026_x89f';
+const SECRET_KEY = process.env.JWT_SECRET;
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -57,18 +59,12 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
         );
 
         if (user) {
-            // 🛡️ BCRYPT KONTROLÜ
-            let isMatch = await bcrypt.compare(password, user.sifre);
-            
-            // Gerçekleşen eski düz metin şifre durumu için fallback:
-            if (!isMatch && user.sifre === password) {
-                isMatch = true;
-            }
+            // BCRYPT KONTROLÜ
+            const isMatch = await bcrypt.compare(password, user.sifre);
 
             if (isMatch) {
                 const role = (user.rol || 'USER').toUpperCase();
                 
-                // 🛡️ GERÇEK JWT İMZALAMA
                 const token = jwt.sign(
                     { 
                         username: user.kullanici_adi, 
