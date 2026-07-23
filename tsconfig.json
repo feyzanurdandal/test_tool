@@ -9,5 +9,5 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["node"]
   },
-  "include": ["src/**/*", "tests/**/*", "pages/**/*", "map-site.ts"]
+  "include": ["src/**/*", "tests/**/*", "pages/**/*"]
 }

@@ -39,6 +39,36 @@ app.get(/^(?!\/api).*$/, (req, res) => {
     res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
 });
 
+// 🏥 HEALTH-CHECK ENDPOINT'İ (Sistem ve Veritabanı Sağlık Kontrolü)
+app.get('/api/health', async (req, res) => {
+    const healthStatus = {
+        status: 'UP',
+        timestamp: new Date().toISOString(),
+        services: {
+            server: 'HEALTHY',
+            database: 'UNKNOWN'
+        }
+    };
+
+    try {
+        // DPU Base servisine hızlı bir bağlantı testi atıyoruz
+        const dbCheck = await dpu.select('projeler', 1);
+        if (dbCheck && dbCheck.success) {
+            healthStatus.services.database = 'HEALTHY';
+            return res.status(200).json(healthStatus);
+        } else {
+            healthStatus.status = 'DEGRADED';
+            healthStatus.services.database = 'UNHEALTHY';
+            return res.status(503).json(healthStatus);
+        }
+    } catch (err) {
+        healthStatus.status = 'DOWN';
+        healthStatus.services.database = 'DOWN';
+        healthStatus.error = err.message;
+        return res.status(500).json(healthStatus);
+    }
+});
+
 // ─── DİNAMİK DPU BASE GİRİŞ SİSTEMİ ───
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
