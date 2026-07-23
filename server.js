@@ -48,7 +48,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     }
 
     try {
-        const dbResult = await dpu.select('kullanicilar', 100);
+        const dbResult = await dpu.selectAll('kullanicilar');
         if (!dbResult || !dbResult.success || !dbResult.data) {
             return res.status(500).json({ error: "Veritabanı bağlantı hatası!" });
         }

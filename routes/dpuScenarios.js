@@ -40,7 +40,7 @@ router.get('/projects/list', requireAuth, async (req, res) => {
     const username = req.user.username;
 
     try {
-        const result = await dpu.select('projeler', 100);
+        const result = await dpu.selectAll('projeler');
         if (!result.success) {
             return res.status(500).json({ error: "DPU Base listeleme hatası", details: result });
         }
@@ -48,7 +48,7 @@ router.get('/projects/list', requireAuth, async (req, res) => {
         let projectNames = result.data.map(p => p.proje_adi);
 
         if (userRole !== 'ADMIN' && username) {
-            const permissionsRes = await dpu.select('kullanici_projeleri', 100);
+            const permissionsRes = await dpu.selectAll('kullanici_projeleri');
             if (permissionsRes.success && permissionsRes.data) {
                 const allowedProjects = permissionsRes.data
                     .filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase())
@@ -80,7 +80,7 @@ router.post('/projects/create', requireAuth, requireAdmin, async (req, res) => {
     if (!sanitizedProjName) return res.status(400).json({ error: "Geçersiz proje adı!" });
 
     try {
-        const checkExist = await dpu.select('projeler', 1, `proje_adi:eq:${sanitizedProjName}`);
+        const checkExist = await dpu.selectAll('projeler', 1, `proje_adi:eq:${sanitizedProjName}`);
         if (checkExist.success && checkExist.data.length > 0) {
             return res.status(400).json({ error: "Bu isimde bir proje zaten mevcut!" });
         }
@@ -102,7 +102,7 @@ router.post('/projects/delete', requireAuth, requireAdmin, async (req, res) => {
 
     try {
         // 1. Projeyi veritabanında bul
-        const projectRes = await dpu.select('projeler', 100);
+        const projectRes = await dpu.selectAll('projeler');
         if (!projectRes.success || !projectRes.data) {
             return res.status(500).json({ error: "Projeler tablosuna erişilemedi." });
         }
@@ -119,7 +119,7 @@ router.post('/projects/delete', requireAuth, requireAdmin, async (req, res) => {
         }
 
         // 3. 'kullanici_projeleri' tablosundaki bu projeye ait tüm ilişkileri temizle
-        const permsRes = await dpu.select('kullanici_projeleri', 500);
+        const permsRes = await dpu.selectAll('kullanici_projeleri');
         if (permsRes.success && permsRes.data) {
             const relatedPerms = permsRes.data.filter(p => p.proje_adi.toLowerCase() === projectName.trim().toLowerCase());
             for (const perm of relatedPerms) {
@@ -144,7 +144,7 @@ router.get('/list', requireAuth, async (req, res) => {
 
     try {
         if (userRole !== 'ADMIN' && username) {
-            const permissionsRes = await dpu.select('kullanici_projeleri', 100);
+            const permissionsRes = await dpu.selectAll('kullanici_projeleri');
             if (permissionsRes.success && permissionsRes.data) {
                 const allowedProjects = permissionsRes.data
                     .filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase())
@@ -158,14 +158,14 @@ router.get('/list', requireAuth, async (req, res) => {
             }
         }
 
-        const projectRes = await dpu.select('projeler', 100);
+        const projectRes = await dpu.selectAll('projeler');
         if (!projectRes.success || !projectRes.data) return res.json({ scenarios: [] });
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
         if (!foundProj) return res.json({ scenarios: [] });
         
         const projectId = foundProj.id;
-        const scenariosRes = await dpu.select('senaryolar', 100);
+        const scenariosRes = await dpu.selectAll('senaryolar');
         
         if (scenariosRes.success && scenariosRes.data) {
             const filteredScenarios = scenariosRes.data
@@ -189,14 +189,14 @@ router.get('/content', requireAuth, async (req, res) => {
     if (!scenarioName) return res.status(400).json({ error: "Senaryo ismi zorunlu!" });
 
     try {
-        const projectRes = await dpu.select('projeler', 100);
+        const projectRes = await dpu.selectAll('projeler');
         if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
         if (!foundProj) return res.status(404).json({ error: "Proje bulunamadı." });
         const projectId = foundProj.id;
 
-        const scenarioRes = await dpu.select('senaryolar', 100);
+        const scenarioRes = await dpu.selectAll('senaryolar');
         if (scenarioRes.success && scenarioRes.data) {
             const scenario = scenarioRes.data.find(s => 
                 String(s.project_id) === String(projectId) && 
@@ -233,14 +233,14 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, async (req, res) => 
     }
 
     try {
-        const projectRes = await dpu.select('projeler', 100);
+        const projectRes = await dpu.selectAll('projeler');
         if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
         if (!foundProj) return res.status(404).json({ error: "İlgili proje bulunamadı!" });
         const projectId = foundProj.id;
 
-        const checkScenario = await dpu.select('senaryolar', 100);
+        const checkScenario = await dpu.selectAll('senaryolar');
         if (checkScenario.success && checkScenario.data) {
             const isDuplicate = checkScenario.data.some(s => 
                 String(s.project_id) === String(projectId) && 
@@ -281,14 +281,14 @@ router.post('/delete', requireAuth, async (req, res) => {
     if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var!" });
 
     try {
-        const projectRes = await dpu.select('projeler', 100);
+        const projectRes = await dpu.selectAll('projeler');
         if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
         if (!foundProj) return res.status(404).json({ error: "Proje bulunamadı." });
         const projectId = foundProj.id;
 
-        const scenarioRes = await dpu.select('senaryolar', 100);
+        const scenarioRes = await dpu.selectAll('senaryolar');
         if (!scenarioRes.success || !scenarioRes.data) return res.status(404).json({ error: "Senaryolar tablosuna erişilemedi." });
 
         const foundScenario = scenarioRes.data.find(s => 
@@ -325,14 +325,14 @@ router.post('/run', testRunLimiter, requireAuth, async (req, res) => {
     if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var!" });
 
     try {
-        const projectRes = await dpu.select('projeler', 100);
+        const projectRes = await dpu.selectAll('projeler');
         if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
 
         const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
         if (!foundProj) return res.status(404).json({ error: "Proje bulunamadı." });
         const projectId = foundProj.id;
 
-        const scenariosRes = await dpu.select('senaryolar', 100);
+        const scenariosRes = await dpu.selectAll('senaryolar');
         if (!scenariosRes.success || !scenariosRes.data) return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
 
         const foundScenario = scenariosRes.data.find(s => 
@@ -386,7 +386,7 @@ router.get('/reports/list', requireAuth, async (req, res) => {
     if (!selectedProj) return res.json({ reports: [] });
 
     try {
-        const projectRes = await dpu.select('projeler', 100);
+        const projectRes = await dpu.selectAll('projeler');
         if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
             return res.json({ reports: [] });
         }
@@ -396,7 +396,7 @@ router.get('/reports/list', requireAuth, async (req, res) => {
         
         const projectId = foundProj.id;
 
-        const reportsRes = await dpu.select('raporlar', 100);
+        const reportsRes = await dpu.selectAll('raporlar');
         if (reportsRes.success && reportsRes.data) {
             const filteredReports = reportsRes.data
                 .filter(r => String(r.project_id) === String(projectId))
@@ -420,11 +420,11 @@ router.post('/run-batch', requireAuth, async (req, res) => {
     }
 
     try {
-        const projectRes = await dpu.select('projeler', 1, `proje_adi:eq:${selectedProj}`);
+        const projectRes = await dpu.selectAll('projeler', 1, `proje_adi:eq:${selectedProj}`);
         if (!projectRes.success || projectRes.data.length === 0) return res.status(404).json({ error: "Proje bulunamadı." });
         const projectId = projectRes.data[0].id;
 
-        const scenariosRes = await dpu.select('senaryolar', 100, `project_id:eq:${projectId}`);
+        const scenariosRes = await dpu.selectAll('senaryolar', 100, `project_id:eq:${projectId}`);
         if (!scenariosRes.success || !scenariosRes.data) return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
 
         const batchScenarios = scenariosRes.data.filter(s => scenarioNames.includes(s.senaryo_adi));
@@ -464,7 +464,7 @@ router.post('/run-batch', requireAuth, async (req, res) => {
 // ─── 10. API: AYARLARI GETİRME ───
 router.get('/settings/get', requireAuth, requireAdmin, async (req, res) => {
     try {
-        const dbResult = await dpu.select('ayarlar', 100);
+        const dbResult = await dpu.selectAll('ayarlar');
         const settings = { testRunnerApi: "openai", translatorApi: "gemini", apiKeys: {} };
 
         if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
@@ -495,7 +495,7 @@ router.post('/settings/save', requireAuth, requireAdmin, async (req, res) => {
     
     try {
         const nowIso = new Date().toISOString();
-        const currentDb = await dpu.select('ayarlar', 100);
+        const currentDb = await dpu.selectAll('ayarlar');
         const existingRows = currentDb.success && currentDb.data ? currentDb.data : [];
 
         const targetSettings = {
@@ -566,9 +566,9 @@ router.post('/reports/delete', requireAuth, async (req, res) => {
 // 1. Kullanıcıları Listeleme
 router.get('/users/list', requireAuth, requireAdmin, async (req, res) => {
     try {
-        const usersRes = await dpu.select('kullanicilar', 100);
-        const projectsRes = await dpu.select('projeler', 100);
-        const permsRes = await dpu.select('kullanici_projeleri', 100);
+        const usersRes = await dpu.selectAll('kullanicilar');
+        const projectsRes = await dpu.selectAll('projeler');
+        const permsRes = await dpu.selectAll('kullanici_projeleri');
 
         if (usersRes.success) {
             const formattedUsers = usersRes.data.map(user => {
@@ -598,7 +598,7 @@ router.post('/users/create', requireAuth, requireAdmin, async (req, res) => {
     if (!username || !password || !role) return res.status(400).json({ error: "Eksik alanlar var!" });
 
     try {
-        const usersCheck = await dpu.select('kullanicilar', 100);
+        const usersCheck = await dpu.selectAll('kullanicilar');
         if (usersCheck.success && usersCheck.data.some(u => u.kullanici_adi.toLowerCase() === username.toLowerCase())) {
             return res.status(400).json({ error: "Bu kullanıcı adı zaten mevcut!" });
         }
@@ -634,7 +634,7 @@ router.post('/users/delete', requireAuth, requireAdmin, async (req, res) => {
     try {
         const deleteUser = await dpu.delete('kullanicilar', id);
         if (deleteUser.success) {
-            const permsRes = await dpu.select('kullanici_projeleri', 100);
+            const permsRes = await dpu.selectAll('kullanici_projeleri');
             if (permsRes.success && permsRes.data) {
                 const userPerms = permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase());
                 for (const perm of userPerms) {
@@ -656,7 +656,7 @@ router.post('/users/update', requireAuth, requireAdmin, async (req, res) => {
 
     try {
         // 1. Güncellenecek kullanıcıyı DPU Base'den doğruluyoruz
-        const usersRes = await dpu.select('kullanicilar', 100);
+        const usersRes = await dpu.selectAll('kullanicilar');
         if (!usersRes.success || !usersRes.data) return res.status(500).json({ error: "Veritabanı erişim hatası." });
 
         const existingUser = usersRes.data.find(u => String(u.id) === String(id));
@@ -685,7 +685,7 @@ router.post('/users/update', requireAuth, requireAdmin, async (req, res) => {
         }
 
         // 5. Kullanıcıya atanmış proje yetkilerini güncelle
-        const permsRes = await dpu.select('kullanici_projeleri', 500);
+        const permsRes = await dpu.selectAll('kullanici_projeleri');
         if (permsRes.success && permsRes.data) {
             const oldUserPerms = permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase());
             for (const perm of oldUserPerms) {

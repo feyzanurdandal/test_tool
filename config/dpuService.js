@@ -82,6 +82,43 @@ class DpuService {
         return await this.request(url, "GET");
     }
 
+    // 🔍 1.1 SELECT ALL (Tüm sayfaları otomatik gezerek tam veriyi getirir)
+    async selectAll(tableName, pageSize = 100, where = "") {
+        try {
+            let allRecords = [];
+            let currentPage = 1;
+            let hasMore = true;
+
+            while (hasMore) {
+                let url = `${tableName}?limit=${pageSize}&page=${currentPage}`;
+                if (where) {
+                    url += `&where=${encodeURIComponent(where)}`;
+                }
+
+                const response = await this.request(url, "GET");
+
+                if (response && response.success && Array.isArray(response.data)) {
+                    allRecords = allRecords.concat(response.data);
+
+                    // Eğer dönen kayıt sayısı istenen limit sayısından azsa son sayfaya gelmişizdir
+                    if (response.data.length < pageSize) {
+                        hasMore = false;
+                    } else {
+                        currentPage++;
+                    }
+                } else {
+                    // İstek başarısızsa veya veri yoksa döngüyü kır
+                    hasMore = false;
+                }
+            }
+
+            return { success: true, data: allRecords };
+        } catch (error) {
+            console.error(`DPU Base SelectAll Hatası (${tableName}):`, error);
+            return { success: false, error: error.message, data: [] };
+        }
+    }
+
     // 💾 2. CREATE
     async insert(tableName, data) {
         return await this.request(tableName, "POST", data);
