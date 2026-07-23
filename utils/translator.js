@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { OpenAI } from "openai"; 
 import * as dotenv from 'dotenv';
 import dpu from '../config/dpuService.js';
+import { decrypt } from './cryptoHelper.js';
 
 dotenv.config();
 
@@ -14,7 +15,7 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
     let chosenModel = "gemini-3.1-flash-lite";
     let apiKey = process.env.GEMINI_API_KEY;
 
-    // 2. Ayarları DPU Base'den Çekme (Dinamik ve Kilitlenmesiz İthalat! 🔓)
+// 2. Ayarları DPU Base'den Çekme (Dinamik ve Kilitlenmesiz İthalat! 🔓)
     try {
         console.log("🔄 [Translator Gateway] Ayarlar DPU Base'den sorgulanıyor...");
         
@@ -22,7 +23,7 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
         const dpuModule = await import('../config/dpuService.js');
         const dpuClient = dpuModule.default || dpuModule;
 
-        const dbResult = await dpuClient.select('ayarlar', 100); 
+        const dbResult = await dpuClient.selectAll('ayarlar'); 
 
         if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
             const settingsRows = dbResult.data;
@@ -38,8 +39,9 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
                 const providerRow = settingsRows.find(r => r.ayar_anahtar === chosenApi);
 
                 if (providerRow) {
-                    apiKey = providerRow.ayar_deger;     
-                    chosenModel = providerRow.ayar_model; 
+                    // 🔓 Veritabanından gelen şifreli API Key'i AES-256 ile çözüyoruz
+                    apiKey = decrypt(providerRow.ayar_deger);     
+                    chosenModel = providerRow.ayar_model || chosenModel; 
                 }
             }
         }

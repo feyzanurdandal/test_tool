@@ -9,6 +9,7 @@ import { aiCallLimiter, testRunLimiter } from '../middleware/rateLimit.js';
 import { isSafeUrl } from '../utils/ipGuard.js';
 import { translateToStagehandJson } from '../utils/translator.js';
 import { sendServerError } from '../middleware/errorHandler.js';
+import { encrypt, decrypt } from '../utils/cryptoHelper.js';
 
 const router = express.Router();
 
@@ -476,8 +477,10 @@ router.get('/settings/get', requireAuth, requireAdmin, async (req, res) => {
 
             dbResult.data.forEach(row => {
                 if (row.ayar_anahtar !== 'test_runner_api' && row.ayar_anahtar !== 'translator_api') {
+                    // 🔓 Şifreli anahtar çözülüyor
+                    const rawKey = row.ayar_deger || "";
                     settings.apiKeys[row.ayar_anahtar] = {
-                        key: row.ayar_deger || "",
+                        key: decrypt(rawKey),
                         model: row.ayar_model || ""
                     };
                 }
@@ -505,8 +508,10 @@ router.post('/settings/save', requireAuth, requireAdmin, async (req, res) => {
 
         if (apiKeys && typeof apiKeys === 'object') {
             Object.entries(apiKeys).forEach(([provider, details]) => {
+                // 🔒 Veritabanına kaydetmeden önce AES-256 ile şifreliyoruz
+                const encryptedKey = details.key ? encrypt(details.key) : "";
                 targetSettings[provider] = {
-                    val: details.key || "",
+                    val: encryptedKey,
                     model: details.model || ""
                 };
             });
