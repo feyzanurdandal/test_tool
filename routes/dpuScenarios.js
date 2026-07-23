@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import { translateScenario, validateTargetUrl } from '../services/scenarioService.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { loginLimiter, aiCallLimiter, testRunLimiter } from '../middleware/rateLimit.js';
+import { isSafeUrl } from '../utils/ipGuard.js';
 
 const router = express.Router();
 
@@ -183,6 +184,15 @@ router.get('/content', requireAuth, async (req, res) => {
 // ─── 5. API: SENARYO KAYDETME VE MANTIKLI ÇEVİRİSİ ───
 router.post('/create-and-save', aiCallLimiter , requireAuth, async (req, res) => {
     const { scenarioName, turkishInstructions, targetUrl, projectName } = req.body;
+
+// 🛡️ SSRF / IP Koruması
+    if (targetUrl) {
+        const urlCheck = isSafeUrl(targetUrl);
+        if (!urlCheck.safe) {
+            return res.status(400).json({ error: `Güvenlik Engeli: ${urlCheck.reason}` });
+        }
+    }
+
     const selectedProj = (projectName || 'Varsayılan Proje').trim();
 
     if (!scenarioName || !turkishInstructions || !targetUrl) {
@@ -274,7 +284,16 @@ router.post('/delete', requireAuth, async (req, res) => {
 
 // ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA ───
 router.post('/run',testRunLimiter, requireAuth, async (req, res) => {
-    const { scenarioName, projectName } = req.body;
+    const { scenarioName, targetUrl, projectName } = req.body;
+
+// 🛡️ SSRF / IP Koruması
+    if (targetUrl) {
+        const urlCheck = isSafeUrl(targetUrl);
+        if (!urlCheck.safe) {
+            return res.status(400).json({ error: `Güvenlik Engeli: ${urlCheck.reason}` });
+        }
+    }
+
     const selectedProj = (projectName || '').trim();
 
     if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var! Senaryo veya proje adı gelmedi." });
