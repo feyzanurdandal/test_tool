@@ -182,6 +182,44 @@ class DpuService {
     async delete(tableName, id) {
         return await this.request(`${tableName}/${id}`, "DELETE");
     }
+
+    // config/dpuService.js
+
+    /**
+     * DPU Base veritabanından filtreli (WHERE) veri çeker.
+     * @param {string} tableName - Tablo adı (ör: 'kullanicilar')
+     * @param {Object} filters - Filtre objesi (ör: { kullanici_adi: { eq: 'admin' } })
+     */
+    async selectWhere(tableName, filters = {}) {
+        try {
+            const queryParams = new URLSearchParams();
+
+            // Object'i DPU Base'in where[field][op]=val formatına dönüştürüyoruz
+            Object.entries(filters).forEach(([field, ops]) => {
+                Object.entries(ops).forEach(([op, val]) => {
+                    queryParams.append(`where[${field}][${op}]`, val);
+                });
+            });
+
+            const url = `${this.baseUrl}/api/v1/${tableName}?${queryParams.toString()}`;
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'X-API-Key': this.apiKey,
+                    'X-Project-Code': this.projectCode,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            console.error(`DPU Base WHERE Sorgu Hatası (${tableName}):`, error);
+            return { success: false, error: error.message };
+        }
+    }
 }
 
 const dpu = new DpuService();

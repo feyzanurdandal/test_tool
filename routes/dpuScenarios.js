@@ -8,7 +8,6 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { aiCallLimiter, testRunLimiter } from '../middleware/rateLimit.js';
 import { isSafeUrl } from '../utils/ipGuard.js';
 import { translateToStagehandJson } from '../utils/translator.js';
-import { sendServerError } from '../middleware/errorHandler.js';
 import { encrypt, decrypt } from '../utils/cryptoHelper.js';
 import { validate } from '../middleware/validate.js';
 import {
@@ -33,6 +32,14 @@ const runPlaywrightTest = (stepsFilePath) => {
         const env = { ...process.env, RUNTIME_STEPS_PATH: stepsFilePath };
 
         exec('npx playwright test tests/ai-security.spec.ts', { env }, (error, stdout, stderr) => {
+            // 🔍 Playwright çıktısını ve hatasını terminale basalım
+            if (error) {
+                console.error("❌ Playwright Test Hatası (stdout):", stdout);
+                console.error("❌ Playwright Test Hatası (stderr):", stderr);
+            } else {
+                console.log("✅ Playwright Testi Başarıyla Tamamlandı.");
+            }
+
             try {
                 if (fs.existsSync(stepsFilePath)) fs.unlinkSync(stepsFilePath);
             } catch (e) {
@@ -48,7 +55,7 @@ const runPlaywrightTest = (stepsFilePath) => {
 };
 
 // ─── 1. API: PROJELERİ LİSTELEME ───
-router.get('/projects/list', requireAuth, async (req, res) => {
+router.get('/projects/list', requireAuth, async (req, res, next) => {
     const userRole = req.user.role;
     const username = req.user.username;
 
@@ -61,12 +68,13 @@ router.get('/projects/list', requireAuth, async (req, res) => {
         let projectNames = result.data.map(p => p.proje_adi);
 
         if (userRole !== 'ADMIN' && username) {
-            const permissionsRes = await dpu.selectAll('kullanici_projeleri');
-            if (permissionsRes.success && permissionsRes.data) {
-                const allowedProjects = permissionsRes.data
-                    .filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase())
-                    .map(p => p.proje_adi);
+            // 🚀 DB-LEVEL FILTER: Tüm tablo yerine sadece kullanıcıya ait izinler çekiliyor
+            const permissionsRes = await dpu.selectWhere('kullanici_projeleri', {
+                kullanici_adi: { eq: username.toLowerCase() }
+            });
 
+            if (permissionsRes.success && permissionsRes.data) {
+                const allowedProjects = permissionsRes.data.map(p => p.proje_adi);
                 projectNames = projectNames.filter(name => allowedProjects.includes(name));
             } else {
                 projectNames = [];
@@ -80,21 +88,23 @@ router.get('/projects/list', requireAuth, async (req, res) => {
         
         return res.json({ success: true, projects: projectNames });
     } catch (error) {
-        return sendServerError(res, error, "Projeler listelenemedi.", "Projects/List");
+        next(error);
     }
 });
 
 // ─── 2. API: YENİ PROJE OLUŞTURMA (Sadece ADMIN Yetkili) ───
-router.post('/projects/create', requireAuth, requireAdmin, validate(createProjectSchema), async (req, res) => {
+router.post('/projects/create', requireAuth, requireAdmin, validate(createProjectSchema), async (req, res, next) => {
     const { projectName } = req.body;
-    if (!projectName) return res.status(400).json({ error: "Proje adı boş olamaz!" });
 
     const sanitizedProjName = projectName.replace(/[^a-zA-Z0-9\s_-]/g, '').trim();
     if (!sanitizedProjName) return res.status(400).json({ error: "Geçersiz proje adı!" });
 
     try {
-        const checkExist = await dpu.selectAll('projeler', 1, `proje_adi:eq:${sanitizedProjName}`);
-        if (checkExist.success && checkExist.data.length > 0) {
+        const checkExist = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: sanitizedProjName }
+        });
+
+        if (checkExist.success && checkExist.data && checkExist.data.length > 0) {
             return res.status(400).json({ error: "Bu isimde bir proje zaten mevcut!" });
         }
 
@@ -104,146 +114,128 @@ router.post('/projects/create', requireAuth, requireAdmin, validate(createProjec
         }
         return res.status(500).json({ error: "DPU Base proje kayıt hatası", details: result });
     } catch (error) {
-        return sendServerError(res, error, "Proje oluşturulamadı.", "Projects/Create");
+        next(error);
     }
 });
 
 // ─── 2.1 API: PROJE SİLME (Sadece ADMIN Yetkili) ───
-router.post('/projects/delete', requireAuth, requireAdmin,validate(deleteProjectSchema), async (req, res) => {
+router.post('/projects/delete', requireAuth, requireAdmin, validate(deleteProjectSchema), async (req, res, next) => {
     const { projectName } = req.body;
-    if (!projectName) return res.status(400).json({ error: "Silinecek proje adı boş olamaz!" });
 
     try {
-        // 1. Projeyi veritabanında bul
-        const projectRes = await dpu.selectAll('projeler');
-        if (!projectRes.success || !projectRes.data) {
-            return res.status(500).json({ error: "Projeler tablosuna erişilemedi." });
-        }
+        // 🚀 DB-LEVEL FILTER
+        const projectRes = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: projectName.trim() }
+        });
 
-        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === projectName.trim().toLowerCase());
-        if (!foundProj) {
+        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
             return res.status(404).json({ error: "Silinecek proje bulunamadı!" });
         }
 
-        // 2. Projeyi 'projeler' tablosundan sil
+        const foundProj = projectRes.data[0];
+
         const deleteRes = await dpu.delete('projeler', foundProj.id);
         if (!deleteRes.success) {
             return res.status(500).json({ error: "Proje silinirken veritabanı hatası oluştu." });
         }
 
-        // 3. 'kullanici_projeleri' tablosundaki bu projeye ait tüm ilişkileri temizle
-        const permsRes = await dpu.selectAll('kullanici_projeleri');
+        const permsRes = await dpu.selectWhere('kullanici_projeleri', {
+            proje_adi: { eq: projectName.trim() }
+        });
+
         if (permsRes.success && permsRes.data) {
-            const relatedPerms = permsRes.data.filter(p => p.proje_adi.toLowerCase() === projectName.trim().toLowerCase());
-            for (const perm of relatedPerms) {
+            for (const perm of permsRes.data) {
                 await dpu.delete('kullanici_projeleri', perm.id);
             }
         }
 
         return res.json({ success: true, message: `"${projectName}" projesi ve bağlı tüm kullanıcı yetkileri silindi.` });
     } catch (error) {
-        return sendServerError(res, error, "Proje silinirken bir sunucu hatası oluştu.", "Projects/Delete");
+        next(error);
     }
 });
 
 // ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME ───
-router.get('/list', requireAuth, async (req, res) => {
+router.get('/list', requireAuth, async (req, res, next) => {
     const { project } = req.query;
     const selectedProj = (project || '').trim();
-    const userRole = req.user.role;
-    const username = req.user.username;
 
     if (!selectedProj) return res.json({ scenarios: [] });
 
     try {
-        if (userRole !== 'ADMIN' && username) {
-            const permissionsRes = await dpu.selectAll('kullanici_projeleri');
-            if (permissionsRes.success && permissionsRes.data) {
-                const allowedProjects = permissionsRes.data
-                    .filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase())
-                    .map(p => p.proje_adi.toLowerCase());
+        // 🚀 DB-LEVEL FILTER
+        const projectRes = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: selectedProj }
+        });
 
-                if (!allowedProjects.includes(selectedProj.toLowerCase())) {
-                    return res.json({ scenarios: [] });
-                }
-            } else {
-                return res.json({ scenarios: [] });
-            }
+        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
+            return res.json({ scenarios: [] });
         }
 
-        const projectRes = await dpu.selectAll('projeler');
-        if (!projectRes.success || !projectRes.data) return res.json({ scenarios: [] });
+        const projectId = projectRes.data[0].id;
 
-        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-        if (!foundProj) return res.json({ scenarios: [] });
-        
-        const projectId = foundProj.id;
-        const scenariosRes = await dpu.selectAll('senaryolar');
+        const scenariosRes = await dpu.selectWhere('senaryolar', {
+            project_id: { eq: projectId }
+        });
         
         if (scenariosRes.success && scenariosRes.data) {
-            const filteredScenarios = scenariosRes.data
-                .filter(s => String(s.project_id) === String(projectId))
-                .map(s => s.senaryo_adi);
-            
+            const filteredScenarios = scenariosRes.data.map(s => s.senaryo_adi);
             return res.json({ scenarios: filteredScenarios });
         }
         
         return res.json({ scenarios: [] });
     } catch (error) {
-        return sendServerError(res, error, "Senaryolar listelenemedi.", "Scenarios/List");
+        next(error);
     }
 });
 
 // ─── 4. API: SENARYO JSON İÇERİĞİNİ OKUMA ───
-router.get('/content', requireAuth, validate(getScenarioContentSchema), async (req, res) => {
+router.get('/content', requireAuth, validate(getScenarioContentSchema), async (req, res, next) => {
     const { scenarioName, project } = req.query;
     const selectedProj = (project || 'Varsayılan Proje').trim();
 
-    // IDOR Koruması
+    // 🔒 IDOR Koruması
     const hasAccess = await checkProjectOwnership(req.user, selectedProj);
     if (!hasAccess) {
         return res.status(403).json({ error: "Yetkisiz Erişim: Bu projeye erişim izniniz bulunmuyor!" });
     }
 
-    if (!scenarioName) return res.status(400).json({ error: "Senaryo ismi zorunlu!" });
-
     try {
-        const projectRes = await dpu.selectAll('projeler');
-        if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
+        // 🚀 DB-LEVEL FILTER
+        const projectRes = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: selectedProj }
+        });
 
-        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-        if (!foundProj) return res.status(404).json({ error: "Proje bulunamadı." });
-        const projectId = foundProj.id;
-
-        const scenarioRes = await dpu.selectAll('senaryolar');
-        if (scenarioRes.success && scenarioRes.data) {
-            const scenario = scenarioRes.data.find(s => 
-                String(s.project_id) === String(projectId) && 
-                s.senaryo_adi === scenarioName
-            );
-
-            if (scenario) {
-                const adimlarContent = typeof scenario.adimlar === 'string' 
-                    ? JSON.parse(scenario.adimlar) 
-                    : scenario.adimlar;
-
-                return res.json({ success: true, content: adimlarContent });
-            }
+        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
+            return res.status(404).json({ error: "Proje bulunamadı." });
         }
+
+        const projectId = projectRes.data[0].id;
+
+        const scenarioRes = await dpu.selectWhere('senaryolar', {
+            project_id: { eq: projectId },
+            senaryo_adi: { eq: scenarioName }
+        });
+
+        if (scenarioRes.success && scenarioRes.data && scenarioRes.data.length > 0) {
+            const scenario = scenarioRes.data[0];
+            const adimlarContent = typeof scenario.adimlar === 'string' 
+                ? JSON.parse(scenario.adimlar) 
+                : scenario.adimlar;
+
+            return res.json({ success: true, content: adimlarContent });
+        }
+
         return res.status(404).json({ error: "Senaryo bulunamadı." });
     } catch (error) {
-        return sendServerError(res, error, "Senaryo içeriği okunamadı.", "Scenarios/Content");
+        next(error);
     }
 });
 
 // ─── 5. API: SENARYO KAYDETME VE AI ÇEVİRİSİ ───
-router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScenarioSchema), async (req, res) => {
+router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScenarioSchema), async (req, res, next) => {
     const { scenarioName, turkishInstructions, targetUrl, projectName } = req.body;
     const selectedProj = (projectName || 'Varsayılan Proje').trim();
-
-    if (!scenarioName || !turkishInstructions || !targetUrl) {
-        return res.status(400).json({ error: "Eksik alanlar var!" });
-    }
 
     // 🛡️ SSRF / IP Koruması
     const urlCheck = await isSafeUrl(targetUrl);
@@ -252,23 +244,26 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
     }
 
     try {
-        const projectRes = await dpu.selectAll('projeler');
-        if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
+        // 🚀 DB-LEVEL FILTER
+        const projectRes = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: selectedProj }
+        });
 
-        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-        if (!foundProj) return res.status(404).json({ error: "İlgili proje bulunamadı!" });
-        const projectId = foundProj.id;
+        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
+            return res.status(404).json({ error: "İlgili proje bulunamadı!" });
+        }
+        const projectId = projectRes.data[0].id;
 
-        const checkScenario = await dpu.selectAll('senaryolar');
-        if (checkScenario.success && checkScenario.data) {
-            const isDuplicate = checkScenario.data.some(s => 
-                String(s.project_id) === String(projectId) && 
-                s.senaryo_adi === scenarioName
-            );
-            if (isDuplicate) return res.status(400).json({ error: "Bu proje altında bu senaryo adı zaten mevcut!" });
+        const checkScenario = await dpu.selectWhere('senaryolar', {
+            project_id: { eq: projectId },
+            senaryo_adi: { eq: scenarioName }
+        });
+
+        if (checkScenario.success && checkScenario.data && checkScenario.data.length > 0) {
+            return res.status(400).json({ error: "Bu proje altında bu senaryo adı zaten mevcut!" });
         }
 
-        // 🤖 Modüler AI Çeviricisini çağırıyoruz
+        // 🤖 Modüler AI Çeviricisi
         const stagehandJson = await translateToStagehandJson(turkishInstructions, targetUrl);
         if (!stagehandJson) return res.status(500).json({ error: "Senaryo çevirisi esnasında yapay zeka hata döndürdü." });
 
@@ -288,16 +283,16 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
         }
         return res.status(500).json({ error: "Senaryo kaydedilirken bir veritabanı hatası oluştu." });
     } catch (error) {
-        return sendServerError(res, error, "Senaryo kaydedilirken beklenmeyen bir hata oluştu.", "Scenarios/Create");
+        next(error);
     }
 });
 
 // ─── 6. API: SENARYO SİLME ───
-router.post('/delete', requireAuth, async (req, res) => {
+router.post('/delete', requireAuth, async (req, res, next) => {
     const { scenarioName, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 
-    //  IDOR Koruması
+    // 🔒 IDOR Koruması
     const hasAccess = await checkProjectOwnership(req.user, selectedProj);
     if (!hasAccess) {
         return res.status(403).json({ error: "Yetkisiz Erişim: Bu projeden senaryo silme yetkiniz yok!" });
@@ -306,22 +301,26 @@ router.post('/delete', requireAuth, async (req, res) => {
     if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var!" });
 
     try {
-        const projectRes = await dpu.selectAll('projeler');
-        if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
+        // 🚀 DB-LEVEL FILTER
+        const projectRes = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: selectedProj }
+        });
 
-        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-        if (!foundProj) return res.status(404).json({ error: "Proje bulunamadı." });
-        const projectId = foundProj.id;
+        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
+            return res.status(404).json({ error: "Proje bulunamadı." });
+        }
+        const projectId = projectRes.data[0].id;
 
-        const scenarioRes = await dpu.selectAll('senaryolar');
-        if (!scenarioRes.success || !scenarioRes.data) return res.status(404).json({ error: "Senaryolar tablosuna erişilemedi." });
+        const scenarioRes = await dpu.selectWhere('senaryolar', {
+            project_id: { eq: projectId },
+            senaryo_adi: { eq: scenarioName }
+        });
 
-        const foundScenario = scenarioRes.data.find(s => 
-            String(s.project_id) === String(projectId) && 
-            s.senaryo_adi === scenarioName
-        );
+        if (!scenarioRes.success || !scenarioRes.data || scenarioRes.data.length === 0) {
+            return res.status(404).json({ error: "Silinecek senaryo bulunamadı." });
+        }
 
-        if (!foundScenario) return res.status(404).json({ error: "Silinecek senaryo bulunamadı." });
+        const foundScenario = scenarioRes.data[0];
 
         const deleteResult = await dpu.delete('senaryolar', foundScenario.id);
         if (deleteResult.success) {
@@ -329,15 +328,15 @@ router.post('/delete', requireAuth, async (req, res) => {
         }
         return res.status(500).json({ error: "Senaryo silinirken veritabanı hatası oluştu." });
     } catch (error) {
-        return sendServerError(res, error, "Senaryo silinirken hata oluştu.", "Scenarios/Delete");
+        next(error);
     }
 });
 
 // ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA ───
-router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), async (req, res) => {
+router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), async (req, res, next) => {
     const { scenarioName, targetUrl, projectName } = req.body;
 
-    // SSRF / IP Koruması
+    // 🛡️ SSRF / IP Koruması
     if (targetUrl) {
         const urlCheck = await isSafeUrl(targetUrl);
         if (!urlCheck.safe) {
@@ -347,31 +346,33 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), as
 
     const selectedProj = (projectName || '').trim();
 
-    // IDOR Koruması
+    // 🔒 IDOR Koruması
     const hasAccess = await checkProjectOwnership(req.user, selectedProj);
     if (!hasAccess) {
         return res.status(403).json({ error: "Yetkisiz Erişim: Bu projede test koşturma yetkiniz bulunmuyor!" });
     }
 
-    if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var!" });
-
     try {
-        const projectRes = await dpu.selectAll('projeler');
-        if (!projectRes.success || !projectRes.data) return res.status(404).json({ error: "Projeler tablosuna erişilemedi." });
+        // 🚀 DB-LEVEL FILTER
+        const projectRes = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: selectedProj }
+        });
 
-        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-        if (!foundProj) return res.status(404).json({ error: "Proje bulunamadı." });
-        const projectId = foundProj.id;
+        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
+            return res.status(404).json({ error: "Proje bulunamadı." });
+        }
+        const projectId = projectRes.data[0].id;
 
-        const scenariosRes = await dpu.selectAll('senaryolar');
-        if (!scenariosRes.success || !scenariosRes.data) return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
+        const scenariosRes = await dpu.selectWhere('senaryolar', {
+            project_id: { eq: projectId },
+            senaryo_adi: { eq: scenarioName }
+        });
 
-        const foundScenario = scenariosRes.data.find(s => 
-            String(s.project_id) === String(projectId) && 
-            String(s.senaryo_adi).trim().toLowerCase() === String(scenarioName).trim().toLowerCase()
-        );
+        if (!scenariosRes.success || !scenariosRes.data || scenariosRes.data.length === 0) {
+            return res.status(404).json({ error: "Çalıştırılacak senaryo veritabanında bulunamadı." });
+        }
 
-        if (!foundScenario) return res.status(404).json({ error: "Çalıştırılacak senaryo veritabanında bulunamadı." });
+        const foundScenario = scenariosRes.data[0];
 
         const rawSteps = foundScenario.adimlar;
         const cacheDir = path.join(process.cwd(), 'cache');
@@ -405,63 +406,70 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), as
 
         return res.status(200).json({ success: true, message: "Test başarıyla koşturuldu ve tamamlandı!" });
     } catch (error) {
-        return sendServerError(res, error, "Test koşturma esnasında bir hata oluştu.", "Scenarios/Run");
+        next(error);
     }
 });
 
 // ─── 8. API: PROJE BAZLI RAPORLARI LİSTELEME ───
-router.get('/reports/list', requireAuth, async (req, res) => {
+router.get('/reports/list', requireAuth, async (req, res, next) => {
     const { project } = req.query;
     const selectedProj = (project || '').trim();
 
     if (!selectedProj) return res.json({ reports: [] });
 
     try {
-        const projectRes = await dpu.selectAll('projeler');
+        // 🚀 DB-LEVEL FILTER
+        const projectRes = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: selectedProj }
+        });
+
         if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
             return res.json({ reports: [] });
         }
-
-        const foundProj = projectRes.data.find(p => p.proje_adi.toLowerCase() === selectedProj.toLowerCase());
-        if (!foundProj) return res.json({ reports: [] });
         
-        const projectId = foundProj.id;
+        const projectId = projectRes.data[0].id;
 
-        const reportsRes = await dpu.selectAll('raporlar');
+        const reportsRes = await dpu.selectWhere('raporlar', {
+            project_id: { eq: projectId }
+        });
+
         if (reportsRes.success && reportsRes.data) {
-            const filteredReports = reportsRes.data
-                .filter(r => String(r.project_id) === String(projectId))
-                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-            return res.json({ success: true, reports: filteredReports });
+            const sortedReports = reportsRes.data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            return res.json({ success: true, reports: sortedReports });
         }
+
         return res.json({ reports: [] });
     } catch (error) {
-        return res.json({ reports: [] });
+        next(error);
     }
 });
 
 // ─── 9. API: SIRALI TOPLU TEST KOŞTURMA (BATCH PIPELINE) ───
-router.post('/run-batch', requireAuth, validate(runBatchSchema), async (req, res) => {
+router.post('/run-batch', requireAuth, validate(runBatchSchema), async (req, res, next) => {
     const { scenarioNames, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 
-    // IDOR Koruması
+    // 🔒 IDOR Koruması
     const hasAccess = await checkProjectOwnership(req.user, selectedProj);
     if (!hasAccess) {
         return res.status(403).json({ error: "Yetkisiz Erişim: Bu projede toplu test başlatma yetkiniz bulunmuyor!" });
     }
 
-    if (!scenarioNames || !Array.isArray(scenarioNames) || scenarioNames.length === 0 || !selectedProj) {
-        return res.status(400).json({ error: "Eksik veya hatalı parametre!" });
-    }
-
     try {
-        const projectRes = await dpu.selectAll('projeler', 1, `proje_adi:eq:${selectedProj}`);
-        if (!projectRes.success || projectRes.data.length === 0) return res.status(404).json({ error: "Proje bulunamadı." });
+        // 🚀 DB-LEVEL FILTER
+        const projectRes = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: selectedProj }
+        });
+
+        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
+            return res.status(404).json({ error: "Proje bulunamadı." });
+        }
         const projectId = projectRes.data[0].id;
 
-        const scenariosRes = await dpu.selectAll('senaryolar', 100, `project_id:eq:${projectId}`);
+        const scenariosRes = await dpu.selectWhere('senaryolar', {
+            project_id: { eq: projectId }
+        });
+
         if (!scenariosRes.success || !scenariosRes.data) return res.status(500).json({ error: "Senaryolar tablosuna erişilemedi." });
 
         const batchScenarios = scenariosRes.data.filter(s => scenarioNames.includes(s.senaryo_adi));
@@ -494,12 +502,12 @@ router.post('/run-batch', requireAuth, validate(runBatchSchema), async (req, res
             }
         })();
     } catch (error) {
-        if (!res.headersSent) return sendServerError(res, error, "Batch test başlatılamadı.", "Scenarios/RunBatch");
+        next(error);
     }
 });
 
 // ─── 10. API: AYARLARI GETİRME ───
-router.get('/settings/get', requireAuth, requireAdmin, async (req, res) => {
+router.get('/settings/get', requireAuth, requireAdmin, async (req, res, next) => {
     try {
         const dbResult = await dpu.selectAll('ayarlar');
         const settings = { testRunnerApi: "openai", translatorApi: "gemini", apiKeys: {} };
@@ -513,7 +521,6 @@ router.get('/settings/get', requireAuth, requireAdmin, async (req, res) => {
 
             dbResult.data.forEach(row => {
                 if (row.ayar_anahtar !== 'test_runner_api' && row.ayar_anahtar !== 'translator_api') {
-                    // 🔓 Şifreli anahtar çözülüyor
                     const rawKey = row.ayar_deger || "";
                     settings.apiKeys[row.ayar_anahtar] = {
                         key: decrypt(rawKey),
@@ -524,12 +531,12 @@ router.get('/settings/get', requireAuth, requireAdmin, async (req, res) => {
         }
         return res.json({ success: true, settings });
     } catch (err) {
-        return sendServerError(res, err, "Ayarlar yüklenemedi.", "Settings/Get");
+        next(err);
     }
 });
 
 // ─── 11. API: AYARLARI KAYDETME ───
-router.post('/settings/save', requireAuth, requireAdmin, async (req, res) => {
+router.post('/settings/save', requireAuth, requireAdmin, async (req, res, next) => {
     const { testRunnerApi, translatorApi, apiKeys } = req.body;
     
     try {
@@ -544,7 +551,6 @@ router.post('/settings/save', requireAuth, requireAdmin, async (req, res) => {
 
         if (apiKeys && typeof apiKeys === 'object') {
             Object.entries(apiKeys).forEach(([provider, details]) => {
-                // 🔒 Veritabanına kaydetmeden önce AES-256 ile şifreliyoruz
                 const encryptedKey = details.key ? encrypt(details.key) : "";
                 targetSettings[provider] = {
                     val: encryptedKey,
@@ -582,12 +588,12 @@ router.post('/settings/save', requireAuth, requireAdmin, async (req, res) => {
 
         return res.json({ success: true, message: "Ayarlar başarıyla veritabanına mühürlendi!" });
     } catch (err) {
-        return sendServerError(res, err, "Ayarlar kaydedilemedi.", "Settings/Save");
+        next(err);
     }
 });
 
 // ─── 12. API: TEKİL TEST RAPORUNU SİLME ───
-router.post('/reports/delete', requireAuth, async (req, res) => {
+router.post('/reports/delete', requireAuth, async (req, res, next) => {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: "Eksik parametre! Rapor ID değeri gelmedi." });
 
@@ -598,14 +604,14 @@ router.post('/reports/delete', requireAuth, async (req, res) => {
         }
         return res.status(500).json({ error: "Silme işlemi veritabanında başarısız oldu.", details: deleteResult });
     } catch (error) {
-        return sendServerError(res, error, "Rapor silinemedi.", "Reports/Delete");
+        next(error);
     }
 });
 
 // ─── KULLANICI YÖNETİMİ ───
 
 // 1. Kullanıcıları Listeleme
-router.get('/users/list', requireAuth, requireAdmin, async (req, res) => {
+router.get('/users/list', requireAuth, requireAdmin, async (req, res, next) => {
     try {
         const usersRes = await dpu.selectAll('kullanicilar');
         const projectsRes = await dpu.selectAll('projeler');
@@ -629,18 +635,21 @@ router.get('/users/list', requireAuth, requireAdmin, async (req, res) => {
         }
         return res.status(500).json({ error: "Kullanıcılar yüklenemedi." });
     } catch (err) {
-        return sendServerError(res, err, "Kullanıcı listesi çekilemedi.", "Users/List");
+        next(err);
     }
 });
 
 // 2. Yeni Kullanıcı Oluşturma
-router.post('/users/create', requireAuth, requireAdmin, validate(createUserSchema), async (req, res) => {
+router.post('/users/create', requireAuth, requireAdmin, validate(createUserSchema), async (req, res, next) => {
     const { username, password, role, selectedProjects } = req.body;
-    if (!username || !password || !role) return res.status(400).json({ error: "Eksik alanlar var!" });
 
     try {
-        const usersCheck = await dpu.selectAll('kullanicilar');
-        if (usersCheck.success && usersCheck.data.some(u => u.kullanici_adi.toLowerCase() === username.toLowerCase())) {
+        // 🚀 DB-LEVEL FILTER
+        const usersCheck = await dpu.selectWhere('kullanicilar', {
+            kullanici_adi: { eq: username.toLowerCase() }
+        });
+
+        if (usersCheck.success && usersCheck.data && usersCheck.data.length > 0) {
             return res.status(400).json({ error: "Bu kullanıcı adı zaten mevcut!" });
         }
 
@@ -664,21 +673,24 @@ router.post('/users/create', requireAuth, requireAdmin, validate(createUserSchem
         }
         return res.status(500).json({ error: "Kullanıcı eklenemedi." });
     } catch (err) {
-        return sendServerError(res, err, "Kullanıcı oluşturulamadı.", "Users/Create");
+        next(err);
     }
 });
 
 // 3. Kullanıcı Silme
-router.post('/users/delete', requireAuth, requireAdmin, async (req, res) => {
+router.post('/users/delete', requireAuth, requireAdmin, async (req, res, next) => {
     const { id, username } = req.body;
+    if (!id || !username) return res.status(400).json({ error: "Eksik parametre!" });
 
     try {
         const deleteUser = await dpu.delete('kullanicilar', id);
         if (deleteUser.success) {
-            const permsRes = await dpu.selectAll('kullanici_projeleri');
+            const permsRes = await dpu.selectWhere('kullanici_projeleri', {
+                kullanici_adi: { eq: username.toLowerCase() }
+            });
+
             if (permsRes.success && permsRes.data) {
-                const userPerms = permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase());
-                for (const perm of userPerms) {
+                for (const perm of permsRes.data) {
                     await dpu.delete('kullanici_projeleri', perm.id);
                 }
             }
@@ -686,24 +698,26 @@ router.post('/users/delete', requireAuth, requireAdmin, async (req, res) => {
         }
         return res.status(500).json({ error: "Kullanıcı silinemedi." });
     } catch (err) {
-        return sendServerError(res, err, "Kullanıcı silinemedi.", "Users/Delete");
+        next(err);
     }
 });
 
-// 4. Kullanıcı Güncelleme (DPU Base PATCH Uyumlu)
-router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchema), async (req, res) => {
+// 4. Kullanıcı Güncelleme
+router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchema), async (req, res, next) => {
     const { id, username, password, role, selectedProjects } = req.body;
-    if (!id || !username) return res.status(400).json({ error: "Eksik parametre!" });
 
     try {
-        // 1. Güncellenecek kullanıcıyı DPU Base'den doğruluyoruz
-        const usersRes = await dpu.selectAll('kullanicilar');
-        if (!usersRes.success || !usersRes.data) return res.status(500).json({ error: "Veritabanı erişim hatası." });
+        // 🚀 DB-LEVEL FILTER
+        const usersRes = await dpu.selectWhere('kullanicilar', {
+            id: { eq: id }
+        });
 
-        const existingUser = usersRes.data.find(u => String(u.id) === String(id));
-        if (!existingUser) return res.status(404).json({ error: "Güncellenecek kullanıcı bulunamadı." });
+        if (!usersRes.success || !usersRes.data || usersRes.data.length === 0) {
+            return res.status(404).json({ error: "Güncellenecek kullanıcı bulunamadı." });
+        }
 
-        // 2. Şifre değişmediyse eski hash'li şifreyi koru, değiştiyse bcrypt ile yeni hash üret
+        const existingUser = usersRes.data[0];
+
         let finalPassword = existingUser.sifre;
         if (password && password.trim() !== '') {
             finalPassword = await bcrypt.hash(password, 10);
@@ -711,25 +725,24 @@ router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchem
 
         const finalRole = role ? role.toUpperCase() : existingUser.rol;
 
-        // 3. DPU Base PATCH isteği için body oluştur
         const updatePayload = {
             kullanici_adi: username,
             sifre: finalPassword,
             rol: finalRole
         };
 
-        // 4. Doğrudan DPU Base PATCH /api/v1/kullanicilar/{id} çağrısı
         const updateRes = await dpu.update('kullanicilar', existingUser.id, updatePayload);
         
         if (!updateRes || !updateRes.success) {
             return res.status(500).json({ error: "Kullanıcı bilgileri güncellenirken veritabanı hatası oluştu.", details: updateRes });
         }
 
-        // 5. Kullanıcıya atanmış proje yetkilerini güncelle
-        const permsRes = await dpu.selectAll('kullanici_projeleri');
+        const permsRes = await dpu.selectWhere('kullanici_projeleri', {
+            kullanici_adi: { eq: username.toLowerCase() }
+        });
+
         if (permsRes.success && permsRes.data) {
-            const oldUserPerms = permsRes.data.filter(p => p.kullanici_adi.toLowerCase() === username.toLowerCase());
-            for (const perm of oldUserPerms) {
+            for (const perm of permsRes.data) {
                 await dpu.delete('kullanici_projeleri', perm.id);
             }
         }
@@ -745,7 +758,7 @@ router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchem
 
         return res.json({ success: true, message: "Kullanıcı bilgileri ve yetkileri başarıyla güncellendi!" });
     } catch (err) {
-        return sendServerError(res, err, "Kullanıcı bilgileri güncellenemedi.", "Users/Update");
+        next(err);
     }
 });
 

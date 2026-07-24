@@ -9,6 +9,7 @@ import jwt from 'jsonwebtoken';
 import { loginLimiter } from './middleware/rateLimit.js';
 import { sendServerError } from './middleware/errorHandler.js';
 import './config/env.js';
+import { globalErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 // Güvenli Secret Katmanı
 if (!process.env.JWT_SECRET) {
@@ -119,6 +120,12 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
         return sendServerError(res, err, "Giriş işlemi esnasında sunucu hatası oluştu.", "Auth/Login");
     }
 });
+
+// 1. Tanımlanmamış rotalara atılan istekleri yakalamak için (404 Handler)
+app.use(notFoundHandler);
+
+// 2. Tüm catch(err) bloklarında next(err) dendiğinde hataları yakalayan merkezi sistem
+app.use(globalErrorHandler);
 
 // Sunucuyu ateşleme noktası
 app.listen(CONSTANTS.PORT, () => {
