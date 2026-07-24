@@ -21,6 +21,7 @@ import {
     createUserSchema,
     updateUserSchema
 } from '../schemas/scenarioSchemas.js';
+import { checkProjectOwnership } from '../utils/projectGuard.js';
 
 const router = express.Router();
 
@@ -198,6 +199,12 @@ router.get('/content', requireAuth, validate(getScenarioContentSchema), async (r
     const { scenarioName, project } = req.query;
     const selectedProj = (project || 'Varsayılan Proje').trim();
 
+    // IDOR Koruması
+    const hasAccess = await checkProjectOwnership(req.user, selectedProj);
+    if (!hasAccess) {
+        return res.status(403).json({ error: "Yetkisiz Erişim: Bu projeye erişim izniniz bulunmuyor!" });
+    }
+
     if (!scenarioName) return res.status(400).json({ error: "Senaryo ismi zorunlu!" });
 
     try {
@@ -290,6 +297,12 @@ router.post('/delete', requireAuth, async (req, res) => {
     const { scenarioName, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 
+    //  IDOR Koruması
+    const hasAccess = await checkProjectOwnership(req.user, selectedProj);
+    if (!hasAccess) {
+        return res.status(403).json({ error: "Yetkisiz Erişim: Bu projeden senaryo silme yetkiniz yok!" });
+    }
+
     if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var!" });
 
     try {
@@ -324,7 +337,7 @@ router.post('/delete', requireAuth, async (req, res) => {
 router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), async (req, res) => {
     const { scenarioName, targetUrl, projectName } = req.body;
 
-    // 🛡️ SSRF / IP Koruması
+    // SSRF / IP Koruması
     if (targetUrl) {
         const urlCheck = isSafeUrl(targetUrl);
         if (!urlCheck.safe) {
@@ -333,6 +346,12 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), as
     }
 
     const selectedProj = (projectName || '').trim();
+
+    // IDOR Koruması
+    const hasAccess = await checkProjectOwnership(req.user, selectedProj);
+    if (!hasAccess) {
+        return res.status(403).json({ error: "Yetkisiz Erişim: Bu projede test koşturma yetkiniz bulunmuyor!" });
+    }
 
     if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var!" });
 
@@ -426,6 +445,12 @@ router.get('/reports/list', requireAuth, async (req, res) => {
 router.post('/run-batch', requireAuth, validate(runBatchSchema), async (req, res) => {
     const { scenarioNames, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
+
+    // IDOR Koruması
+    const hasAccess = await checkProjectOwnership(req.user, selectedProj);
+    if (!hasAccess) {
+        return res.status(403).json({ error: "Yetkisiz Erişim: Bu projede toplu test başlatma yetkiniz bulunmuyor!" });
+    }
 
     if (!scenarioNames || !Array.isArray(scenarioNames) || scenarioNames.length === 0 || !selectedProj) {
         return res.status(400).json({ error: "Eksik veya hatalı parametre!" });
