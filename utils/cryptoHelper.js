@@ -3,9 +3,7 @@ import crypto from 'crypto';
 const ALGORITHM = 'aes-256-gcm';
 // .env dosyasından 32 byte'lık (64 karakter hex) Master Key alıyoruz.
 // Yoksa fallback olarak sistemin çökmemesi için deterministik bir key türetiyoruz.
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY 
-    ? Buffer.from(process.env.ENCRYPTION_KEY, 'hex') 
-    : crypto.scryptSync(process.env.JWT_SECRET || 'dpu-test-tool-default-secret', 'salt', 32);
+const ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
 
 /**
  * Düz metin veriyi (API Key vb.) AES-256-GCM ile şifreler.
@@ -52,6 +50,6 @@ export function decrypt(encryptedText) {
         return decrypted;
     } catch (error) {
         console.error("❌ Şifre çözme (Decryption) hatası:", error.message);
-        return encryptedText; // Çözülemezse orijinalini dön (fallback)
+        return encryptedText; 
     }
 }

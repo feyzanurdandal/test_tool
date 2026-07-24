@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const SECRET_KEY = process.env.JWT_SECRET || 'dpu_secure_production_secret_key_2026_x89f';
+const SECRET_KEY = process.env.JWT_SECRET;
 
 // 1. Kimlik Doğrulama Middleware'i (Login Olunmuş Mu?)
 export function requireAuth(req, res, next) {

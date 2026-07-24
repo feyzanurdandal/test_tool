@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { loginLimiter } from './middleware/rateLimit.js';
 import { sendServerError } from './middleware/errorHandler.js';
+import './config/env.js';
 
 // Güvenli Secret Katmanı
 if (!process.env.JWT_SECRET) {
