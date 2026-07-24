@@ -9,10 +9,9 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
-        /* Görsellerdeki o tatlı ince scrollbar yapısı  */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #09090b; }
-        ::-webkit-scrollbar-thumb { background: #27272a; rounded: 3px; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
     </style>
 </head>
 <body class="bg-[#09090b] text-[#fafafa] min-h-screen flex flex-col antialiased select-none">
@@ -56,7 +55,7 @@
             
             <div class="flex items-center gap-2">
                 <select id="project-dropdown" class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-md px-3 py-1.5 outline-none cursor-pointer focus:border-[#3b82f6] transition font-medium min-w-[160px]">
-                    </select>
+                </select>
                 <button id="add-project-btn" class="w-7 h-7 bg-[#18181b] border border-[rgba(255,255,255,0.08)] rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-[#27272a] transition">
                     <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                 </button>
@@ -86,7 +85,6 @@
                 <button data-target="view-settings" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
                     <i data-lucide="settings" class="w-4 h-4"></i> <span>Ayarlar</span>
                 </button>
-                <!-- index.html aside içerisine eklenecek buton -->
                 <button id="nav-users-btn" data-target="view-users" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b] hidden">
                     <i data-lucide="users" class="w-4 h-4"></i> <span>Kullanıcı Yönetimi</span>
                 </button>
@@ -153,7 +151,7 @@
                     
                     <div id="reports-container" class="space-y-3">
                         <div id="reports-empty" class="text-xs text-zinc-500 font-medium py-12 text-center bg-[#09090b] border border-[rgba(255,255,255,0.08)] rounded-xl">
-                            Bu projeye ait henüz geçmiş bir test raporu bulunmuyor .
+                            Bu projeye ait henüz geçmiş bir test raporu bulunmuyor.
                         </div>
                         
                         <div id="reports-list-accordion" class="space-y-3"></div>
@@ -163,7 +161,7 @@
                 <div id="view-settings" class="view-content space-y-6 hidden animate-fade-in w-full">
                     <div>
                         <h2 class="text-xl font-bold tracking-tight text-white">Sistem Ayarları</h2>
-                        <p class="text-xs text-zinc-500 mt-0.5">Yapay zeka sağlayıcılarını ve bunlara ait anahtar/model ikililerini dinamik yönetin </p>
+                        <p class="text-xs text-zinc-500 mt-0.5">Yapay zeka sağlayıcılarını ve bunlara ait anahtar/model ikililerini dinamik yönetin</p>
                     </div>
 
                     <form id="settings-form" class="space-y-6 w-full bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl">
@@ -175,7 +173,7 @@
                             <div>
                                 <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Aktif Test Sağlayıcısı</label>
                                 <select id="setting-test-runner-api" class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-lg outline-none focus:border-[#3b82f6] transition font-medium cursor-pointer">
-                                    </select>
+                                </select>
                             </div>
                         </div>
 
@@ -186,7 +184,7 @@
                             <div>
                                 <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Aktif Çeviri Sağlayıcısı</label>
                                 <select id="setting-translator-api" class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-lg outline-none focus:border-[#3b82f6] transition font-medium cursor-pointer">
-                                    </select>
+                                </select>
                             </div>
                         </div>
 
@@ -201,7 +199,7 @@
                             </h3>
                             
                             <div id="api-keys-container" class="space-y-3 overflow-y-auto pr-1">
-                                </div>
+                            </div>
                         </div>
 
                         <div class="border-t border-[rgba(255,255,255,0.06)] pt-4 flex justify-end">
@@ -212,7 +210,6 @@
                     </form>
                 </div>
 
-                <!-- index.html main içerisine eklenecek görünüm -->
                 <div id="view-users" class="view-content space-y-6 hidden w-full">
                     <div class="flex items-center justify-between">
                         <div>
@@ -240,13 +237,10 @@
                     </div>
                 </div>
 
-                                <!-- index.html içindeki kullanıcı modalı - app.js ile %100 Uyuşan Sürüm -->
                 <div id="user-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div class="w-full max-w-md bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl">
-                        
                         <form id="user-form" class="space-y-4">
                             <div class="flex items-center justify-between">
-                                <!-- 🚨 BİRİNCİ KRİTİK ID: app.js'in textContent bastığı yer -->
                                 <h3 id="user-modal-title" class="text-sm font-semibold text-white">Kullanıcı İşlemi</h3>
                                 <button type="button" id="close-user-modal" class="text-zinc-500 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
                             </div>
@@ -271,7 +265,6 @@
                                 <div id="user-projects-checkboxes" class="space-y-1.5 max-h-[120px] overflow-y-auto bg-[#27272a]/40 p-3 rounded-lg border border-[rgba(255,255,255,0.04)]"></div>
                             </div>
                             
-                            <!-- 🚨 İKİNCİ KRİTİK ID: app.js'in metnini değiştirdiği kaydetme butonu -->
                             <button type="submit" id="user-modal-submit-btn" class="w-full py-2 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition">
                                 Kaydet
                             </button>
@@ -283,7 +276,6 @@
         </div>
     </div>
 
-    <script src="js/app.js"></script>
     <div id="project-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
         <div class="w-full max-w-sm bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-4">
             <div class="flex items-center justify-between">
@@ -350,5 +342,8 @@
             </form>
         </div>
     </div>
+
+    <!-- Script dosyası DOM yüklendikten sonra çalışacak şekilde sayfa sonuna çekildi -->
+    <script src="js/app.js"></script>
 </body>
 </html>
