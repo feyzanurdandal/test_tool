@@ -246,7 +246,7 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
     }
 
     // 🛡️ SSRF / IP Koruması
-    const urlCheck = isSafeUrl(targetUrl);
+    const urlCheck = await isSafeUrl(targetUrl);
     if (!urlCheck.safe) {
         return res.status(400).json({ error: `Güvenlik Engeli: ${urlCheck.reason}` });
     }
@@ -339,7 +339,7 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), as
 
     // SSRF / IP Koruması
     if (targetUrl) {
-        const urlCheck = isSafeUrl(targetUrl);
+        const urlCheck = await isSafeUrl(targetUrl);
         if (!urlCheck.safe) {
             return res.status(400).json({ error: `Güvenlik Engeli: ${urlCheck.reason}` });
         }
