@@ -50,6 +50,55 @@ class DpuService {
         }
     }
 
+    // 🛠️ Resilience Helper: Fetch isteğine Timeout ve Retry desteği
+    async fetchWithTimeoutAndRetry(url, config, options = { timeoutMs: 8000, retries: 2 }) {
+        let lastError;
+
+        for (let attempt = 0; attempt <= options.retries; attempt++) {
+            // AbortController ile zamanaşımı mekanizması kuruyoruz
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs);
+
+            try {
+                const response = await fetch(url, {
+                    ...config,
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                // Eğer HTTP statüsü 5xx ise ve retry hakkımız varsa yeniden denemek üzere catch'e düşür
+                if (!response.ok && response.status >= 500 && attempt < options.retries) {
+                    throw new Error(`DPU Base Sunucu Hatası (HTTP ${response.status}) - Yeniden deneniyor...`);
+                }
+
+                // 2xx veya 4xx durumunda doğrudan cevabı döndür (4xx hatalarında retry atılmaz)
+                return await response.json();
+
+            } catch (error) {
+                clearTimeout(timeoutId);
+                
+                const isAbortError = error.name === 'AbortError';
+                const errorMessage = isAbortError 
+                    ? `DPU Base isteği zamanaşımına uğradı (${options.timeoutMs}ms)` 
+                    : error.message;
+
+                lastError = new Error(errorMessage);
+
+                if (attempt < options.retries) {
+                    // Exponential Backoff: Her başarısız denemede bekleme süresini katla (1sn, 2sn...)
+                    const backoffDelay = Math.pow(2, attempt) * 1000;
+                    console.warn(`⚠️ [DPU Base Retry] İstek başarısız oldu (${errorMessage}). ${attempt + 1}/${options.retries} deneme ${backoffDelay}ms sonra yapılacak...`);
+                    await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                } else {
+                    console.error(`❌ [DPU Base Critical Failure] ${options.retries} deneme sonrası istek tamamen başarısız oldu:`, errorMessage);
+                }
+            }
+        }
+
+        return { success: false, error: lastError ? lastError.message : "DPU Base servisine ulaşılamadı." };
+    }
+
     // 🛠️ Genel İstek Atma Yardımcısı (Helper)
     async request(endpoint, method = "GET", body = null) {
         const token = await this.getValidToken();
@@ -69,8 +118,8 @@ class DpuService {
             config.body = JSON.stringify(body);
         }
 
-        const response = await fetch(`${this.baseUrl}/api/v1/${endpoint}`, config);
-        return await response.json();
+        // Doğrudan fetch yerine Timeout + Retry mekanizmasını çağırıyoruz
+        return await this.fetchWithTimeoutAndRetry(`${this.baseUrl}/api/v1/${endpoint}`, config);
     }
 
     // 🔍 1. LIST / SEARCH
