@@ -10,6 +10,17 @@ import { isSafeUrl } from '../utils/ipGuard.js';
 import { translateToStagehandJson } from '../utils/translator.js';
 import { sendServerError } from '../middleware/errorHandler.js';
 import { encrypt, decrypt } from '../utils/cryptoHelper.js';
+import { validate } from '../middleware/validate.js';
+import {
+    createProjectSchema,
+    deleteProjectSchema,
+    getScenarioContentSchema,
+    createScenarioSchema,
+    runScenarioSchema,
+    runBatchSchema,
+    createUserSchema,
+    updateUserSchema
+} from '../schemas/scenarioSchemas.js';
 
 const router = express.Router();
 
@@ -73,7 +84,7 @@ router.get('/projects/list', requireAuth, async (req, res) => {
 });
 
 // ─── 2. API: YENİ PROJE OLUŞTURMA (Sadece ADMIN Yetkili) ───
-router.post('/projects/create', requireAuth, requireAdmin, async (req, res) => {
+router.post('/projects/create', requireAuth, requireAdmin, validate(createProjectSchema), async (req, res) => {
     const { projectName } = req.body;
     if (!projectName) return res.status(400).json({ error: "Proje adı boş olamaz!" });
 
@@ -97,7 +108,7 @@ router.post('/projects/create', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // ─── 2.1 API: PROJE SİLME (Sadece ADMIN Yetkili) ───
-router.post('/projects/delete', requireAuth, requireAdmin, async (req, res) => {
+router.post('/projects/delete', requireAuth, requireAdmin,validate(deleteProjectSchema), async (req, res) => {
     const { projectName } = req.body;
     if (!projectName) return res.status(400).json({ error: "Silinecek proje adı boş olamaz!" });
 
@@ -183,7 +194,7 @@ router.get('/list', requireAuth, async (req, res) => {
 });
 
 // ─── 4. API: SENARYO JSON İÇERİĞİNİ OKUMA ───
-router.get('/content', requireAuth, async (req, res) => {
+router.get('/content', requireAuth, validate(getScenarioContentSchema), async (req, res) => {
     const { scenarioName, project } = req.query;
     const selectedProj = (project || 'Varsayılan Proje').trim();
 
@@ -219,7 +230,7 @@ router.get('/content', requireAuth, async (req, res) => {
 });
 
 // ─── 5. API: SENARYO KAYDETME VE AI ÇEVİRİSİ ───
-router.post('/create-and-save', aiCallLimiter, requireAuth, async (req, res) => {
+router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScenarioSchema), async (req, res) => {
     const { scenarioName, turkishInstructions, targetUrl, projectName } = req.body;
     const selectedProj = (projectName || 'Varsayılan Proje').trim();
 
@@ -310,7 +321,7 @@ router.post('/delete', requireAuth, async (req, res) => {
 });
 
 // ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA ───
-router.post('/run', testRunLimiter, requireAuth, async (req, res) => {
+router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), async (req, res) => {
     const { scenarioName, targetUrl, projectName } = req.body;
 
     // 🛡️ SSRF / IP Koruması
@@ -412,7 +423,7 @@ router.get('/reports/list', requireAuth, async (req, res) => {
 });
 
 // ─── 9. API: SIRALI TOPLU TEST KOŞTURMA (BATCH PIPELINE) ───
-router.post('/run-batch', requireAuth, async (req, res) => {
+router.post('/run-batch', requireAuth, validate(runBatchSchema), async (req, res) => {
     const { scenarioNames, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 
@@ -598,7 +609,7 @@ router.get('/users/list', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // 2. Yeni Kullanıcı Oluşturma
-router.post('/users/create', requireAuth, requireAdmin, async (req, res) => {
+router.post('/users/create', requireAuth, requireAdmin, validate(createUserSchema), async (req, res) => {
     const { username, password, role, selectedProjects } = req.body;
     if (!username || !password || !role) return res.status(400).json({ error: "Eksik alanlar var!" });
 
@@ -655,7 +666,7 @@ router.post('/users/delete', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // 4. Kullanıcı Güncelleme (DPU Base PATCH Uyumlu)
-router.post('/users/update', requireAuth, requireAdmin, async (req, res) => {
+router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchema), async (req, res) => {
     const { id, username, password, role, selectedProjects } = req.body;
     if (!id || !username) return res.status(400).json({ error: "Eksik parametre!" });
 
