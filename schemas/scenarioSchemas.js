@@ -53,11 +53,14 @@ export const runBatchSchema = z.object({
   })
 });
 
+// createUserSchema ve updateUserSchema içerisindeki role alanını güncelleyin:
+
 export const createUserSchema = z.object({
   body: z.object({
     username: z.string().trim().min(3, "Kullanıcı adı en az 3 karakter olmalıdır!"),
     password: z.string().min(6, "Şifre en az 6 karakter olmalıdır!"),
-    role: z.enum(["ADMIN", "USER"], { errorMap: () => ({ message: "Geçersiz rol!" }) }),
+    // 🚨 DÜZELTME: PM rolü eklendi
+    role: z.enum(["ADMIN", "PM", "USER"], { errorMap: () => ({ message: "Geçersiz rol seçimi!" }) }),
     selectedProjects: z.array(z.string()).optional().default([])
   })
 });
@@ -67,7 +70,8 @@ export const updateUserSchema = z.object({
     id: z.union([z.string(), z.number()]),
     username: z.string().trim().min(1, "Kullanıcı adı boş olamaz!"),
     password: z.string().optional(),
-    role: z.enum(["ADMIN", "USER"]).optional(),
+    // 🚨 DÜZELTME: PM rolü eklendi
+    role: z.enum(["ADMIN", "PM", "USER"]).optional(),
     selectedProjects: z.array(z.string()).optional()
   })
 });

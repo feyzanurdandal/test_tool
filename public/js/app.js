@@ -1033,7 +1033,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 stepsContainer.innerHTML = `
                     <div class="flex items-center gap-3 bg-[#27272a]/40 p-2.5 rounded-lg border border-[rgba(255,255,255,0.04)]">
                         <span class="step-number text-[10px] font-mono text-zinc-500 w-5 text-center">01.</span>
-                        <input type="text" required placeholder='"Giriş" butonunu bul' class="step-input flex-1 bg-transparent text-xs text-white outline-none">
+                        <input type="text" required placeholder='"Giriş" butonuna tıkla (Çevrilmesini istemediğiniz değerleri "değer" şeklinde yazın)' class="step-input flex-1 bg-transparent text-xs text-white outline-none">
                         <button type="button" class="remove-step-btn text-zinc-600 hover:text-red-400 transition opacity-0 pointer-events-none"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                     </div>
                 `;
@@ -1056,7 +1056,7 @@ document.addEventListener("DOMContentLoaded", () => {
             stepRow.className = "flex items-center gap-3 bg-[#27272a]/40 p-2.5 rounded-lg border border-[rgba(255,255,255,0.04)] animate-slide-in";
             stepRow.innerHTML = `
                 <span class="step-number text-[10px] font-mono text-zinc-500 w-5 text-center">${paddedIndex}</span>
-                <input type="text" required placeholder="Yeni talimatı girin." class="step-input flex-1 bg-transparent text-xs text-white outline-none">
+                <input type="text" required placeholder='Yeni talimatı girin (Örn: "Arama" kutusunu bul).' class="step-input flex-1 bg-transparent text-xs text-white outline-none">
                 <button type="button" class="remove-step-btn text-zinc-500 hover:text-red-400 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
             `;
 
