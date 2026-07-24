@@ -1,5 +1,5 @@
 # Microsoft'un resmi Playwright Linux imajı (Chromium & Node.js hazır gelir)
-FROM mcr.microsoft.com/playwright:v1.49.0-noble
+FROM mcr.microsoft.com/playwright:v1.61.1-noble
 
 WORKDIR /app
 
