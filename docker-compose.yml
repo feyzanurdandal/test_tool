@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # 1. SERVİS: Node.js + Playwright API Sunucusu
   node-backend:
@@ -17,13 +15,14 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - HEADLESS=true
     volumes:
-      - ./cache:/app/cache # Test adımları ve runtime_steps.json için kalıcı hacim
+      - ./cache:/app/cache # Test adımları ve runtime_steps.json için kalıcı bellek
     ports:
       - "3000:3000"
 
-  # 2. SERVİS: Nginx Reverse Proxy (Ön Yüz Kapı Görevlisi & Zırh)
+  # 2. SERVİS: Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
     container_name: test_tool_nginx
