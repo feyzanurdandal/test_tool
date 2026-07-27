@@ -33,6 +33,17 @@ document.addEventListener("DOMContentLoaded", () => {
     let cachedAllProjects = [];
     let globalEditUserId = "";
 
+    // XSS Kaçış
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     // ─── GLOBAL PROJE SİLME FONKSİYONU ───
     window.deleteProject = async function(projectName) {
         if (!projectName || projectName === 'Varsayılan Proje') {
@@ -209,7 +220,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <td class="py-3 px-4 font-mono text-zinc-500">${String(index + 1).padStart(2, '0')}</td>
                         <td class="py-3 px-4 font-medium text-white flex items-center gap-2">
                             <i data-lucide="chevron-right" class="chevron-icon-scen w-4 h-4 text-zinc-500 transition-transform duration-200"></i>
-                            <span>${scenarioName}</span>
+                            <span>${escapeHtml(scenarioName)}</span>
                         </td>
                         <td class="py-3 px-4 target-url-cell text-zinc-400 font-mono text-[11px]">-</td>
                         <td class="py-3 px-4 text-right" onclick="event.stopPropagation();">
@@ -284,7 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                                     <div class="flex items-start gap-3 bg-[#27272a]/20 p-2.5 rounded-lg border border-[rgba(255,255,255,0.02)]">
                                                         <span class="font-mono text-[10px] text-zinc-600 mt-0.5">${String(stepIdx + 1).padStart(2, '0')}.</span>
                                                         <div class="flex-1">
-                                                            <div class="font-medium text-zinc-200 select-text">${step.instruction}</div>
+                                                            <div class="font-medium text-zinc-200 select-text">${escapeHtml(step.instruction)}</div>
                                                             ${step.field ? `<div class="text-[10px] text-zinc-500 mt-1 font-mono">Çıktı Kolonu: ${step.field}</div>` : ''}
                                                         </div>
                                                         <span class="text-[9px] px-1.5 py-0.5 rounded border ${badgeClass} font-mono font-bold uppercase shrink-0">${step.type}</span>
@@ -510,8 +521,8 @@ document.addEventListener("DOMContentLoaded", () => {
                                 </div>
                                 <div class="inner-accordion-content max-h-0 overflow-hidden transition-all duration-200 ease-in-out">
                                     <div class="p-3 bg-black/40 border-t border-[rgba(255,255,255,0.02)]">
-                                        ${step.rawHeader ? `<div class="text-[10px] font-mono text-zinc-500 border-b border-[rgba(255,255,255,0.02)] pb-1.5 mb-1.5">Ham Satır: ${step.rawHeader}</div>` : ''}
-                                        <pre class="text-[10px] font-mono text-zinc-400 overflow-x-auto whitespace-pre-wrap leading-relaxed select-text">${stepBody || 'Bu adıma ait ekstra detay logu bulunmuyor.'}</pre>
+                                        ${step.rawHeader ? `<div class="text-[10px] font-mono text-zinc-500 border-b border-[rgba(255,255,255,0.02)] pb-1.5 mb-1.5">Ham Satır: ${escapeHtml(step.rawHeader)}</div>` : ''}
+                                        <pre class="text-[10px] font-mono text-zinc-400 overflow-x-auto whitespace-pre-wrap leading-relaxed select-text">${escapeHtml(stepBody) || 'Bu adıma ait ekstra detay logu bulunmuyor.'}</pre>
                                     </div>
                                 </div>
                             </div>
@@ -527,7 +538,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     <i data-lucide="${isSuccess ? 'check-circle' : 'alert-triangle'}" class="w-4 h-4"></i>
                                 </div>
                                 <div>
-                                    <h4 class="text-xs font-semibold text-white">${scenarioName}</h4>
+                                    <h4 class="text-xs font-semibold text-white">${escapeHtml(scenarioName)}</h4>
                                     <span class="text-[10px] text-zinc-500">${formattedDate}</span>
                                 </div>
                             </div>
@@ -696,7 +707,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <input type="checkbox" value="${scenarioName}" class="batch-checkbox w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0 cursor-pointer transition">
                         </td>
                         <td class="py-3 px-4 font-mono text-zinc-500 font-semibold batch-order-cell">-</td>
-                        <td class="py-3 px-4 font-medium text-white">${scenarioName}</td>
+                        <td class="py-3 px-4 font-medium text-white">${escapeHtml(scenarioName)}</td>
                     `;
 
                     const checkbox = row.querySelector(".batch-checkbox");
@@ -1407,12 +1418,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     const pBadges = user.rol === 'ADMIN' 
                         ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#3b82f6]/10 text-[#3b82f6] border border-[#3b82f6]/20">TÜMÜ (ADMIN)</span>' 
                         : (user.projeler.length > 0 
-                            ? user.projeler.map(p => `<span class="px-2 py-0.5 mr-1 rounded text-[10px] bg-zinc-500/10 text-zinc-300 border border-zinc-500/20 font-mono">${p}</span>`).join('')
+                            ? user.projeler.map(p => `<span class="px-2 py-0.5 mr-1 rounded text-[10px] bg-zinc-500/10 text-zinc-300 border border-zinc-500/20 font-mono">${escapeHtml(p)}</span>`).join('')
                             : `<span class="text-zinc-500 italic text-[10px]">Atanmış proje yok</span>`);
 
                     row.innerHTML = `
-                        <td class="py-3 px-4 text-white font-medium">${user.kullanici_adi}</td>
-                        <td class="py-3 px-4 text-zinc-400 font-mono">${user.rol}</td>
+                        <td class="py-3 px-4 text-white font-medium">${escapeHtml(user.kullanici_adi)}</td>
+                        <td class="py-3 px-4 text-zinc-400 font-mono">${escapeHtml(user.rol)}</td>
                         <td class="py-3 px-4 text-zinc-400">${pBadges}</td>
                         <td class="py-3 px-4 text-right flex items-center justify-end gap-2 h-12">
                             <button class="edit-user-btn text-zinc-500 hover:text-amber-400 transition p-1 rounded hover:bg-amber-500/10" 

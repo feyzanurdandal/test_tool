@@ -1,5 +1,21 @@
 import { z } from 'zod';
 
+// XSS ve Script Enjeksiyonunu Önleyen Karakter Kontrolü
+const safeTextRule = (val) => !/[<>"'\\]/.test(val);
+const safeTextMessage = 'Özel/zararlı karakterler (< > " \' \\) içeremez.';
+
+export const scenarioNameSchema = z.string({ required_error: "Senaryo adı zorunlu!" })
+  .trim()
+  .min(1, "Senaryo adı boş bırakılamaz!")
+  .max(100, "Senaryo adı çok uzun!")
+  .refine(safeTextRule, { message: `Senaryo adı ${safeTextMessage}` });
+
+export const usernameSchema = z.string({ required_error: "Kullanıcı adı zorunlu!" })
+  .trim()
+  .min(3, "Kullanıcı adı en az 3 karakter olmalıdır!")
+  .max(50, "Kullanıcı adı çok uzun!")
+  .refine(safeTextRule, { message: `Kullanıcı adı ${safeTextMessage}` });
+
 export const createProjectSchema = z.object({
   body: z.object({
     projectName: z.string({ required_error: "Proje adı boş olamaz!" })
@@ -24,14 +40,14 @@ export const listScenariosSchema = z.object({
 
 export const getScenarioContentSchema = z.object({
   query: z.object({
-    scenarioName: z.string().trim().min(1, "Senaryo ismi zorunlu!"),
+    scenarioName: scenarioNameSchema,
     project: z.string().optional().default('Varsayılan Proje')
   })
 });
 
 export const createScenarioSchema = z.object({
   body: z.object({
-    scenarioName: z.string().trim().min(1, "Senaryo adı boş olamaz!"),
+    scenarioName: scenarioNameSchema,
     turkishInstructions: z.union([z.string(), z.array(z.string()), z.object({})]),
     targetUrl: z.string().url("Geçerli bir URL giriniz!"),
     projectName: z.string().optional().default('Varsayılan Proje')
@@ -40,7 +56,7 @@ export const createScenarioSchema = z.object({
 
 export const runScenarioSchema = z.object({
   body: z.object({
-    scenarioName: z.string().trim().min(1, "Senaryo adı zorunlu!"),
+    scenarioName: scenarioNameSchema,
     projectName: z.string().trim().min(1, "Proje adı zorunlu!"),
     targetUrl: z.string().url("Geçersiz URL formatı!").optional()
   })
@@ -48,18 +64,15 @@ export const runScenarioSchema = z.object({
 
 export const runBatchSchema = z.object({
   body: z.object({
-    scenarioNames: z.array(z.string()).min(1, "Kuyruk için en az bir senaryo gereklidir!"),
+    scenarioNames: z.array(scenarioNameSchema).min(1, "Kuyruk için en az bir senaryo gereklidir!"),
     projectName: z.string().trim().min(1, "Proje adı zorunlu!")
   })
 });
 
-// createUserSchema ve updateUserSchema içerisindeki role alanını güncelleyin:
-
 export const createUserSchema = z.object({
   body: z.object({
-    username: z.string().trim().min(3, "Kullanıcı adı en az 3 karakter olmalıdır!"),
+    username: usernameSchema,
     password: z.string().min(6, "Şifre en az 6 karakter olmalıdır!"),
-    // 🚨 DÜZELTME: PM rolü eklendi
     role: z.enum(["ADMIN", "PM", "USER"], { errorMap: () => ({ message: "Geçersiz rol seçimi!" }) }),
     selectedProjects: z.array(z.string()).optional().default([])
   })
@@ -68,9 +81,8 @@ export const createUserSchema = z.object({
 export const updateUserSchema = z.object({
   body: z.object({
     id: z.union([z.string(), z.number()]),
-    username: z.string().trim().min(1, "Kullanıcı adı boş olamaz!"),
+    username: usernameSchema,
     password: z.string().optional(),
-    // 🚨 DÜZELTME: PM rolü eklendi
     role: z.enum(["ADMIN", "PM", "USER"]).optional(),
     selectedProjects: z.array(z.string()).optional()
   })

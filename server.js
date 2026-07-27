@@ -1,5 +1,6 @@
 // server.js
 import express from 'express';
+import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CONSTANTS } from './config/constants.js'; 
@@ -22,6 +23,20 @@ const SECRET_KEY = process.env.JWT_SECRET;
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Helmet & CSP Middleware (XSS ve Güvenlik Başlıkları)
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://unpkg.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'"],
+        },
+    },
+}));
 
 // ─── MIDDLEWARES ───
 app.use(express.json());
