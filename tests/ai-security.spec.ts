@@ -6,7 +6,9 @@ import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { CONSTANTS } from '../config/constants.js'; 
+import { CONSTANTS } from '../config/constants.js';
+// @ts-ignore
+import { decrypt } from '../utils/cryptoHelper.js'; 
 
 
 // @ts-ignore
@@ -52,7 +54,14 @@ test('Yapay Zeka Test Otomasyonu', async () => {
                 const providerRow = settingsRows.find((r: any) => r.ayar_anahtar === chosenApi);
 
                 if (providerRow) {
+                try {
+                    // Veritabanından gelen enc:iv:tag formatındaki key'i çözüyoruz
+                    apiKeyValue = decrypt(providerRow.ayar_deger);
+                } catch (e) {
+                    const error = e as Error;
+                    console.error("API Key çözülemedi, ham değer deneniyor:", error.message);
                     apiKeyValue = providerRow.ayar_deger;
+                }
                     activeModel = providerRow.ayar_model;
                 }
             }
