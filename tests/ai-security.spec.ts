@@ -9,8 +9,6 @@ import { fileURLToPath } from 'url';
 import { CONSTANTS } from '../config/constants.js';
 // @ts-ignore
 import { decrypt } from '../utils/cryptoHelper.js'; 
-
-
 // @ts-ignore
 import dpu from '../config/dpuService.js';
 
@@ -19,7 +17,6 @@ test('Yapay Zeka Test Otomasyonu', async () => {
     const __dirname = path.dirname(__filename);
     
     const scenarioName = process.env.SCENARIO_NAME || 'ai-prompts';
-    // const promptFilePath = path.join(process.cwd(), 'cache', 'runtime_steps.json');
     const stepsFilePath = process.env.RUNTIME_STEPS_PATH || path.join(process.cwd(), 'cache', 'runtime_steps.json');
 
     if (!fs.existsSync(stepsFilePath)) {
@@ -28,7 +25,7 @@ test('Yapay Zeka Test Otomasyonu', async () => {
 
     const promptData = JSON.parse(fs.readFileSync(stepsFilePath, 'utf-8'));
 
-    // ─── ⚙️ DİNAMİK AYARLARI OKUMA SİHRİ (DPU Base Jilet Gibi JS Filtreleme Sürümü! 🔒) ───
+    // DİNAMİK AYARLARI OKUMA
     let activeModel = 'openai/gpt-4o-mini';
     let chosenApi = 'openai';
     let apiKeyValue = CONSTANTS.OPENAI_API_KEY;
@@ -38,7 +35,7 @@ test('Yapay Zeka Test Otomasyonu', async () => {
         console.log("🔄 [Test Runner] Aktif test çalıştırıcı sağlayıcı DPU Base'den sorgulanıyor...");
         
         const dpuClient = dpu as any;
-        const dbResult = await dpuClient.select('ayarlar', 100); // Filtre göndermeden çekerek API tıkanıklığını aşıyoruz !
+        const dbResult = await dpuClient.select('ayarlar', 100); 
 
         if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
             const settingsRows = dbResult.data;
@@ -66,7 +63,6 @@ test('Yapay Zeka Test Otomasyonu', async () => {
                 }
             }
 
-            // 🎯 EVRENSEL SAĞLAYICI ÖNEKİ (PREFIX) STANDARTLAŞTIRMASI
             if (chosenApi.toLowerCase().includes("openai")) {
                 if (!activeModel.startsWith("openai/")) {
                     activeModel = `openai/${activeModel}`;
@@ -87,14 +83,14 @@ test('Yapay Zeka Test Otomasyonu', async () => {
         console.warn("⚠️ DPU Base ayar tablosu sorgulanamadı, local CONSTANTS kullanılacak. Hata:", err.message);
     }
 
-    // 🎯 Çevre değişkenlerini kütüphanelerin okuyabileceği şekilde mühürlüyoruz
+    // Çevre değişkenlerini kütüphanelerin okuyabileceği şekilde ayarlıyoruz
     if (chosenApi.toLowerCase().includes("gemini")) {
         process.env.GEMINI_API_KEY = apiKeyValue;
     } else {
         process.env.OPENAI_API_KEY = apiKeyValue || "local-no-key";
     }
 
-    // 🔒 YEREL LLM GÜVENLİK YAPILANDIRMASI: Alt ajanların OpenAI sunucularına kaçmasını engelleyen köprü!
+    // YEREL LLM GÜVENLİK YAPILANDIRMASI
     const localConfig = customBaseUrl ? {
         baseURL: customBaseUrl,
         defaultHeaders: {
@@ -105,7 +101,7 @@ test('Yapay Zeka Test Otomasyonu', async () => {
     console.log(`⚙️ [Test Runner] Stagehand Başlatılıyor. Sağlayıcı: ${chosenApi} | Model: ${activeModel}`);
 
 
-    // 🛡️ DOCKER / LINUX SESSİZ MOD (HEADLESS) AYARI
+    // DOCKER / LINUX SESSİZ MOD (HEADLESS) AYARI
     const isDockerEnv = process.env.DOCKER_ENV === 'true';
 
     const stagehand = new Stagehand({
@@ -113,7 +109,7 @@ test('Yapay Zeka Test Otomasyonu', async () => {
         model: activeModel as any,
         cacheDir: path.resolve(__dirname, '../cache/ai-security'),
         domSettleTimeout: 10000,
-        // 🚨 KRİTİK DÜZELTME: Docker içindeyken headless: true, localdeyken false olsun!
+        // Docker içindeyken headless: true, localdeyken false olsun
         localBrowserLaunchOptions: { 
             headless: isDockerEnv ? true : false,
             args: isDockerEnv ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'] : []
@@ -156,8 +152,6 @@ test('Yapay Zeka Test Otomasyonu', async () => {
                 }
             } catch (e: any) {
                 console.warn(`⚠️ Yapay zeka ana akışta adımı gerçekleştiremedi: ${e.message}`);
-                
-                // 🌟 DİNAMİK FALLBACK: OpenAI sunucularına gitmeyi tamamen engelleyip yerel köprüyü buraya da kuruyoruz!
                 console.log(`⏳ Adım, aktif yerel LLM ajanına paslanıyor... (Model: ${activeModel})`);
                 try {
                     const agent = stagehand.agent({
@@ -170,7 +164,7 @@ test('Yapay Zeka Test Otomasyonu', async () => {
                     await agent.execute({ instruction: step.instruction, page: pwPage });
                 } catch (agentErr: any) {
                     console.error(`❌ Yedek ajan da adımı tamamlayamadı: ${agentErr.message}`);
-                    throw agentErr; // Hata durumunda testi patlatıyoruz ki raporlarımıza "FAILED" olarak mühürlensin!
+                    throw agentErr; // Hata durumunda testi patlatıyoruz
                 }
             }
         }

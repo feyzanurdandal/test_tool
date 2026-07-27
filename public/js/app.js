@@ -350,7 +350,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 });
 
-                // B. TEKİL TESTİ KOŞTUR BUTONLARI
+                // B. TEKİL TESTİ ÇALIŞTIR BUTONLARI
                 document.querySelectorAll(".run-single-btn").forEach(btn => {
                     btn.addEventListener("click", async (e) => {
                         e.stopPropagation();
@@ -405,7 +405,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // 📊 Raporları Çeken Fonksiyon
+    // Raporları Çeken Fonksiyon
     async function loadReports() {
         const reportsEmpty = document.getElementById("reports-empty");
         const accordionContainer = document.getElementById("reports-list-accordion");
@@ -807,7 +807,7 @@ document.addEventListener("DOMContentLoaded", () => {
         loadBatchScenarios();
     }
 
-    // 📂 Projeleri Yükleme
+    // Projeleri Yükleme
     async function loadProjects() {
         if (!projectDropdown) return;
 
@@ -1080,7 +1080,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 🎯 SENARYO KAYDETME FORMU
+    // SENARYO KAYDETME FORMU
     if (scenarioForm) {
         scenarioForm.addEventListener("submit", async (e) => {
             e.preventDefault();

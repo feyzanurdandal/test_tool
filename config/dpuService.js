@@ -5,14 +5,14 @@ class DpuService {
         this.baseUrl = process.env.DPU_BASE_URL;
         this.projectCode = process.env.DPU_PROJECT_CODE;
         this.apiKey = process.env.DPU_API_KEY;
-        this.email = process.env.DPU_USER_EMAIL; // Admin yerine User Email 
-        this.password = process.env.DPU_USER_PASSWORD; // Admin yerine User Password 
+        this.email = process.env.DPU_USER_EMAIL; 
+        this.password = process.env.DPU_USER_PASSWORD;  
 
         this.token = null;
         this.tokenExpiresAt = null;
     }
 
-    // 🔑 JWT Token Alma ve Yenileme Mekanizması
+    // JWT Token Alma ve Yenileme Mekanizması
     async getValidToken() {
         const now = new Date();
         
@@ -50,7 +50,7 @@ class DpuService {
         }
     }
 
-    // 🛠️ Resilience Helper: Fetch isteğine Timeout ve Retry desteği
+    // Fetch isteğine Timeout ve Retry desteği
     async fetchWithTimeoutAndRetry(url, config, options = { timeoutMs: 8000, retries: 2 }) {
         let lastError;
 
@@ -86,7 +86,7 @@ class DpuService {
                 lastError = new Error(errorMessage);
 
                 if (attempt < options.retries) {
-                    // Exponential Backoff: Her başarısız denemede bekleme süresini katla (1sn, 2sn...)
+                    // Her başarısız denemede bekleme süresini katla (1sn, 2sn...)
                     const backoffDelay = Math.pow(2, attempt) * 1000;
                     console.warn(`⚠️ [DPU Base Retry] İstek başarısız oldu (${errorMessage}). ${attempt + 1}/${options.retries} deneme ${backoffDelay}ms sonra yapılacak...`);
                     await new Promise(resolve => setTimeout(resolve, backoffDelay));
@@ -99,7 +99,7 @@ class DpuService {
         return { success: false, error: lastError ? lastError.message : "DPU Base servisine ulaşılamadı." };
     }
 
-    // 🛠️ Genel İstek Atma Yardımcısı (Helper)
+    // Genel İstek Atma
     async request(endpoint, method = "GET", body = null) {
         const token = await this.getValidToken();
         const headers = {
@@ -122,7 +122,7 @@ class DpuService {
         return await this.fetchWithTimeoutAndRetry(`${this.baseUrl}/api/v1/${endpoint}`, config);
     }
 
-    // 🔍 1. LIST / SEARCH
+    // 1. LIST / SEARCH
     async select(tableName, limit = 100, where = "") {
         let url = `${tableName}?limit=${limit}`;
         if (where) {
@@ -131,7 +131,7 @@ class DpuService {
         return await this.request(url, "GET");
     }
 
-    // 🔍 1.1 SELECT ALL (Tüm sayfaları otomatik gezerek tam veriyi getirir)
+    // 1.1 SELECT ALL (Tüm sayfaları otomatik gezerek tam veriyi getirir)
     async selectAll(tableName, pageSize = 100, where = "") {
         try {
             let allRecords = [];
@@ -168,24 +168,22 @@ class DpuService {
         }
     }
 
-    // 💾 2. CREATE
+    // 2. CREATE
     async insert(tableName, data) {
         return await this.request(tableName, "POST", data);
     }
 
-    // 🔄 3. UPDATE (request helper'ı kullanılarak güvenli hale getirildi)
+    // 3. UPDATE 
     async update(tableName, id, data) {
         return await this.request(`${tableName}/${id}`, "PATCH", data);
     }
 
-    // 🗑️ 4. DELETE
+    // 4. DELETE
     async delete(tableName, id) {
         return await this.request(`${tableName}/${id}`, "DELETE");
     }
 
-    // config/dpuService.js
-
-/**
+    /**
      * DPU Base veritabanından filtreli (WHERE) veri çeker.
      * Otomatik JWT Token yenileme ve Retry mekanizmasını (request metodu vasıtasıyla) kullanır.
      * @param {string} tableName - Tablo adı (ör: 'kullanicilar')
@@ -201,7 +199,6 @@ class DpuService {
                 });
             });
 
-            // ❌ /api/v1/ ÖNEKİ KALDIRILDI! (this.request zaten ekliyor)
             const endpoint = `${tableName}?${queryParams.toString()}`;
 
             // İstek sonucunu değişkene alıp logluyoruz

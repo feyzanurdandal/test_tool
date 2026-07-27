@@ -24,7 +24,7 @@ import { checkProjectOwnership } from '../utils/projectGuard.js';
 
 const router = express.Router();
 
-// Yardımcı Fonksiyon: Playwright testini dinamik dosya yoluyla çalıştırma 🎭
+// Playwright testini dinamik dosya yoluyla çalıştırma 
 const runPlaywrightTest = (stepsFilePath) => {
     return new Promise((resolve) => {
         console.log(`🔥 Playwright motoru asenkron olarak tetikleniyor... (Dosya: ${stepsFilePath})`);
@@ -32,7 +32,6 @@ const runPlaywrightTest = (stepsFilePath) => {
         const env = { ...process.env, RUNTIME_STEPS_PATH: stepsFilePath };
 
         exec('npx playwright test tests/ai-security.spec.ts', { env }, (error, stdout, stderr) => {
-            // 🔍 Playwright çıktısını ve hatasını terminale basalım
             if (error) {
                 console.error("❌ Playwright Test Hatası (stdout):", stdout);
                 console.error("❌ Playwright Test Hatası (stderr):", stderr);
@@ -68,7 +67,7 @@ router.get('/projects/list', requireAuth, async (req, res, next) => {
         let projectNames = result.data.map(p => p.proje_adi);
 
         if (userRole !== 'ADMIN' && username) {
-            // 🚀 DB-LEVEL FILTER: Tüm tablo yerine sadece kullanıcıya ait izinler çekiliyor
+            // kullanıcıya ait izinler çekiliyor
             const permissionsRes = await dpu.selectWhere('kullanici_projeleri', {
                 kullanici_adi: { eq: username.toLowerCase() }
             });
@@ -123,7 +122,7 @@ router.post('/projects/delete', requireAuth, requireAdmin, validate(deleteProjec
     const { projectName } = req.body;
 
     try {
-        // 🚀 DB-LEVEL FILTER
+        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: projectName.trim() }
         });
@@ -163,7 +162,7 @@ router.get('/list', requireAuth, async (req, res, next) => {
     if (!selectedProj) return res.json({ scenarios: [] });
 
     try {
-        // 🚀 DB-LEVEL FILTER
+        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -194,14 +193,14 @@ router.get('/content', requireAuth, validate(getScenarioContentSchema), async (r
     const { scenarioName, project } = req.query;
     const selectedProj = (project || 'Varsayılan Proje').trim();
 
-    // 🔒 IDOR Koruması
+    // IDOR Koruması
     const hasAccess = await checkProjectOwnership(req.user, selectedProj);
     if (!hasAccess) {
         return res.status(403).json({ error: "Yetkisiz Erişim: Bu projeye erişim izniniz bulunmuyor!" });
     }
 
     try {
-        // 🚀 DB-LEVEL FILTER
+        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -237,14 +236,14 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
     const { scenarioName, turkishInstructions, targetUrl, projectName } = req.body;
     const selectedProj = (projectName || 'Varsayılan Proje').trim();
 
-    // 🛡️ SSRF / IP Koruması
+    // SSRF / IP Koruması
     const urlCheck = await isSafeUrl(targetUrl);
     if (!urlCheck.safe) {
         return res.status(400).json({ error: `Güvenlik Engeli: ${urlCheck.reason}` });
     }
 
     try {
-        // 🚀 DB-LEVEL FILTER
+        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -263,7 +262,7 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
             return res.status(400).json({ error: "Bu proje altında bu senaryo adı zaten mevcut!" });
         }
 
-        // 🤖 Modüler AI Çeviricisi
+        // Modüler AI Çeviricisi
         const stagehandJson = await translateToStagehandJson(turkishInstructions, targetUrl);
         if (!stagehandJson) return res.status(500).json({ error: "Senaryo çevirisi esnasında yapay zeka hata döndürdü." });
 
@@ -301,7 +300,7 @@ router.post('/delete', requireAuth, async (req, res, next) => {
     if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var!" });
 
     try {
-        // 🚀 DB-LEVEL FILTER
+        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -336,7 +335,7 @@ router.post('/delete', requireAuth, async (req, res, next) => {
 router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), async (req, res, next) => {
     const { scenarioName, targetUrl, projectName } = req.body;
 
-    // 🛡️ SSRF / IP Koruması
+    // SSRF / IP Koruması
     if (targetUrl) {
         const urlCheck = await isSafeUrl(targetUrl);
         if (!urlCheck.safe) {
@@ -346,14 +345,14 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), as
 
     const selectedProj = (projectName || '').trim();
 
-    // 🔒 IDOR Koruması
+    // IDOR Koruması
     const hasAccess = await checkProjectOwnership(req.user, selectedProj);
     if (!hasAccess) {
         return res.status(403).json({ error: "Yetkisiz Erişim: Bu projede test koşturma yetkiniz bulunmuyor!" });
     }
 
     try {
-        // 🚀 DB-LEVEL FILTER
+        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -418,7 +417,7 @@ router.get('/reports/list', requireAuth, async (req, res, next) => {
     if (!selectedProj) return res.json({ reports: [] });
 
     try {
-        // 🚀 DB-LEVEL FILTER
+        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -449,14 +448,14 @@ router.post('/run-batch', requireAuth, validate(runBatchSchema), async (req, res
     const { scenarioNames, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 
-    // 🔒 IDOR Koruması
+    // IDOR Koruması
     const hasAccess = await checkProjectOwnership(req.user, selectedProj);
     if (!hasAccess) {
         return res.status(403).json({ error: "Yetkisiz Erişim: Bu projede toplu test başlatma yetkiniz bulunmuyor!" });
     }
 
     try {
-        // 🚀 DB-LEVEL FILTER
+        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -644,7 +643,7 @@ router.post('/users/create', requireAuth, requireAdmin, validate(createUserSchem
     const { username, password, role, selectedProjects } = req.body;
 
     try {
-        // 🚀 DB-LEVEL FILTER
+        // DB-LEVEL FILTER
         const usersCheck = await dpu.selectWhere('kullanicilar', {
             kullanici_adi: { eq: username.toLowerCase() }
         });
@@ -707,7 +706,7 @@ router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchem
     const { id, username, password, role, selectedProjects } = req.body;
 
     try {
-        // 🚀 DB-LEVEL FILTER
+        // DB-LEVEL FILTER
         const usersRes = await dpu.selectWhere('kullanicilar', {
             id: { eq: id }
         });

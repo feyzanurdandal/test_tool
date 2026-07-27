@@ -41,7 +41,7 @@ app.get(/^(?!\/api).*$/, (req, res) => {
     res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
 });
 
-// 🏥 HEALTH-CHECK ENDPOINT'İ (Sistem ve Veritabanı Sağlık Kontrolü)
+// HEALTH-CHECK ENDPOINT'İ (Sistem ve Veritabanı Sağlık Kontrolü)
 app.get('/api/health', async (req, res) => {
     const healthStatus = {
         status: 'UP',
@@ -129,5 +129,5 @@ app.use(globalErrorHandler);
 
 // Sunucuyu ateşleme noktası
 app.listen(CONSTANTS.PORT, () => {
-    console.log(`🚀 Sunucu http://localhost:${CONSTANTS.PORT} üzerinde aktif`);
+    console.log(`Sunucu http://localhost:${CONSTANTS.PORT} üzerinde aktif`);
 });

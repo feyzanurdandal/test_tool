@@ -15,11 +15,9 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
     let chosenModel = "gemini-3.1-flash-lite";
     let apiKey = process.env.GEMINI_API_KEY;
 
-// 2. Ayarları DPU Base'den Çekme (Dinamik ve Kilitlenmesiz İthalat! 🔓)
+// 2. Ayarları DPU Base'den Çekme
     try {
         console.log("🔄 [Translator Gateway] Ayarlar DPU Base'den sorgulanıyor...");
-        
-        // 🌟 KİLİT ÇÖZÜM: circular dependency pürüzünü aşmak için dpuService'i tam ihtiyaç anında dinamik yüklüyoruz!
         const dpuModule = await import('../config/dpuService.js');
         const dpuClient = dpuModule.default || dpuModule;
 
@@ -27,8 +25,6 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
 
         if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
             const settingsRows = dbResult.data;
-
-            // Çeviri sağlayıcısını bellekte eşleştirerek buluyoruz
             const activeTranslatorRow = settingsRows.find(r => r.ayar_anahtar === 'translator_api');
             
             if (activeTranslatorRow) {
@@ -39,7 +35,6 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
                 const providerRow = settingsRows.find(r => r.ayar_anahtar === chosenApi);
 
                 if (providerRow) {
-                    // 🔓 Veritabanından gelen şifreli API Key'i AES-256 ile çözüyoruz
                     apiKey = decrypt(providerRow.ayar_deger);     
                     chosenModel = providerRow.ayar_model || chosenModel; 
                 }
@@ -93,7 +88,7 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
 
         switch (chosenApi.toLowerCase()) {
 
-            // ─── 1. SEÇENEK: CLOUD OPENAI (CHATGPT) ───
+            // ─── 1. SEÇENEK: OPENAI (CHATGPT) ───
             case "openai":
             case "openai_api_key": {
                 if (!apiKey) throw new Error("Ayarlar panelinde OpenAI için geçerli bir API Key bulunamadı!");
@@ -112,7 +107,7 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
                 break;
             }
 
-            // ─── 2. SEÇENEK: GOOGLE GEMINI (VARSAYILAN) ───
+            // ─── 2. SEÇENEK: GOOGLE GEMINI ───
             case "gemini":
             case "gemini_api_key":
             default: {

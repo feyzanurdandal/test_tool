@@ -15,7 +15,6 @@ COPY . .
 RUN mkdir -p cache
 
 # Docker ortam değişkenini aktifleştir
-# 🚨 SİHİRLİ SATIR: Stagehand'in Chrome bulma hatasını çözen ortam değişkenleri
 
 ENV DOCKER_ENV=true
 ENV PORT=3000

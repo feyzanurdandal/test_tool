@@ -15,7 +15,6 @@ export const validate = (schema) => async (req, res, next) => {
         next();
     } catch (error) {
         if (error instanceof z.ZodError) {
-            // 🚨 DÜZELTME: issues dizisini güvenli biçimde yakalıyoruz
             const issueList = error.issues || error.errors || [];
             return res.status(400).json({
                 error: "Girdi doğrulama hatası!",
