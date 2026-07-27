@@ -34,6 +34,7 @@ app.use(helmet({
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "blob:"],
             connectSrc: ["'self'"],
+            connectSrc: ["'self'", "https://unpkg.com"],
         },
     },
 }));
@@ -86,6 +87,8 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
+const DUMMY_HASH = "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUUWXYZ123456";
+
 // ─── DİNAMİK DPU BASE GİRİŞ SİSTEMİ ───
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
@@ -95,39 +98,32 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     }
 
     try {
-        const dbResult = await dpu.selectAll('kullanicilar');
-        if (!dbResult || !dbResult.success || !dbResult.data) {
-            return res.status(500).json({ error: "Veritabanı bağlantı hatası!" });
-        }
+        const dbResult = await dpu.selectWhere('kullanicilar', { kullanici_adi: username.trim() });
+        
+        // DPU Service tüm listeyi dönse bile aranan kullanıcıyı JS tarafında büyük/küçük harfe duyarsız tam eşleştiriyoruz
+        const user = (dbResult?.success && dbResult?.data)
+            ? dbResult.data.find(u => u.kullanici_adi && u.kullanici_adi.toLowerCase() === username.trim().toLowerCase())
+            : null;
 
-        // Kullanıcıyı kullanıcı adından buluyoruz
-        const user = dbResult.data.find(u => 
-            u.kullanici_adi && u.kullanici_adi.toLowerCase() === username.toLowerCase()
-        );
+        // Zamanlama Saldırısı Koruması (Timing Attack Prevention)
+        const hashToCompare = user ? user.sifre : DUMMY_HASH;
+        const isMatch = await bcrypt.compare(password, hashToCompare);
 
-        if (user) {
-            // BCRYPT KONTROLÜ
-            const isMatch = await bcrypt.compare(password, user.sifre);
+        if (user && isMatch) {
+            const role = (user.rol || 'USER').toUpperCase();
+            
+            const token = jwt.sign(
+                { username: user.kullanici_adi, role: role }, 
+                SECRET_KEY, 
+                { expiresIn: '8h' }
+            );
 
-            if (isMatch) {
-                const role = (user.rol || 'USER').toUpperCase();
-                
-                const token = jwt.sign(
-                    { 
-                        username: user.kullanici_adi, 
-                        role: role 
-                    }, 
-                    SECRET_KEY, 
-                    { expiresIn: '8h' }
-                );
-
-                return res.json({ 
-                    success: true, 
-                    token, 
-                    role, 
-                    username: user.kullanici_adi 
-                });
-            }
+            return res.json({ 
+                success: true, 
+                token, 
+                role, 
+                username: user.kullanici_adi 
+            });
         }
 
         return res.status(401).json({ error: "Kullanıcı adı veya şifre hatalı!" });
