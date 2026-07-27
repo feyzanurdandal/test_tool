@@ -185,8 +185,9 @@ class DpuService {
 
     // config/dpuService.js
 
-    /**
+/**
      * DPU Base veritabanından filtreli (WHERE) veri çeker.
+     * Otomatik JWT Token yenileme ve Retry mekanizmasını (request metodu vasıtasıyla) kullanır.
      * @param {string} tableName - Tablo adı (ör: 'kullanicilar')
      * @param {Object} filters - Filtre objesi (ör: { kullanici_adi: { eq: 'admin' } })
      */
@@ -194,29 +195,21 @@ class DpuService {
         try {
             const queryParams = new URLSearchParams();
 
-            // Object'i DPU Base'in where[field][op]=val formatına dönüştürüyoruz
             Object.entries(filters).forEach(([field, ops]) => {
                 Object.entries(ops).forEach(([op, val]) => {
                     queryParams.append(`where[${field}][${op}]`, val);
                 });
             });
 
-            const url = `${this.baseUrl}/api/v1/${tableName}?${queryParams.toString()}`;
+            // ❌ /api/v1/ ÖNEKİ KALDIRILDI! (this.request zaten ekliyor)
+            const endpoint = `${tableName}?${queryParams.toString()}`;
 
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'X-API-Key': this.apiKey,
-                    'X-Project-Code': this.projectCode,
-                    'Content-Type': 'application/json'
-                }
-            });
+            // İstek sonucunu değişkene alıp logluyoruz
+            const res = await this.request(endpoint, 'GET');
 
-            const result = await response.json();
-            return result;
+            return res;
         } catch (error) {
-            console.error(`DPU Base WHERE Sorgu Hatası (${tableName}):`, error);
+            console.error(`DPU Base WHERE sorgu hatası (${tableName}):`, error);
             return { success: false, error: error.message };
         }
     }
