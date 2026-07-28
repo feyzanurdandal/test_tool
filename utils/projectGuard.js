@@ -1,30 +1,45 @@
 import dpu from '../config/dpuService.js';
-
 /**
- * Kullanıcının belirtilen projeye erişim yetkisi olup olmadığını denetler.
- * ADMIN rolü her zaman tam yetkilidir.
- * 
- * @param {Object} user - req.user nesnesi ({ username, role })
- * @param {string} projectName - İşlem yapılmak istenen proje adı
- * @returns {Promise<boolean>}
+ * Kullanıcının erişmeye çalıştığı projeye yetkisi olup olmadığını kontrol eden merkezi middleware.
+ * Request body, query veya params içinden 'projectName' veya 'proje' parametresini otomatik yakalar.
  */
-export async function checkProjectOwnership(user, projectName) {
-    if (!user || !projectName) return false;
-    
-    // ADMIN tüm projelere erişebilir
-    if (user.role === 'ADMIN') return true;
-
+export const requireProjectAccess = async (req, res, next) => {
     try {
-        const permissionsRes = await dpu.selectAll('kullanici_projeleri');
-        if (!permissionsRes.success || !permissionsRes.data) return false;
+        // ADMIN her projeye erişebilir
+        if (req.user && req.user.role === 'ADMIN') {
+            return next();
+        }
 
-        const allowedProjects = permissionsRes.data
-            .filter(p => p.kullanici_adi.toLowerCase() === user.username.toLowerCase())
-            .map(p => p.proje_adi.toLowerCase());
+        // Proje adını gelen istekten esnekçe çekiyoruz
+        const projectName = req.body?.projectName || req.body?.proje || req.query?.projectName || req.query?.proje;
 
-        return allowedProjects.includes(projectName.trim().toLowerCase());
-    } catch (error) {
-        console.error("Yetki kontrolü esnasında hata oluştu:", error);
-        return false;
+        if (!projectName) {
+            return res.status(400).json({ success: false, error: "Proje adı belirtilmelidir!" });
+        }
+
+        // Kullanıcı veritabanından sorgulanır
+        const userResult = await dpu.selectWhere('kullanicilar', { kullanici_adi: req.user.username });
+        
+        if (!userResult.success || !userResult.data || userResult.data.length === 0) {
+            return res.status(401).json({ success: false, error: "Oturum açan kullanıcı veritabanında bulunamadı!" });
+        }
+
+        const user = userResult.data[0];
+        const assignedProjects = user.projeler || [];
+
+        // Kullanıcının atandığı projeler arasında bu proje var mı?
+        const hasAccess = assignedProjects.includes(projectName);
+
+        if (!hasAccess) {
+            return res.status(403).json({ 
+                success: false, 
+                error: `Erişim Engellendi: '${projectName}' projesine erişim yetkiniz bulunmuyor!` 
+            });
+        }
+
+        next();
+    } catch (err) {
+        console.error("🚨 [ProjectGuard Middleware Error]:", err.message);
+        return res.status(500).json({ success: false, error: "Yetki kontrolü sırasında sunucu hatası oluştu." });
     }
-}
+};

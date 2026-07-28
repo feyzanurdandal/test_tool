@@ -10,6 +10,7 @@ import { isSafeUrl } from '../utils/ipGuard.js';
 import { translateToStagehandJson } from '../utils/translator.js';
 import { encrypt, decrypt } from '../utils/cryptoHelper.js';
 import { validate } from '../middleware/validate.js';
+import { requireProjectAccess } from '../utils/projectGuard.js';
 import {
     createProjectSchema,
     deleteProjectSchema,
@@ -20,21 +21,25 @@ import {
     createUserSchema,
     updateUserSchema
 } from '../schemas/scenarioSchemas.js';
-import { checkProjectOwnership } from '../utils/projectGuard.js';
 
 const router = express.Router();
 
-// Playwright testini dinamik dosya yoluyla çalıştırma 
-const runPlaywrightTest = (stepsFilePath) => {
+// Playwright testini Dinamik Dosya Yolu ve TIMEOUT Mekanizmasıyla Çalıştırma (Max 2 Dakika)
+const runPlaywrightTest = (stepsFilePath, timeoutMs = 120000) => {
     return new Promise((resolve) => {
         console.log(`🔥 Playwright motoru asenkron olarak tetikleniyor... (Dosya: ${stepsFilePath})`);
         
         const env = { ...process.env, RUNTIME_STEPS_PATH: stepsFilePath };
 
-        exec('npx playwright test tests/ai-security.spec.ts', { env }, (error, stdout, stderr) => {
+        // ⏱️ Process Timeout Eklendi (Asılı kalan process'leri öldürür)
+        const childProcess = exec('npx playwright test tests/ai-security.spec.ts', { env, timeout: timeoutMs }, (error, stdout, stderr) => {
             if (error) {
-                console.error("❌ Playwright Test Hatası (stdout):", stdout);
-                console.error("❌ Playwright Test Hatası (stderr):", stderr);
+                if (error.killed) {
+                    console.error(`❌ Playwright Testi Zaman Aşımına Uğradı (${timeoutMs / 1000}sn) ve Öldürüldü!`);
+                } else {
+                    console.error("❌ Playwright Test Hatası (stdout):", stdout);
+                    console.error("❌ Playwright Test Hatası (stderr):", stderr);
+                }
             } else {
                 console.log("✅ Playwright Testi Başarıyla Tamamlandı.");
             }
@@ -47,7 +52,7 @@ const runPlaywrightTest = (stepsFilePath) => {
 
             resolve({
                 isSuccess: !error,
-                logContent: stdout + (stderr ? `\n--- Hatalar ---\n${stderr}` : '')
+                logContent: stdout + (stderr ? `\n--- Hatalar ---\n${stderr}` : '') + (error?.killed ? '\n[HATA]: Test zaman aşımına uğradı.' : '')
             });
         });
     });
@@ -67,7 +72,6 @@ router.get('/projects/list', requireAuth, async (req, res, next) => {
         let projectNames = result.data.map(p => p.proje_adi);
 
         if (userRole !== 'ADMIN' && username) {
-            // kullanıcıya ait izinler çekiliyor
             const permissionsRes = await dpu.selectWhere('kullanici_projeleri', {
                 kullanici_adi: { eq: username.toLowerCase() }
             });
@@ -122,7 +126,6 @@ router.post('/projects/delete', requireAuth, requireAdmin, validate(deleteProjec
     const { projectName } = req.body;
 
     try {
-        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: projectName.trim() }
         });
@@ -155,14 +158,13 @@ router.post('/projects/delete', requireAuth, requireAdmin, validate(deleteProjec
 });
 
 // ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME ───
-router.get('/list', requireAuth, async (req, res, next) => {
-    const { project } = req.query;
+router.get('/list', requireAuth, requireProjectAccess, async (req, res, next) => {
+    const project = req.query.project || req.query.projectName;
     const selectedProj = (project || '').trim();
 
     if (!selectedProj) return res.json({ scenarios: [] });
 
     try {
-        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -189,18 +191,11 @@ router.get('/list', requireAuth, async (req, res, next) => {
 });
 
 // ─── 4. API: SENARYO JSON İÇERİĞİNİ OKUMA ───
-router.get('/content', requireAuth, validate(getScenarioContentSchema), async (req, res, next) => {
-    const { scenarioName, project } = req.query;
-    const selectedProj = (project || 'Varsayılan Proje').trim();
-
-    // IDOR Koruması
-    const hasAccess = await checkProjectOwnership(req.user, selectedProj);
-    if (!hasAccess) {
-        return res.status(403).json({ error: "Yetkisiz Erişim: Bu projeye erişim izniniz bulunmuyor!" });
-    }
+router.get('/content', requireAuth, validate(getScenarioContentSchema), requireProjectAccess, async (req, res, next) => {
+    const scenarioName = req.query.scenarioName;
+    const selectedProj = (req.query.project || req.query.projectName || 'Varsayılan Proje').trim();
 
     try {
-        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -232,7 +227,7 @@ router.get('/content', requireAuth, validate(getScenarioContentSchema), async (r
 });
 
 // ─── 5. API: SENARYO KAYDETME VE AI ÇEVİRİSİ ───
-router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScenarioSchema), async (req, res, next) => {
+router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScenarioSchema), requireProjectAccess, async (req, res, next) => {
     const { scenarioName, turkishInstructions, targetUrl, projectName } = req.body;
     const selectedProj = (projectName || 'Varsayılan Proje').trim();
 
@@ -243,7 +238,6 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
     }
 
     try {
-        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -262,7 +256,6 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
             return res.status(400).json({ error: "Bu proje altında bu senaryo adı zaten mevcut!" });
         }
 
-        // Modüler AI Çeviricisi
         const stagehandJson = await translateToStagehandJson(turkishInstructions, targetUrl);
         if (!stagehandJson) return res.status(500).json({ error: "Senaryo çevirisi esnasında yapay zeka hata döndürdü." });
 
@@ -287,20 +280,13 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
 });
 
 // ─── 6. API: SENARYO SİLME ───
-router.post('/delete', requireAuth, async (req, res, next) => {
+router.post('/delete', requireAuth, requireProjectAccess, async (req, res, next) => {
     const { scenarioName, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
-
-    // 🔒 IDOR Koruması
-    const hasAccess = await checkProjectOwnership(req.user, selectedProj);
-    if (!hasAccess) {
-        return res.status(403).json({ error: "Yetkisiz Erişim: Bu projeden senaryo silme yetkiniz yok!" });
-    }
 
     if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var!" });
 
     try {
-        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -332,10 +318,10 @@ router.post('/delete', requireAuth, async (req, res, next) => {
 });
 
 // ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA ───
-router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), async (req, res, next) => {
+
+router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), requireProjectAccess, async (req, res, next) => {
     const { scenarioName, targetUrl, projectName } = req.body;
 
-    // SSRF / IP Koruması
     if (targetUrl) {
         const urlCheck = await isSafeUrl(targetUrl);
         if (!urlCheck.safe) {
@@ -345,14 +331,7 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), as
 
     const selectedProj = (projectName || '').trim();
 
-    // IDOR Koruması
-    const hasAccess = await checkProjectOwnership(req.user, selectedProj);
-    if (!hasAccess) {
-        return res.status(403).json({ error: "Yetkisiz Erişim: Bu projede test koşturma yetkiniz bulunmuyor!" });
-    }
-
     try {
-        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -410,14 +389,13 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), as
 });
 
 // ─── 8. API: PROJE BAZLI RAPORLARI LİSTELEME ───
-router.get('/reports/list', requireAuth, async (req, res, next) => {
-    const { project } = req.query;
+router.get('/reports/list', requireAuth, requireProjectAccess, async (req, res, next) => {
+    const project = req.query.project || req.query.projectName;
     const selectedProj = (project || '').trim();
 
     if (!selectedProj) return res.json({ reports: [] });
 
     try {
-        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -444,18 +422,12 @@ router.get('/reports/list', requireAuth, async (req, res, next) => {
 });
 
 // ─── 9. API: SIRALI TOPLU TEST KOŞTURMA (BATCH PIPELINE) ───
-router.post('/run-batch', requireAuth, validate(runBatchSchema), async (req, res, next) => {
+
+router.post('/run-batch', requireAuth, validate(runBatchSchema), requireProjectAccess, async (req, res, next) => {
     const { scenarioNames, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 
-    // IDOR Koruması
-    const hasAccess = await checkProjectOwnership(req.user, selectedProj);
-    if (!hasAccess) {
-        return res.status(403).json({ error: "Yetkisiz Erişim: Bu projede toplu test başlatma yetkiniz bulunmuyor!" });
-    }
-
     try {
-        // DB-LEVEL FILTER
         const projectRes = await dpu.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
@@ -592,11 +564,34 @@ router.post('/settings/save', requireAuth, requireAdmin, async (req, res, next) 
 });
 
 // ─── 12. API: TEKİL TEST RAPORUNU SİLME ───
+
 router.post('/reports/delete', requireAuth, async (req, res, next) => {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: "Eksik parametre! Rapor ID değeri gelmedi." });
 
     try {
+        const reportRes = await dpu.selectWhere('raporlar', { id: { eq: id } });
+        if (!reportRes.success || !reportRes.data || reportRes.data.length === 0) {
+            return res.status(404).json({ error: "Silinecek rapor bulunamadı." });
+        }
+
+        const report = reportRes.data[0];
+        const projectRes = await dpu.selectWhere('projeler', { id: { eq: report.project_id } });
+
+        if (projectRes.success && projectRes.data && projectRes.data.length > 0) {
+            const projectName = projectRes.data[0].proje_adi;
+            
+            // Proje sahipliği kontrolü
+            if (req.user.role !== 'ADMIN') {
+                const permsRes = await dpu.selectWhere('kullanici_projeleri', { kullanici_adi: { eq: req.user.username.toLowerCase() } });
+                const allowed = permsRes.success && permsRes.data ? permsRes.data.some(p => p.proje_adi.toLowerCase() === projectName.toLowerCase()) : false;
+                
+                if (!allowed) {
+                    return res.status(403).json({ error: "Erişim Engellendi: Bu rapora ait projeyi silme yetkiniz yok!" });
+                }
+            }
+        }
+
         const deleteResult = await dpu.delete('raporlar', id);
         if (deleteResult.success) {
             return res.status(200).json({ success: true, message: "Test raporu başarıyla silindi!" });
@@ -643,7 +638,6 @@ router.post('/users/create', requireAuth, requireAdmin, validate(createUserSchem
     const { username, password, role, selectedProjects } = req.body;
 
     try {
-        // DB-LEVEL FILTER
         const usersCheck = await dpu.selectWhere('kullanicilar', {
             kullanici_adi: { eq: username.toLowerCase() }
         });
@@ -706,7 +700,6 @@ router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchem
     const { id, username, password, role, selectedProjects } = req.body;
 
     try {
-        // DB-LEVEL FILTER
         const usersRes = await dpu.selectWhere('kullanicilar', {
             id: { eq: id }
         });

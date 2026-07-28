@@ -11,6 +11,7 @@ import { loginLimiter } from './middleware/rateLimit.js';
 import { sendServerError } from './middleware/errorHandler.js';
 import './config/env.js';
 import { globalErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { requireProjectAccess } from './utils/projectGuard.js';
 
 // Güvenli Secret Katmanı
 if (!process.env.JWT_SECRET) {
@@ -33,7 +34,6 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "blob:"],
-            connectSrc: ["'self'"],
             connectSrc: ["'self'", "https://unpkg.com"],
         },
     },
