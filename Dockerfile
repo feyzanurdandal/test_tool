@@ -12,14 +12,14 @@ RUN npm install
 COPY . .
 
 # Cache klasörünün varlığından emin ol
-RUN mkdir -p /app/cache && chown -R node:node /app
+RUN mkdir -p /app/cache && chown -R pwuser:pwuser /app
 
 # Docker ortam değişkenini aktifleştir
 
 ENV DOCKER_ENV=true
 ENV PORT=3000
 
-USER node
+USER pwuser
 
 EXPOSE 3000
 
