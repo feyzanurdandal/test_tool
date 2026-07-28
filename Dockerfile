@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
 
 # Cache klasörünün varlığından emin ol
-RUN mkdir -p cache
+RUN mkdir -p /app/cache && chown -R node:node /app
 
 # Docker ortam değişkenini aktifleştir
 
