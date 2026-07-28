@@ -19,6 +19,8 @@ RUN mkdir -p cache
 ENV DOCKER_ENV=true
 ENV PORT=3000
 
+USER node
+
 EXPOSE 3000
 
 # Express sunucumuzu başlatıyoruz

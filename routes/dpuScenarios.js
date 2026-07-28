@@ -66,7 +66,10 @@ router.get('/projects/list', requireAuth, async (req, res, next) => {
     try {
         const result = await dpu.selectAll('projeler');
         if (!result.success) {
-            return res.status(500).json({ error: "DPU Base listeleme hatası", details: result });
+            return res.status(500).json({ 
+                error: "DPU Base listeleme hatası", 
+                ...(process.env.NODE_ENV === 'production' ? {} : { details: result }) 
+            });
         }
 
         let projectNames = result.data.map(p => p.proje_adi);
@@ -115,11 +118,14 @@ router.post('/projects/create', requireAuth, requireAdmin, validate(createProjec
         if (result.success) {
             return res.json({ success: true, projectName: sanitizedProjName });
         }
-        return res.status(500).json({ error: "DPU Base proje kayıt hatası", details: result });
-    } catch (error) {
-        next(error);
-    }
-});
+        return res.status(500).json({ 
+            error: "DPU Base proje kayıt hatası", 
+            ...(process.env.NODE_ENV === 'production' ? {} : { details: result }) 
+        });
+            } catch (error) {
+                next(error);
+            }
+        });
 
 // ─── 2.1 API: PROJE SİLME (Sadece ADMIN Yetkili) ───
 router.post('/projects/delete', requireAuth, requireAdmin, validate(deleteProjectSchema), async (req, res, next) => {
@@ -596,11 +602,14 @@ router.post('/reports/delete', requireAuth, async (req, res, next) => {
         if (deleteResult.success) {
             return res.status(200).json({ success: true, message: "Test raporu başarıyla silindi!" });
         }
-        return res.status(500).json({ error: "Silme işlemi veritabanında başarısız oldu.", details: deleteResult });
-    } catch (error) {
-        next(error);
-    }
-});
+            return res.status(500).json({ 
+            error: "Silme işlemi veritabanında başarısız oldu.", 
+            ...(process.env.NODE_ENV === 'production' ? {} : { details: deleteResult }) 
+        });
+            } catch (error) {
+                next(error);
+            }
+        });
 
 // ─── KULLANICI YÖNETİMİ ───
 
@@ -726,7 +735,10 @@ router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchem
         const updateRes = await dpu.update('kullanicilar', existingUser.id, updatePayload);
         
         if (!updateRes || !updateRes.success) {
-            return res.status(500).json({ error: "Kullanıcı bilgileri güncellenirken veritabanı hatası oluştu.", details: updateRes });
+            return res.status(500).json({ 
+                error: "Kullanıcı bilgileri güncellenirken veritabanı hatası oluştu.", 
+                ...(process.env.NODE_ENV === 'production' ? {} : { details: updateRes }) 
+            });
         }
 
         const permsRes = await dpu.selectWhere('kullanici_projeleri', {
