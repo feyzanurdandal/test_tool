@@ -38,16 +38,21 @@ cp .env.example .env
 PORT=3000
 
 # ─── DPU BASE BAĞLANTI AYARLARI ───
-DPU_BASE_URL=[https://dpubase.dpu.edu.tr](https://dpubase.dpu.edu.tr)
+DPU_BASE_URL=https://dpubase.dpu.edu.tr
 DPU_PROJECT_CODE=test_otomasyonu
 DPU_USER_EMAIL=user+test_otomasyonu@base.dpu.edu.tr
 
-# Kendi DPU Base API key ve şifrenizi girin
+# Aşağıdaki alanlara kendi gizli anahtar/şifrelerinizi girin
 DPU_API_KEY=your_dpu_api_key_here
 DPU_USER_PASSWORD=your_dpu_user_password_here
 
 # ─── BACKEND GÜVENLİK ───
 JWT_SECRET=your_jwt_secret_key_here
+# AES-256-GCM Şifreleme Anahtarı (Tam 32 Karakter / Hex olmalı)
+#encryption key için terminalde 
+#        node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 
+#yazıyoruz çıkan değeri buraya koyuyoruz
+ENCRYPTION_KEY=encryption_key
 ```
 
 ## Projeyi Çalıştırma Yöntemleri
