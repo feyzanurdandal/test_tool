@@ -1,12 +1,15 @@
 
  //1. Tekil Controller/Route Hataları İçin Yardımcı Fonksiyon
 
-export const sendServerError = (res, error, customMessage = "Sunucu hatası oluştu.", context = "") => {
-    console.error(`❌ [${context || 'SERVER_ERROR'}]`, error);
+export const sendServerError = (res, err, customMessage = "Sunucu Hatası", context = "General") => {
+    console.error(`🚨 [${context} Error]:`, err);
+    
+    const isProduction = process.env.NODE_ENV === 'production';
+
     return res.status(500).json({
         success: false,
         error: customMessage,
-        details: error?.message || error
+        ...(isProduction ? {} : { details: err.message })
     });
 };
 

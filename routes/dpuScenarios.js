@@ -423,7 +423,7 @@ router.get('/reports/list', requireAuth, requireProjectAccess, async (req, res, 
 
 // ─── 9. API: SIRALI TOPLU TEST KOŞTURMA (BATCH PIPELINE) ───
 
-router.post('/run-batch', requireAuth, validate(runBatchSchema), requireProjectAccess, async (req, res, next) => {
+router.post('/run-batch', testRunLimiter, requireAuth, validate(runBatchSchema), requireProjectAccess, async (req, res, next) => {
     const { scenarioNames, projectName } = req.body;
     const selectedProj = (projectName || '').trim();
 

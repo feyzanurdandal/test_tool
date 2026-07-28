@@ -18,7 +18,7 @@ export const requireProjectAccess = async (req, res, next) => {
         }
 
         // Kullanıcı veritabanından sorgulanır
-        const userResult = await dpu.selectWhere('kullanicilar', { kullanici_adi: req.user.username });
+        const userResult = await dpu.selectWhere('kullanicilar', { kullanici_adi: { eq: req.user.username } });
         
         if (!userResult.success || !userResult.data || userResult.data.length === 0) {
             return res.status(401).json({ success: false, error: "Oturum açan kullanıcı veritabanında bulunamadı!" });
