@@ -2,7 +2,7 @@ import express from 'express';
 import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import dpu from '../config/dpuService.js';
+import db from '../config/dbService.js';
 import bcrypt from 'bcryptjs';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { aiCallLimiter, testRunLimiter } from '../middleware/rateLimit.js';
@@ -64,7 +64,7 @@ router.get('/projects/list', requireAuth, async (req, res, next) => {
     const username = req.user.username;
 
     try {
-        const result = await dpu.selectAll('projeler');
+        const result = await db.selectAll('projeler');
         if (!result.success) {
             return res.status(500).json({ 
                 error: "DPU Base listeleme hatası", 
@@ -75,7 +75,7 @@ router.get('/projects/list', requireAuth, async (req, res, next) => {
         let projectNames = result.data.map(p => p.proje_adi);
 
         if (userRole !== 'ADMIN' && username) {
-            const permissionsRes = await dpu.selectWhere('kullanici_projeleri', {
+            const permissionsRes = await db.selectWhere('kullanici_projeleri', {
                 kullanici_adi: { eq: username.toLowerCase() }
             });
 
@@ -88,7 +88,7 @@ router.get('/projects/list', requireAuth, async (req, res, next) => {
         }
         
         if (projectNames.length === 0 && userRole === 'ADMIN') {
-            await dpu.insert('projeler', { proje_adi: 'Varsayılan Proje' });
+            await db.insert('projeler', { proje_adi: 'Varsayılan Proje' });
             return res.json({ success: true, projects: ['Varsayılan Proje'] });
         }
         
@@ -102,37 +102,42 @@ router.get('/projects/list', requireAuth, async (req, res, next) => {
 router.post('/projects/create', requireAuth, requireAdmin, validate(createProjectSchema), async (req, res, next) => {
     const { projectName } = req.body;
 
-    const sanitizedProjName = projectName.replace(/[^a-zA-Z0-9\s_-]/g, '').trim();
-    if (!sanitizedProjName) return res.status(400).json({ error: "Geçersiz proje adı!" });
+    if (!projectName || !projectName.trim()) {
+        return res.status(400).json({ success: false, error: "Geçersiz proje adı!" });
+    }
+
+    const sanitizedProjName = projectName.trim();
 
     try {
-        const checkExist = await dpu.selectWhere('projeler', {
+        const checkExist = await db.selectWhere('projeler', {
             proje_adi: { eq: sanitizedProjName }
         });
 
         if (checkExist.success && checkExist.data && checkExist.data.length > 0) {
-            return res.status(400).json({ error: "Bu isimde bir proje zaten mevcut!" });
+            return res.status(400).json({ success: false, error: "Bu isimde bir proje zaten mevcut!" });
         }
 
-        const result = await dpu.insert('projeler', { proje_adi: sanitizedProjName });
+        const result = await db.insert('projeler', { proje_adi: sanitizedProjName });
+        
         if (result.success) {
             return res.json({ success: true, projectName: sanitizedProjName });
         }
+        
         return res.status(500).json({ 
-            error: "DPU Base proje kayıt hatası", 
-            ...(process.env.NODE_ENV === 'production' ? {} : { details: result }) 
+            success: false,
+            error: "Proje kayıt hatası: " + (result.error || "Bilinmeyen veritabanı hatası")
         });
-            } catch (error) {
-                next(error);
-            }
-        });
+    } catch (error) {
+        next(error);
+    }
+});
 
 // ─── 2.1 API: PROJE SİLME (Sadece ADMIN Yetkili) ───
 router.post('/projects/delete', requireAuth, requireAdmin, validate(deleteProjectSchema), async (req, res, next) => {
     const { projectName } = req.body;
 
     try {
-        const projectRes = await dpu.selectWhere('projeler', {
+        const projectRes = await db.selectWhere('projeler', {
             proje_adi: { eq: projectName.trim() }
         });
 
@@ -142,18 +147,18 @@ router.post('/projects/delete', requireAuth, requireAdmin, validate(deleteProjec
 
         const foundProj = projectRes.data[0];
 
-        const deleteRes = await dpu.delete('projeler', foundProj.id);
+        const deleteRes = await db.delete('projeler', foundProj.id);
         if (!deleteRes.success) {
             return res.status(500).json({ error: "Proje silinirken veritabanı hatası oluştu." });
         }
 
-        const permsRes = await dpu.selectWhere('kullanici_projeleri', {
+        const permsRes = await db.selectWhere('kullanici_projeleri', {
             proje_adi: { eq: projectName.trim() }
         });
 
         if (permsRes.success && permsRes.data) {
             for (const perm of permsRes.data) {
-                await dpu.delete('kullanici_projeleri', perm.id);
+                await db.delete('kullanici_projeleri', perm.id);
             }
         }
 
@@ -171,23 +176,26 @@ router.get('/list', requireAuth, requireProjectAccess, async (req, res, next) =>
     if (!selectedProj) return res.json({ scenarios: [] });
 
     try {
-        const projectRes = await dpu.selectWhere('projeler', {
-            proje_adi: { eq: selectedProj }
-        });
-
-        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
+        // 1. Projeyi büyük/küçük harf esnekliğiyle bul
+        const allProjectsRes = await db.selectAll('projeler');
+        if (!allProjectsRes.success || !allProjectsRes.data) {
             return res.json({ scenarios: [] });
         }
 
-        const projectId = projectRes.data[0].id;
+        const foundProj = allProjectsRes.data.find(p => p.proje_adi.trim().toLowerCase() === selectedProj.toLowerCase());
 
-        const scenariosRes = await dpu.selectWhere('senaryolar', {
-            project_id: { eq: projectId }
+        if (!foundProj) {
+            return res.json({ scenarios: [] });
+        }
+
+        // 2. Senaryoları ilgili project_id ile getir
+        const scenariosRes = await db.selectWhere('senaryolar', {
+            project_id: { eq: foundProj.id }
         });
         
         if (scenariosRes.success && scenariosRes.data) {
             const filteredScenarios = scenariosRes.data.map(s => s.senaryo_adi);
-            return res.json({ scenarios: filteredScenarios });
+            return res.json({ success: true, scenarios: filteredScenarios });
         }
         
         return res.json({ scenarios: [] });
@@ -202,7 +210,7 @@ router.get('/content', requireAuth, validate(getScenarioContentSchema), requireP
     const selectedProj = (req.query.project || req.query.projectName || 'Varsayılan Proje').trim();
 
     try {
-        const projectRes = await dpu.selectWhere('projeler', {
+        const projectRes = await db.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
 
@@ -212,7 +220,7 @@ router.get('/content', requireAuth, validate(getScenarioContentSchema), requireP
 
         const projectId = projectRes.data[0].id;
 
-        const scenarioRes = await dpu.selectWhere('senaryolar', {
+        const scenarioRes = await db.selectWhere('senaryolar', {
             project_id: { eq: projectId },
             senaryo_adi: { eq: scenarioName }
         });
@@ -244,7 +252,7 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
     }
 
     try {
-        const projectRes = await dpu.selectWhere('projeler', {
+        const projectRes = await db.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
 
@@ -253,7 +261,7 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
         }
         const projectId = projectRes.data[0].id;
 
-        const checkScenario = await dpu.selectWhere('senaryolar', {
+        const checkScenario = await db.selectWhere('senaryolar', {
             project_id: { eq: projectId },
             senaryo_adi: { eq: scenarioName }
         });
@@ -275,7 +283,7 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
             updated_at: nowIso
         };
 
-        const result = await dpu.insert('senaryolar', insertData);
+        const result = await db.insert('senaryolar', insertData);
         if (result.success) {
             return res.status(200).json({ success: true, status: "SUCCESS", message: "Senaryo başarıyla buluta kaydedildi." });
         }
@@ -293,7 +301,7 @@ router.post('/delete', requireAuth, requireProjectAccess, async (req, res, next)
     if (!scenarioName || !selectedProj) return res.status(400).json({ error: "Eksik parametre var!" });
 
     try {
-        const projectRes = await dpu.selectWhere('projeler', {
+        const projectRes = await db.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
 
@@ -302,7 +310,7 @@ router.post('/delete', requireAuth, requireProjectAccess, async (req, res, next)
         }
         const projectId = projectRes.data[0].id;
 
-        const scenarioRes = await dpu.selectWhere('senaryolar', {
+        const scenarioRes = await db.selectWhere('senaryolar', {
             project_id: { eq: projectId },
             senaryo_adi: { eq: scenarioName }
         });
@@ -313,7 +321,7 @@ router.post('/delete', requireAuth, requireProjectAccess, async (req, res, next)
 
         const foundScenario = scenarioRes.data[0];
 
-        const deleteResult = await dpu.delete('senaryolar', foundScenario.id);
+        const deleteResult = await db.delete('senaryolar', foundScenario.id);
         if (deleteResult.success) {
             return res.status(200).json({ success: true, message: "Senaryo başarıyla silindi!" });
         }
@@ -338,7 +346,7 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), re
     const selectedProj = (projectName || '').trim();
 
     try {
-        const projectRes = await dpu.selectWhere('projeler', {
+        const projectRes = await db.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
 
@@ -347,7 +355,7 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), re
         }
         const projectId = projectRes.data[0].id;
 
-        const scenariosRes = await dpu.selectWhere('senaryolar', {
+        const scenariosRes = await db.selectWhere('senaryolar', {
             project_id: { eq: projectId },
             senaryo_adi: { eq: scenarioName }
         });
@@ -379,7 +387,7 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), re
         };
 
         try {
-            await dpu.insert('raporlar', reportData);
+            await db.insert('raporlar', reportData);
         } catch (dbErr) {
             console.error("⚠️ Rapor veritabanına yazılırken hata oluştu:", dbErr.message);
         }
@@ -402,18 +410,19 @@ router.get('/reports/list', requireAuth, requireProjectAccess, async (req, res, 
     if (!selectedProj) return res.json({ reports: [] });
 
     try {
-        const projectRes = await dpu.selectWhere('projeler', {
-            proje_adi: { eq: selectedProj }
-        });
-
-        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
+        const allProjectsRes = await db.selectAll('projeler');
+        if (!allProjectsRes.success || !allProjectsRes.data) {
             return res.json({ reports: [] });
         }
-        
-        const projectId = projectRes.data[0].id;
 
-        const reportsRes = await dpu.selectWhere('raporlar', {
-            project_id: { eq: projectId }
+        const foundProj = allProjectsRes.data.find(p => p.proje_adi.trim().toLowerCase() === selectedProj.toLowerCase());
+
+        if (!foundProj) {
+            return res.json({ reports: [] });
+        }
+
+        const reportsRes = await db.selectWhere('raporlar', {
+            project_id: { eq: foundProj.id }
         });
 
         if (reportsRes.success && reportsRes.data) {
@@ -434,7 +443,7 @@ router.post('/run-batch', testRunLimiter, requireAuth, validate(runBatchSchema),
     const selectedProj = (projectName || '').trim();
 
     try {
-        const projectRes = await dpu.selectWhere('projeler', {
+        const projectRes = await db.selectWhere('projeler', {
             proje_adi: { eq: selectedProj }
         });
 
@@ -443,7 +452,7 @@ router.post('/run-batch', testRunLimiter, requireAuth, validate(runBatchSchema),
         }
         const projectId = projectRes.data[0].id;
 
-        const scenariosRes = await dpu.selectWhere('senaryolar', {
+        const scenariosRes = await db.selectWhere('senaryolar', {
             project_id: { eq: projectId }
         });
 
@@ -475,7 +484,7 @@ router.post('/run-batch', testRunLimiter, requireAuth, validate(runBatchSchema),
                     created_at: new Date().toISOString()
                 };
 
-                await dpu.insert('raporlar', reportData);
+                await db.insert('raporlar', reportData);
             }
         })();
     } catch (error) {
@@ -486,7 +495,7 @@ router.post('/run-batch', testRunLimiter, requireAuth, validate(runBatchSchema),
 // ─── 10. API: AYARLARI GETİRME ───
 router.get('/settings/get', requireAuth, requireAdmin, async (req, res, next) => {
     try {
-        const dbResult = await dpu.selectAll('ayarlar');
+        const dbResult = await db.selectAll('ayarlar');
         const settings = { testRunnerApi: "openai", translatorApi: "gemini", apiKeys: {} };
 
         if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
@@ -518,7 +527,7 @@ router.post('/settings/save', requireAuth, requireAdmin, async (req, res, next) 
     
     try {
         const nowIso = new Date().toISOString();
-        const currentDb = await dpu.selectAll('ayarlar');
+        const currentDb = await db.selectAll('ayarlar');
         const existingRows = currentDb.success && currentDb.data ? currentDb.data : [];
 
         const targetSettings = {
@@ -547,18 +556,18 @@ router.post('/settings/save', requireAuth, requireAdmin, async (req, res, next) 
 
             if (matchedRow) {
                 if (matchedRow.ayar_deger !== details.val || matchedRow.ayar_model !== details.model) {
-                    await dpu.delete('ayarlar', matchedRow.id);
-                    await dpu.insert('ayarlar', { ...insertData, created_at: matchedRow.created_at || nowIso });
+                    await db.delete('ayarlar', matchedRow.id);
+                    await db.insert('ayarlar', { ...insertData, created_at: matchedRow.created_at || nowIso });
                 }
             } else {
-                await dpu.insert('ayarlar', { ...insertData, created_at: nowIso });
+                await db.insert('ayarlar', { ...insertData, created_at: nowIso });
             }
         }
 
         for (const row of existingRows) {
             if (row.ayar_anahtar !== 'test_runner_api' && row.ayar_anahtar !== 'translator_api') {
                 if (!(row.ayar_anahtar in targetSettings)) {
-                    await dpu.delete('ayarlar', row.id);
+                    await db.delete('ayarlar', row.id);
                 }
             }
         }
@@ -576,20 +585,20 @@ router.post('/reports/delete', requireAuth, async (req, res, next) => {
     if (!id) return res.status(400).json({ error: "Eksik parametre! Rapor ID değeri gelmedi." });
 
     try {
-        const reportRes = await dpu.selectWhere('raporlar', { id: { eq: id } });
+        const reportRes = await db.selectWhere('raporlar', { id: { eq: id } });
         if (!reportRes.success || !reportRes.data || reportRes.data.length === 0) {
             return res.status(404).json({ error: "Silinecek rapor bulunamadı." });
         }
 
         const report = reportRes.data[0];
-        const projectRes = await dpu.selectWhere('projeler', { id: { eq: report.project_id } });
+        const projectRes = await db.selectWhere('projeler', { id: { eq: report.project_id } });
 
         if (projectRes.success && projectRes.data && projectRes.data.length > 0) {
             const projectName = projectRes.data[0].proje_adi;
             
             // Proje sahipliği kontrolü
             if (req.user.role !== 'ADMIN') {
-                const permsRes = await dpu.selectWhere('kullanici_projeleri', { kullanici_adi: { eq: req.user.username.toLowerCase() } });
+                const permsRes = await db.selectWhere('kullanici_projeleri', { kullanici_adi: { eq: req.user.username.toLowerCase() } });
                 const allowed = permsRes.success && permsRes.data ? permsRes.data.some(p => p.proje_adi.toLowerCase() === projectName.toLowerCase()) : false;
                 
                 if (!allowed) {
@@ -598,7 +607,7 @@ router.post('/reports/delete', requireAuth, async (req, res, next) => {
             }
         }
 
-        const deleteResult = await dpu.delete('raporlar', id);
+        const deleteResult = await db.delete('raporlar', id);
         if (deleteResult.success) {
             return res.status(200).json({ success: true, message: "Test raporu başarıyla silindi!" });
         }
@@ -616,9 +625,9 @@ router.post('/reports/delete', requireAuth, async (req, res, next) => {
 // 1. Kullanıcıları Listeleme
 router.get('/users/list', requireAuth, requireAdmin, async (req, res, next) => {
     try {
-        const usersRes = await dpu.selectAll('kullanicilar');
-        const projectsRes = await dpu.selectAll('projeler');
-        const permsRes = await dpu.selectAll('kullanici_projeleri');
+        const usersRes = await db.selectAll('kullanicilar');
+        const projectsRes = await db.selectAll('projeler');
+        const permsRes = await db.selectAll('kullanici_projeleri');
 
         if (usersRes.success) {
             const formattedUsers = usersRes.data.map(user => {
@@ -647,34 +656,37 @@ router.post('/users/create', requireAuth, requireAdmin, validate(createUserSchem
     const { username, password, role, selectedProjects } = req.body;
 
     try {
-        const usersCheck = await dpu.selectWhere('kullanicilar', {
-            kullanici_adi: { eq: username.toLowerCase() }
+        const cleanUsername = username.trim().toLowerCase();
+
+        const usersCheck = await db.selectWhere('kullanicilar', {
+            kullanici_adi: { eq: cleanUsername }
         });
 
         if (usersCheck.success && usersCheck.data && usersCheck.data.length > 0) {
-            return res.status(400).json({ error: "Bu kullanıcı adı zaten mevcut!" });
+            return res.status(400).json({ success: false, error: "Bu kullanıcı adı zaten mevcut!" });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const userInsert = await dpu.insert('kullanicilar', {
-            kullanici_adi: username,
+        const userInsert = await db.insert('kullanicilar', {
+            kullanici_adi: username.trim(),
             sifre: hashedPassword,
-            rol: role.toUpperCase()
+            rol: (role || 'USER').toUpperCase()
         });
 
         if (userInsert.success) {
-            if (Array.isArray(selectedProjects)) {
+            if (Array.isArray(selectedProjects) && selectedProjects.length > 0) {
                 for (const proj of selectedProjects) {
-                    await dpu.insert('kullanici_projeleri', {
-                        kullanici_adi: username,
+                    await db.insert('kullanici_projeleri', {
+                        kullanici_adi: username.trim(),
                         proje_adi: proj
                     });
                 }
             }
             return res.json({ success: true, message: "Kullanıcı başarıyla oluşturuldu!" });
         }
-        return res.status(500).json({ error: "Kullanıcı eklenemedi." });
+        return res.status(500).json({ success: false, error: "Kullanıcı veritabanına eklenemedi." });
     } catch (err) {
+        console.error("🚨 Kullanıcı ekleme sunucu hatası:", err.message);
         next(err);
     }
 });
@@ -685,15 +697,15 @@ router.post('/users/delete', requireAuth, requireAdmin, async (req, res, next) =
     if (!id || !username) return res.status(400).json({ error: "Eksik parametre!" });
 
     try {
-        const deleteUser = await dpu.delete('kullanicilar', id);
+        const deleteUser = await db.delete('kullanicilar', id);
         if (deleteUser.success) {
-            const permsRes = await dpu.selectWhere('kullanici_projeleri', {
+            const permsRes = await db.selectWhere('kullanici_projeleri', {
                 kullanici_adi: { eq: username.toLowerCase() }
             });
 
             if (permsRes.success && permsRes.data) {
                 for (const perm of permsRes.data) {
-                    await dpu.delete('kullanici_projeleri', perm.id);
+                    await db.delete('kullanici_projeleri', perm.id);
                 }
             }
             return res.json({ success: true, message: "Kullanıcı ve yetkileri silindi!" });
@@ -709,7 +721,7 @@ router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchem
     const { id, username, password, role, selectedProjects } = req.body;
 
     try {
-        const usersRes = await dpu.selectWhere('kullanicilar', {
+        const usersRes = await db.selectWhere('kullanicilar', {
             id: { eq: id }
         });
 
@@ -732,7 +744,7 @@ router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchem
             rol: finalRole
         };
 
-        const updateRes = await dpu.update('kullanicilar', existingUser.id, updatePayload);
+        const updateRes = await db.update('kullanicilar', existingUser.id, updatePayload);
         
         if (!updateRes || !updateRes.success) {
             return res.status(500).json({ 
@@ -741,19 +753,19 @@ router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchem
             });
         }
 
-        const permsRes = await dpu.selectWhere('kullanici_projeleri', {
+        const permsRes = await db.selectWhere('kullanici_projeleri', {
             kullanici_adi: { eq: username.toLowerCase() }
         });
 
         if (permsRes.success && permsRes.data) {
             for (const perm of permsRes.data) {
-                await dpu.delete('kullanici_projeleri', perm.id);
+                await db.delete('kullanici_projeleri', perm.id);
             }
         }
 
         if (Array.isArray(selectedProjects)) {
             for (const proj of selectedProjects) {
-                await dpu.insert('kullanici_projeleri', {
+                await db.insert('kullanici_projeleri', {
                     kullanici_adi: username,
                     proje_adi: proj
                 });

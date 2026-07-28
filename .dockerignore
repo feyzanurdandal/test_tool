@@ -12,3 +12,5 @@ dist
 build
 coverage
 cache
+database.sqlite*
+database.sqlite-journal

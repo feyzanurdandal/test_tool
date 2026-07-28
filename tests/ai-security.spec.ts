@@ -10,7 +10,7 @@ import { CONSTANTS } from '../config/constants.js';
 // @ts-ignore
 import { decrypt } from '../utils/cryptoHelper.js'; 
 // @ts-ignore
-import dpu from '../config/dpuService.js';
+import { db } from '../config/dbService.js';
 
 test('Yapay Zeka Test Otomasyonu', async () => {
     const __filename = fileURLToPath(import.meta.url);
@@ -32,15 +32,15 @@ test('Yapay Zeka Test Otomasyonu', async () => {
     let customBaseUrl: string | undefined = undefined;
 
     try {
-        console.log("🔄 [Test Runner] Aktif test çalıştırıcı sağlayıcı DPU Base'den sorgulanıyor...");
+        console.log("🔄 [Test Runner] Aktif test çalıştırıcı sağlayıcı SQLite veritabanından sorgulanıyor...");
         
-        const dpuClient = dpu as any;
-        const dbResult = await dpuClient.select('ayarlar', 100); 
+        // YENİ: db.selectAll kullanıyoruz
+        const dbResult = await db.selectAll('ayarlar'); 
 
         if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
             const settingsRows = dbResult.data;
 
-            // 1. Aktif çalıştırıcıyı JavaScript tarafında buluyoruz
+            // 1. Aktif çalıştırıcıyı buluyoruz
             const activeRunnerRow = settingsRows.find((r: any) => r.ayar_anahtar === 'test_runner_api');
 
             if (activeRunnerRow) {
@@ -51,36 +51,32 @@ test('Yapay Zeka Test Otomasyonu', async () => {
                 const providerRow = settingsRows.find((r: any) => r.ayar_anahtar === chosenApi);
 
                 if (providerRow) {
-                try {
-                    // Veritabanından gelen enc:iv:tag formatındaki key'i çözüyoruz
-                    apiKeyValue = decrypt(providerRow.ayar_deger);
-                } catch (e) {
-                    const error = e as Error;
-                    console.error("API Key çözülemedi, ham değer deneniyor:", error.message);
-                    apiKeyValue = providerRow.ayar_deger;
-                }
-                    activeModel = providerRow.ayar_model;
+                    try {
+                        apiKeyValue = decrypt(providerRow.ayar_deger);
+                    } catch (e) {
+                        const error = e as Error;
+                        console.error("API Key çözülemedi, ham değer deneniyor:", error.message);
+                        apiKeyValue = providerRow.ayar_deger;
+                    }
+                    activeModel = providerRow.ayar_model || activeModel;
                 }
             }
 
+            // Model önek ayarlamaları
             if (chosenApi.toLowerCase().includes("openai")) {
-                if (!activeModel.startsWith("openai/")) {
-                    activeModel = `openai/${activeModel}`;
-                }
+                if (!activeModel.startsWith("openai/")) activeModel = `openai/${activeModel}`;
             } else if (chosenApi.toLowerCase().includes("gemini")) {
                 if (!activeModel.startsWith("google/") && !activeModel.startsWith("gemini/")) {
                     activeModel = `google/${activeModel}`;
                 }
             } else if (chosenApi.toLowerCase().includes("qwen") || chosenApi.toLowerCase().includes("local") || chosenApi.toLowerCase().includes("dpu")) {
                 customBaseUrl = "https://ai.dpu.edu.tr/api";
-                if (!activeModel.startsWith("openai/")) {
-                    activeModel = `openai/${activeModel}`;
-                }
+                if (!activeModel.startsWith("openai/")) activeModel = `openai/${activeModel}`;
                 console.log(`🔌 DPU Yerel Sunucusu Bağlantı Köprüsü kuruldu: ${customBaseUrl}`);
             }
         }
     } catch (err: any) {
-        console.warn("⚠️ DPU Base ayar tablosu sorgulanamadı, local CONSTANTS kullanılacak. Hata:", err.message);
+        console.warn("⚠️ SQLite ayar tablosu sorgulanamadı, local CONSTANTS kullanılacak. Hata:", err.message);
     }
 
     // Çevre değişkenlerini kütüphanelerin okuyabileceği şekilde ayarlıyoruz
@@ -100,7 +96,6 @@ test('Yapay Zeka Test Otomasyonu', async () => {
 
     console.log(`⚙️ [Test Runner] Stagehand Başlatılıyor. Sağlayıcı: ${chosenApi} | Model: ${activeModel}`);
 
-
     // DOCKER / LINUX SESSİZ MOD (HEADLESS) AYARI
     const isDockerEnv = process.env.DOCKER_ENV === 'true';
 
@@ -109,14 +104,11 @@ test('Yapay Zeka Test Otomasyonu', async () => {
         model: activeModel as any,
         cacheDir: path.resolve(__dirname, '../cache/ai-security'),
         domSettleTimeout: 10000,
-        // Docker içindeyken headless: true, localdeyken false olsun
         localBrowserLaunchOptions: { 
             headless: isDockerEnv ? true : false,
             args: isDockerEnv ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'] : []
         },
-        ...(customBaseUrl ? { 
-            configuration: localConfig
-        } : {})
+        ...(customBaseUrl ? { configuration: localConfig } : {})
     });
 
     await stagehand.init();
@@ -157,14 +149,12 @@ test('Yapay Zeka Test Otomasyonu', async () => {
                     const agent = stagehand.agent({
                         mode: "dom",
                         model: activeModel as any,
-                        ...(customBaseUrl ? {
-                            configuration: localConfig
-                        } : {})
+                        ...(customBaseUrl ? { configuration: localConfig } : {})
                     });
                     await agent.execute({ instruction: step.instruction, page: pwPage });
                 } catch (agentErr: any) {
                     console.error(`❌ Yedek ajan da adımı tamamlayamadı: ${agentErr.message}`);
-                    throw agentErr; // Hata durumunda testi patlatıyoruz
+                    throw agentErr; 
                 }
             }
         }

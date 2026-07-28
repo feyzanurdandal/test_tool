@@ -1158,10 +1158,13 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-
+// ─── PROJE SEÇİMİ DEĞİŞTİĞİNDE EKRANI YENİLE ───
     if (projectDropdown) {
         projectDropdown.addEventListener("change", (e) => {
             currentProject = e.target.value;
+            console.log(`🔄 Proje değişti: "${currentProject}". Ekranlar yeniden yükleniyor...`);
+            
+            // Proje etiketlerini ve bağlı tüm içerikleri (Senaryo, Rapor, Batch) anında yeniler
             updateProjectLabels();
         });
     }

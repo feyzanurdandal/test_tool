@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CONSTANTS } from './config/constants.js'; 
-import dpu from './config/dpuService.js';
+import db from './config/dbService.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { loginLimiter } from './middleware/rateLimit.js';
@@ -70,7 +70,7 @@ app.get('/api/health', async (req, res) => {
 
     try {
         // DPU Base servisine hızlı bir bağlantı testi atıyoruz
-        const dbCheck = await dpu.select('projeler', 1);
+        const dbCheck = await db.select('projeler', 1);
         if (dbCheck && dbCheck.success) {
             healthStatus.services.database = 'HEALTHY';
             return res.status(200).json(healthStatus);
@@ -98,7 +98,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     }
 
     try {
-        const dbResult = await dpu.selectWhere('kullanicilar', { kullanici_adi: { eq: username.trim() } });
+        const dbResult = await db.selectWhere('kullanicilar', { kullanici_adi: { eq: username.trim() } });
         
         // DPU Service tüm listeyi dönse bile aranan kullanıcıyı JS tarafında büyük/küçük harfe duyarsız tam eşleştiriyoruz
         const user = (dbResult?.success && dbResult?.data)

@@ -69,21 +69,25 @@ export const runBatchSchema = z.object({
   })
 });
 
+// YENİ: Kullanıcı Oluşturma Şeması (Büyük/Küçük harf toleranslı ve esnek)
 export const createUserSchema = z.object({
   body: z.object({
     username: usernameSchema,
-    password: z.string().min(6, "Şifre en az 6 karakter olmalıdır!"),
-    role: z.enum(["ADMIN", "PM", "USER"], { errorMap: () => ({ message: "Geçersiz rol seçimi!" }) }),
+    password: z.string().min(4, "Şifre en az 4 karakter olmalıdır!"),
+    role: z.string().transform(val => val.toUpperCase()).refine(val => ["ADMIN", "PM", "USER"].includes(val), {
+      message: "Geçersiz rol seçimi! (ADMIN, PM, USER olmalı)"
+    }),
     selectedProjects: z.array(z.string()).optional().default([])
   })
 });
 
+// YENİ: Kullanıcı Güncelleme Şeması
 export const updateUserSchema = z.object({
   body: z.object({
     id: z.union([z.string(), z.number()]),
     username: usernameSchema,
     password: z.string().optional(),
-    role: z.enum(["ADMIN", "PM", "USER"]).optional(),
-    selectedProjects: z.array(z.string()).optional()
+    role: z.string().optional().transform(val => val ? val.toUpperCase() : val),
+    selectedProjects: z.array(z.string()).optional().default([])
   })
 });

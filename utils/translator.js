@@ -1,7 +1,8 @@
+// utils/translator.js
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { OpenAI } from "openai"; 
 import * as dotenv from 'dotenv';
-import dpu from '../config/dpuService.js';
+import { db } from '../config/dbService.js';
 import { decrypt } from './cryptoHelper.js';
 
 dotenv.config();
@@ -15,13 +16,12 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
     let chosenModel = "gemini-3.1-flash-lite";
     let apiKey = process.env.GEMINI_API_KEY;
 
-    // 2. Ayarları DPU Base'den Çekme
+    // 2. Ayarları SQLite'dan Çekme
     try {
-        console.log("🔄 [Translator Gateway] Ayarlar DPU Base'den sorgulanıyor...");
-        const dpuModule = await import('../config/dpuService.js');
-        const dpuClient = dpuModule.default || dpuModule;
+        console.log("🔄 [Translator Gateway] Ayarlar SQLite veritabanından sorgulanıyor...");
 
-        const dbResult = await dpuClient.selectAll('ayarlar'); 
+        // YENİ: Doğrudan db.selectAll kullanıyoruz
+        const dbResult = await db.selectAll('ayarlar'); 
 
         if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
             const settingsRows = dbResult.data;
@@ -40,12 +40,12 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
             }
         }
     } catch (err) {
-        console.warn("⚠️ DPU Base ayarları okunurken pürüz oluştu, .env fallback aktif:", err.message);
+        console.warn("⚠️ SQLite ayarları okunurken pürüz oluştu, .env fallback aktif:", err.message);
     }
 
     console.log(`⚙️ [Translator Gateway] Aktif Sağlayıcı: ${chosenApi} | Model: ${chosenModel}`);
 
-    // 🛡️ 1. SYSTEM PROMPT (Kural & Güvenlik Duvarı)
+// 🛡️ 1. SYSTEM PROMPT (Kural & Güvenlik Duvarı)
     const systemPrompt = `
 You are a Stagehand automation expert and JSON compiler. Convert Turkish automation commands into a valid Stagehand JSON object.
 
@@ -62,12 +62,17 @@ CRITICAL PARSING RULES:
    - General action descriptions (e.g., "the text area", "the search input", "the output field") must be translated entirely to English.
    - Do NOT wrap entire descriptive sentences in double quotes. Only wrap the specific target element's label if it exists as-is on the screen.
 
+4. !!! FORM INPUT FIELD RULE (PREVENT SPAN/LABEL TARGETING) !!!:
+   - When the user asks to type/fill text into a field (e.g., "Öğrenci No alanına x yaz"), NEVER target text spans, labels, or wrapper divs.
+   - ALWAYS explicitly instruct Stagehand to target the **input field** associated with or next to that label.
+   - Example Good Instruction: "Type \\"feyza\\" into the input field for \\"Öğrenci No\\"" or "Fill the input element labeled \\"Öğrenci No\\" with \\"feyza\\"".
+
 JSON Output Schema Example:
 {
   "targetUrl": "https://example.com",
   "steps": [
     { "type": "observe", "instruction": "Find the button with text \\"Giriş yap\\"" },
-    { "type": "act", "instruction": "Type \\"feyza\\" into the input field \\"Kullanıcı Adı\\"" },
+    { "type": "act", "instruction": "Type \\"feyza\\" into the input field for \\"Kullanıcı Adı\\"" },
     { "type": "act", "instruction": "Click on the button with text \\"Giriş yap\\"" }
   ]
 }
@@ -100,7 +105,7 @@ Turkish Commands:
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
                     ],
-                    response_format: { type: "json_object" }, // 🛡️ JSON Mode zorunlu
+                    response_format: { type: "json_object" }, 
                     temperature: 0.1
                 });
                 
@@ -126,13 +131,13 @@ Turkish Commands:
                 const genAI = new GoogleGenerativeAI(apiKey, { apiVersion: "v1" });
                 const model = genAI.getGenerativeModel({ 
                     model: cleanModelName,
-                    systemInstruction: systemPrompt // 🛡️ System Instruction Ayrı Katman
+                    systemInstruction: systemPrompt 
                 });
                 
                 const result = await model.generateContent({
                     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
                     generationConfig: {
-                        responseMimeType: "application/json", // 🛡️ JSON Mime-Type Zorlaması
+                        responseMimeType: "application/json", 
                         temperature: 0.1
                     }
                 });
