@@ -3,7 +3,7 @@
 ## Proje Ne Yapar?
 Bu proje; modern yazılım geliştirme süreçlerinde Yapay Zeka Destekli Keşif (Autonomous Crawler) ve Kalite Güvence (QA / Test Otomasyonu) süreçlerini tek bir çatı altında birleştiren yeni nesil bir test altyapısıdır.
 
-Sistem, test senaryolarını yazarken manuel kodlama veya statik locator (CSS/XPath) bağımlılıklarını tamamen ortadan kaldırır. Yapay zeka ajanları vasıtasıyla dinamik olarak sitenin arayüzünü gözlemler ve insan dilinde yazılmış test adımlarını tarayıcı üzerinde otonom olarak koşturur. Klasik loglama sistemlerinin aksine, test esnasında üretilen tüm çıktıları ve test raporlarını **DPU Base** veritabanında saklayarak web arayüzü üzerinden kronolojik bir zaman akışı halinde izlenebilir kılar.
+Sistem, test senaryolarını yazarken manuel kodlama veya statik locator (CSS/XPath) bağımlılıklarını tamamen ortadan kaldırır. Yapay zeka ajanları vasıtasıyla dinamik olarak sitenin arayüzünü gözlemler ve insan dilinde yazılmış test adımlarını tarayıcı üzerinde otonom olarak koşturur. Test esnasında üretilen tüm çıktıları ve test raporlarını veritabanında saklayarak web arayüzü üzerinden kronolojik bir zaman akışı halinde izlenebilir kılar.
 
 ---
 
@@ -12,7 +12,7 @@ Sistem, birbirine entegre çalışan yüksek performanslı ve modern bir teknolo
 
 - **Stagehand (Yapay Zeka Otomasyon Motoru):** Sayfadaki elementleri insan gibi gözlemleyen, otomatik anlamlandıran ve bütçe dostu LLM modelleri (`gpt-4o-mini`, `gemini-1.5-flash`) ile çalışan otonom web ajanı.
 - **Playwright (TypeScript):** Modern, hızlı, paralel ve izole tarayıcı otomasyon altyapısı.
-- **DPU Base:** Projelerin, test senaryolarının, kullanıcı yetkilerinin (ADMIN/PM) ve test raporlarının bulut ortamında güvenle saklandığı ana veritabanı katmanı.
+- **SQLlite:** Projelerin, test senaryolarının, kullanıcı yetkilerinin (ADMIN/PM) ve test raporlarının saklandığı ana veritabanı katmanı.
 - **TSX (TypeScript Execute):** TypeScript dosyalarının runtime üzerinde derlenmeden, havada anlık olarak çözümlenip koşturulmasını sağlayan modern motor altyapısı.
 - **Express.js:** Rol bazlı yetkilendirme, test tetiklemeleri ve raporlama süreçlerini yöneten modüler backend katmanı.
 - **Docker & Docker Compose:** Tüm uygulamanın bağımlılıklarıyla birlikte izole konteyner ortamında ayağa kaldırılmasını sağlayan kapsülleme yapısı.
@@ -32,20 +32,11 @@ Projenin çalışabilmesi için kök dizindeki `.env.example` dosyasının bir k
 ```bash
 cp .env.example .env
 ```
-.env dosyasını açıp DPU Base bağlantı ve yetki bilgilerinizi tanımlayın (Yapay Zeka API anahtarlarınızı uygulama içi Ayarlar/Settings panelinden dinamik olarak yönetebilirsiniz):
+.env dosyasını açıp bilgilerinizi tanımlayın (Yapay Zeka API anahtarlarınızı uygulama içi Ayarlar/Settings panelinden dinamik olarak yönetebilirsiniz):
 
 ```
 PORT=3000
-
-# ─── DPU BASE BAĞLANTI AYARLARI ───
-DPU_BASE_URL=https://dpubase.dpu.edu.tr
-DPU_PROJECT_CODE=test_otomasyonu
-DPU_USER_EMAIL=user+test_otomasyonu@base.dpu.edu.tr
-
-# Aşağıdaki alanlara kendi gizli anahtar/şifrelerinizi girin
-DPU_API_KEY=your_dpu_api_key_here
-DPU_USER_PASSWORD=your_dpu_user_password_here
-
+NODE_ENV=production
 # ─── BACKEND GÜVENLİK ───
 JWT_SECRET=your_jwt_secret_key_here
 # AES-256-GCM Şifreleme Anahtarı (Tam 32 Karakter / Hex olmalı)
@@ -61,9 +52,21 @@ Bilgisayarınıza Node.js veya npm paketleri kurmanıza gerek kalmadan, tüm ba�
 
 1. Konteynırı Ayağa Kaldırın:
 ```Bash
-docker compose up --build
+docker compose up --build -d
 ```
-2. Durdurmak İstediğinizde:
+2. **docker ps** ile kontrol ettiğinizde şöyle görünmeli:
+```Bash
+PS C:\test-tool> docker ps
+CONTAINER ID   IMAGE                    COMMAND                  CREATED          STATUS          PORTS                                       NAMES
+d6b3ecfe215e   nginx:alpine             "/docker-entrypoint.…"   35 seconds ago   Up 35 seconds   0.0.0.0:80->80/tcp, [::]:80->80/tcp         test_tool_nginx
+f2bb8c968c4d   test-tool-node-backend   "npm start"              35 seconds ago   Up 35 seconds   0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp test_tool_backend
+PS C:\test-tool>
+```
+3. Admin için veritabanında kullanıcı oluşturun:
+```Bash
+docker exec -it test_tool_backend npx tsx createAdmin.js [kullanıcı_adı] [şifre]
+```
+4. Durdurmak İstediğinizde:
 ```Bash
 docker compose down
 ```
@@ -85,13 +88,3 @@ npx tsx server.js
 ```
 - Web Paneli: http://localhost:3000
 
-## Veritabanı Mimarisi (DPU Base)
-Projedeki hiçbir senaryo veya rapor yerel dosya sisteminde saklanmaz. Tüm veriler DPU Base üzerindeki şu tablolarda dinamik olarak yönetilir:
-
-- **projeler:** Proje isimlerini ve ID eşleşmelerini tutar.
-
-- **senaryolar:** Proje bazlı senaryo adlarını, hedef URL'leri ve AI tarafından çevrilmiş Stagehand JSON adımlarını saklar.
-
-- **raporlar:** Koşturulan testlerin başarı/başarısızlık durumlarını ve detaylı log çıktılarını saklar.
-
-- **kullanıcılar & ayarlar:** Sistem kullanıcılarını, rol yetkilerini (ADMIN/PM) ve aktif AI sağlayıcı (Gemini, OpenAI vb.) konfigürasyonlarını yönetir.

@@ -67,7 +67,7 @@ router.get('/projects/list', requireAuth, async (req, res, next) => {
         const result = await db.selectAll('projeler');
         if (!result.success) {
             return res.status(500).json({ 
-                error: "DPU Base listeleme hatası", 
+                error: "Proje listeleme hatası", 
                 ...(process.env.NODE_ENV === 'production' ? {} : { details: result }) 
             });
         }

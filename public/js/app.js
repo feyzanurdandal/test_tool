@@ -183,7 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!scenariosTable || !scenariosEmpty || !scenariosList) return;
 
         try {
-            console.log(`"${currentProject}" projesi için senaryolar buluttan isteniyor...`);
+            console.log(`"${currentProject}" projesi için senaryolar veritabanından getiriliyor...`);
             const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
             const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}`, {
@@ -243,7 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     <span class="text-[10px] font-mono text-zinc-500 bg-[#27272a]/40 px-2 py-0.5 rounded">JSON Modeli</span>
                                 </div>
                                 <div class="steps-details-container space-y-2 text-xs text-zinc-300">
-                                    <div class="animate-pulse text-zinc-500 text-[11px]">Buluttan adımlar yükleniyor...</div>
+                                    <div class="animate-pulse text-zinc-500 text-[11px]">Veritabanından adımlar yükleniyor...</div>
                                 </div>
                             </div>
                         </td>
@@ -310,7 +310,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                         detailsContainer.setAttribute("data-loaded", "true");
                                         lucide.createIcons();
                                     } else {
-                                        detailsContainer.innerHTML = `<div class="text-rose-400 text-[11px]">Adımlar buluttan getirilemedi!</div>`;
+                                        detailsContainer.innerHTML = `<div class="text-rose-400 text-[11px]">Adımlar veritabanından getirilemedi!</div>`;
                                     }
                                 } catch (err) {
                                     detailsContainer.innerHTML = `<div class="text-rose-400 text-[11px]">Bağlantı hatası oluştu!</div>`;
@@ -348,7 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                             const result = await res.json();
                             if (res.ok && result.success) {
-                                alert("Senaryo başarıyla buluttan silindi!");
+                                alert("Senaryo başarıyla veritabanından silindi!");
                                 await loadScenarios(); 
                             } else {
                                 alert(`Silinemedi: ${result.error || "Hata oluştu"}`);
@@ -424,7 +424,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!reportsEmpty || !accordionContainer) return;
 
         try {
-            console.log(`🔄 "${currentProject}" projesi için raporlar buluttan getiriliyor...`);
+            console.log(`🔄 "${currentProject}" projesi için raporlar veritabanından getiriliyor...`);
             const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
             const res = await fetch(`/api/scenarios/reports/list?project=${encodeURIComponent(currentProject)}`, {
@@ -594,7 +594,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                             const deleteResult = await deleteRes.json();
                             if (deleteRes.ok && deleteResult.success) {
-                                alert("🎉 Rapor başarıyla buluttan temizlendi!");
+                                alert("🎉 Rapor başarıyla silindi!");
                                 await loadReports();
                             } else {
                                 alert(`❌ Rapor silinemedi: ${deleteResult.error || "Hata oluştu"}`);
@@ -682,7 +682,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
         try {
-            console.log(`🔄 "${activeProjectName}" projesi için toplu test senaryoları çekiliyor...`);
+            console.log(`🔄 "${activeProjectName}" projesi için toplu test senaryoları yükleniyor...`);
             
             const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(activeProjectName)}`, {
                 headers: {
@@ -1121,7 +1121,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const originalBtnText = submitBtn ? submitBtn.innerHTML : "";
             if (submitBtn) {
                 submitBtn.disabled = true;
-                submitBtn.innerHTML = `<span>Çevriliyor ve Kaydediliyor...</span>`;
+                submitBtn.innerHTML = `<span>Kaydediliyor...</span>`;
             }
 
             try {

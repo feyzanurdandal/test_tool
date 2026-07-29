@@ -72,7 +72,7 @@ test('Yapay Zeka Test Otomasyonu', async () => {
             } else if (chosenApi.toLowerCase().includes("qwen") || chosenApi.toLowerCase().includes("local") || chosenApi.toLowerCase().includes("dpu")) {
                 customBaseUrl = "https://ai.dpu.edu.tr/api";
                 if (!activeModel.startsWith("openai/")) activeModel = `openai/${activeModel}`;
-                console.log(`🔌 DPU Yerel Sunucusu Bağlantı Köprüsü kuruldu: ${customBaseUrl}`);
+                console.log(` Yerel Sunucusu Bağlantı Köprüsü kuruldu: ${customBaseUrl}`);
             }
         }
     } catch (err: any) {

@@ -44,10 +44,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ─── ROTA IMPORTLARI ───
-import dpuScenariosRouter from './routes/dpuScenarios.js';
+import ScenariosRouter from './routes/Scenarios.js';
 
 // ─── 1. API ROTALARI ───
-app.use('/api/scenarios', dpuScenariosRouter);
+app.use('/api/scenarios', ScenariosRouter);
 
 // ─── 2. STATIC FILES & HTML BINDINGS ───
 app.use(express.static(path.join(process.cwd(), 'public')));
@@ -69,7 +69,7 @@ app.get('/api/health', async (req, res) => {
     };
 
     try {
-        // DPU Base servisine hızlı bir bağlantı testi atıyoruz
+        // veritabanı servisine hızlı bir bağlantı testi atıyoruz
         const dbCheck = await db.select('projeler', 1);
         if (dbCheck && dbCheck.success) {
             healthStatus.services.database = 'HEALTHY';
@@ -89,7 +89,7 @@ app.get('/api/health', async (req, res) => {
 
 const DUMMY_HASH = "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUUWXYZ123456";
 
-// ─── DİNAMİK DPU BASE GİRİŞ SİSTEMİ ───
+// ─── DİNAMİK GİRİŞ SİSTEMİ ───
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
 
@@ -100,7 +100,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     try {
         const dbResult = await db.selectWhere('kullanicilar', { kullanici_adi: { eq: username.trim() } });
         
-        // DPU Service tüm listeyi dönse bile aranan kullanıcıyı JS tarafında büyük/küçük harfe duyarsız tam eşleştiriyoruz
+        //tüm listeyi dönse bile aranan kullanıcıyı JS tarafında büyük/küçük harfe duyarsız tam eşleştiriyoruz
         const user = (dbResult?.success && dbResult?.data)
             ? dbResult.data.find(u => u.kullanici_adi && u.kullanici_adi.toLowerCase() === username.trim().toLowerCase())
             : null;

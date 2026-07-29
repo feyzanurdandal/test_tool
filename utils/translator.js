@@ -144,53 +144,6 @@ Turkish Commands:
                 textResult = result.response.text();
                 break;
             }
-
-            // ─── 3. SEÇENEK: YEREL QWEN / LOCAL LLM ───
-            case "qwen":
-            case "qwen3:1.7b":
-            case "local":
-            case "dpu": {
-                console.log(`🚀 [DPU Qwen Direct] ai.dpu.edu.tr üzerinden istek fırlatılıyor. Model: ${chosenModel}`);
-                
-                const dpuAiUrl = "https://ai.dpu.edu.tr/api/chat"; 
-                const bodyPayload = {
-                    model: chosenModel,
-                    messages: [
-                        { role: "system", content: systemPrompt },
-                        { role: "user", content: userPrompt }
-                    ],
-                    think: false,
-                    stream: false,
-                    options: { temperature: 0.1 }
-                };
-
-                const response = await fetch(dpuAiUrl, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify(bodyPayload)
-                });
-
-                if (!response.ok) {
-                    const errText = await response.text();
-                    throw new Error(`DPU AI Sunucusu hata döndürdü (${response.status}): ${errText}`);
-                }
-
-                const data = await response.json();
-
-                if (data.message && data.message.content) {
-                    textResult = data.message.content;
-                } else if (data.choices && data.choices[0] && data.choices[0].message) {
-                    textResult = data.choices[0].message.content;
-                } else if (data.response) {
-                    textResult = data.response;
-                } else {
-                    throw new Error("DPU AI sunucusundan gelen yanıt formatı çözümlenemedi!");
-                }
-                break;
-            }
         }
 
         const cleanJsonText = textResult.replace(/```json|```/g, "").trim();

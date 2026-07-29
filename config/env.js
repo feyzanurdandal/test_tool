@@ -23,9 +23,6 @@ export const env = {
     PORT: process.env.PORT || 3000,
     JWT_SECRET: process.env.JWT_SECRET,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
-    DPU_BASE_URL: process.env.DPU_BASE_URL,
-    DPU_API_KEY: process.env.DPU_API_KEY,
-    DPU_PROJECT_CODE: process.env.DPU_PROJECT_CODE,
 };
 
 export default env;
