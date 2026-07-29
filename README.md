@@ -5,6 +5,8 @@ Bu proje; modern yazılım geliştirme süreçlerinde Yapay Zeka Destekli Keşif
 
 Sistem, test senaryolarını yazarken manuel kodlama veya statik locator (CSS/XPath) bağımlılıklarını tamamen ortadan kaldırır. Yapay zeka ajanları vasıtasıyla dinamik olarak sitenin arayüzünü gözlemler ve insan dilinde yazılmış test adımlarını tarayıcı üzerinde otonom olarak koşturur. Test esnasında üretilen tüm çıktıları ve test raporlarını veritabanında saklayarak web arayüzü üzerinden kronolojik bir zaman akışı halinde izlenebilir kılar.
 
+https://github.com/user-attachments/assets/5b71c835-4ace-456a-a1e6-9d816a6ea500
+
 ---
 
 ## Hangi Teknolojileri Kullanır?
