@@ -50,8 +50,8 @@ ENCRYPTION_KEY=encryption_key
 
 ## Projeyi Çalıştırma Yöntemleri
 Projeyi 2 şekilde çalıştırabilirsiniz;
-1- Localde Çalıştırma: Eğer gerekli kurulumları yapıp belirtilen şekilde çalıştırırsanız testi çalıştırırken chromium penceresi açılır ve yapay zeka testi çalıştırırken izleyebilirsiniz. Senaryoların yazımı aşamasında tavsiye edilir, yazılan senaryo adımlarını yapay zekanın düzgünce yaptığının kontrolünü sağlamak için açılan pencere faydalı olacaktır.
-2- Docker iel Çalıştırma: Bu yöntemi tercih ederseniz localde çalıştırma ile tek farklı chromium penceresi olacaktır. Docker ortamında bu pencere açılmayacağından ötürü yapay zeka testleri yaparken canlı şekilde izleyemezsiniz, sadece sonucu rapordan görebilirsiniz. Senaryolar yazıldıktan sonra ara ara sistemi test etmek veya toplu test senaryolarını çalıştırmak için önerilir.
+1. *Localde Çalıştırma:* Eğer gerekli kurulumları yapıp belirtilen şekilde çalıştırırsanız testi çalıştırırken chromium penceresi açılır ve yapay zeka testi çalıştırırken izleyebilirsiniz. Senaryoların yazımı aşamasında tavsiye edilir, yazılan senaryo adımlarını yapay zekanın düzgünce yaptığının kontrolünü sağlamak için açılan pencere faydalı olacaktır.
+2. *Docker ile Çalıştırma:* Bu yöntemi tercih ederseniz localde çalıştırma ile tek farklı chromium penceresi olacaktır. Docker ortamında bu pencere açılmayacağından ötürü yapay zeka testleri yaparken canlı şekilde izleyemezsiniz, sadece sonucu rapordan görebilirsiniz. Senaryolar yazıldıktan sonra ara ara sistemi test etmek veya toplu test senaryolarını çalıştırmak için önerilir.
 Hangi yöntemi seçerseniz seçin tüm özellikler aktif bir şekilde çalışacaktır, ihtiyacınıza göre iki yöntemi de kullanabilirsiniz
 
 ### Docker İle Çalıştırma (Sıfır Kurulum & Testler arka planda)
