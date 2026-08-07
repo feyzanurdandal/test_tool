@@ -285,6 +285,77 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
     }
 });
 
+// ─── 5.1 API: SENARYO GÜNCELLEME ───
+router.post('/update', aiCallLimiter, requireAuth, requireProjectAccess, async (req, res, next) => {
+    const { scenarioName, originalScenarioName, turkishInstructions, targetUrl, projectName } = req.body;
+    const selectedProj = (projectName || 'Varsayılan Proje').trim();
+
+    if (!scenarioName || !originalScenarioName || !turkishInstructions || !targetUrl) {
+        return res.status(400).json({ error: "Eksik parametre var!" });
+    }
+
+    // SSRF / IP Koruması
+    const urlCheck = await isSafeUrl(targetUrl);
+    if (!urlCheck.safe) {
+        return res.status(400).json({ error: `Güvenlik Engeli: ${urlCheck.reason}` });
+    }
+
+    try {
+        const projectRes = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: selectedProj }
+        });
+
+        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
+            return res.status(404).json({ error: "İlgili proje bulunamadı!" });
+        }
+        const projectId = projectRes.data[0].id;
+
+        // Düzenlenecek senaryonun varlığını kontrol et
+        const existingRes = await dpu.selectWhere('senaryolar', {
+            project_id: { eq: projectId },
+            senaryo_adi: { eq: originalScenarioName }
+        });
+
+        if (!existingRes.success || !existingRes.data || existingRes.data.length === 0) {
+            return res.status(404).json({ error: "Düzenlenecek senaryo bulunamadı." });
+        }
+        const existingScenario = existingRes.data[0];
+
+        // İsim değiştiyse yeni isimde çakışma kontrolü yap
+        if (scenarioName !== originalScenarioName) {
+            const conflictRes = await dpu.selectWhere('senaryolar', {
+                project_id: { eq: projectId },
+                senaryo_adi: { eq: scenarioName }
+            });
+
+            if (conflictRes.success && conflictRes.data && conflictRes.data.length > 0) {
+                return res.status(400).json({ error: "Bu proje altında bu senaryo adı zaten mevcut!" });
+            }
+        }
+
+        // Yapay zeka ile Türkçe adımları Stagehand JSON'ına çevir
+        const stagehandJson = await translateToStagehandJson(turkishInstructions, targetUrl);
+        if (!stagehandJson) {
+            return res.status(500).json({ error: "Senaryo çevirisi esnasında yapay zeka hata döndürdü." });
+        }
+
+        const updateData = {
+            senaryo_adi: scenarioName,
+            hedef_url: targetUrl,
+            adimlar: JSON.stringify(stagehandJson),
+            updated_at: new Date().toISOString()
+        };
+
+        const result = await dpu.update('senaryolar', existingScenario.id, updateData);
+        if (result.success) {
+            return res.status(200).json({ success: true, status: "SUCCESS", message: "Senaryo başarıyla güncellendi." });
+        }
+        return res.status(500).json({ error: "Senaryo güncellenirken bir veritabanı hatası oluştu." });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // ─── 6. API: SENARYO SİLME ───
 router.post('/delete', requireAuth, requireProjectAccess, async (req, res, next) => {
     const { scenarioName, projectName } = req.body;
