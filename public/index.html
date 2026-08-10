@@ -16,6 +16,7 @@
 </head>
 <body class="bg-[#09090b] text-[#fafafa] min-h-screen flex flex-col antialiased select-none">
 
+    <!-- Giriş Ekranı -->
     <div id="login-view" class="flex-1 flex flex-col items-center justify-center p-6">
         <div class="w-full max-w-sm bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-6">
             <div class="flex flex-col items-center space-y-2">
@@ -44,9 +45,11 @@
         </div>
     </div>
 
-    <div id="app-view" class="hidden flex-1 flex flex-col h-screen overflow-hidden">
+    <!-- Ana Uygulama Ekranı -->
+    <div id="app-view" class="hidden h-screen w-screen flex flex-col overflow-hidden">
         
-        <header class="h-14 border-b border-[rgba(255,255,255,0.06)] flex items-center px-6 gap-4 bg-[#09090b] z-10 shrink-0">
+        <!-- Header -->
+        <header class="h-14 border-b border-[rgba(255,255,255,0.06)] flex items-center px-6 gap-4 bg-[#09090b] z-20 shrink-0 select-none">
             <div class="flex items-center gap-2.5">
                 <i data-lucide="flask-conical" class="w-4 h-4 text-[#3b82f6]"></i>
                 <span class="text-sm font-bold tracking-tight text-white">Yazılım Test Otomasyonu</span>
@@ -70,40 +73,43 @@
             </div>
         </header>
 
-        <div class="flex flex-1 overflow-hidden">
+        <!-- İçerik Kapsayıcısı -->
+        <div class="flex flex-1 h-[calc(100vh-3.5rem)] overflow-hidden">
             
-        <aside class="w-60 border-r border-[rgba(255,255,255,0.06)] bg-[#09090b] p-4 flex flex-col justify-between shrink-0 h-[calc(100vh-3.5rem)] select-none">
-            
-            <!-- Üst Menü Navigasyon Butonları -->
-            <div class="space-y-1">
-                <button data-target="view-scenarios" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-[#3b82f6] bg-[#3b82f6]/10">
-                    <i data-lucide="microscope" class="w-4 h-4"></i> <span>Test Senaryoları</span>
-                </button>
-                <button data-target="view-batch" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
-                    <i data-lucide="layers" class="w-4 h-4"></i> <span>Toplu Testler</span>
-                </button>
-                <button data-target="view-reports" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
-                    <i data-lucide="file-text" class="w-4 h-4"></i> <span>Raporlar</span>
-                </button>
-                <button data-target="view-settings" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
-                    <i data-lucide="settings" class="w-4 h-4"></i> <span>Ayarlar</span>
-                </button>
-                <button id="nav-users-btn" data-target="view-users" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b] hidden">
-                    <i data-lucide="users" class="w-4 h-4"></i> <span>Kullanıcı Yönetimi</span>
-                </button>
-            </div>
-
-            <!-- Önbellek Temizle Butonu (En alt köşede kalıcı) -->
-            <div class="pt-4 border-t border-[rgba(255,255,255,0.06)]">
-                <button id="clear-cache-btn" type="button" title="Geçici Önbelleği Temizle" class="w-full bg-[#18181b] hover:bg-[#27272a] text-zinc-400 hover:text-white border border-[rgba(255,255,255,0.08)] text-xs px-3 py-2.5 rounded-lg transition flex items-center justify-center gap-2 cursor-pointer shadow-sm">
-                    <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
-                    <span>Önbelleği Temizle</span>
-                </button>
-            </div>
-        </aside>
-
-            <main class="flex-1 bg-[#09090b] p-8 overflow-y-auto">
+            <!-- Sol Sabit Menü -->
+            <aside class="w-60 border-r border-[rgba(255,255,255,0.06)] bg-[#09090b] p-4 flex flex-col justify-between shrink-0 h-full select-none">
                 
+                <div class="space-y-1 overflow-y-auto">
+                    <button data-target="view-scenarios" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-[#3b82f6] bg-[#3b82f6]/10">
+                        <i data-lucide="microscope" class="w-4 h-4"></i> <span>Test Senaryoları</span>
+                    </button>
+                    <button data-target="view-batch" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
+                        <i data-lucide="layers" class="w-4 h-4"></i> <span>Toplu Testler</span>
+                    </button>
+                    <button data-target="view-reports" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
+                        <i data-lucide="file-text" class="w-4 h-4"></i> <span>Raporlar</span>
+                    </button>
+                    <button data-target="view-settings" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
+                        <i data-lucide="settings" class="w-4 h-4"></i> <span>Ayarlar</span>
+                    </button>
+                    <button id="nav-users-btn" data-target="view-users" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b] hidden">
+                        <i data-lucide="users" class="w-4 h-4"></i> <span>Kullanıcı Yönetimi</span>
+                    </button>
+                </div>
+
+                <!-- Önbellek Temizle Butonu (En Sol Alt Köşede Tam Çakılı) -->
+                <div class="pt-4 border-t border-[rgba(255,255,255,0.06)] shrink-0">
+                    <button id="clear-cache-btn" type="button" title="Geçici Önbelleği Temizle" class="w-full bg-[#18181b] hover:bg-[#27272a] text-zinc-400 hover:text-white border border-[rgba(255,255,255,0.08)] text-xs px-3 py-2.5 rounded-lg transition flex items-center justify-center gap-2 cursor-pointer shadow-sm">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+                        <span>Önbelleği Temizle</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Sağ Dinamik İçerik Alanı (Sadece burası kayar) -->
+            <main class="flex-1 bg-[#09090b] p-8 overflow-y-auto h-full">
+                
+                <!-- 1. TEST SENARYOLARI VİEW -->
                 <div id="view-scenarios" class="view-content space-y-6">
                     <div class="flex items-center justify-between">
                         <div>
@@ -121,7 +127,7 @@
                                 <tr class="border-b border-[rgba(255,255,255,0.06)] text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
                                     <th class="py-3 px-4 w-12">#</th>
                                     <th class="py-3 px-4">Senaryo Adı</th>
-                                    <th class="py-3 px-4">Durum</th>
+                                    <th class="py-3 px-4">Hedef URL</th>
                                     <th class="py-3 px-4 text-right">İşlemler</th>
                                 </tr>
                             </thead>
@@ -130,6 +136,7 @@
                     </div>
                 </div>
 
+                <!-- 2. TOPLU TESTLER VİEW -->
                 <div id="view-batch" class="view-content space-y-6 hidden">
                     <div class="flex items-center justify-between">
                         <div>
@@ -155,8 +162,8 @@
                     </div>
                 </div>
 
+                <!-- 3. RAPORLAR VİEW -->
                 <div id="view-reports" class="view-content space-y-6 hidden">
-                    <!-- Header -->
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
                             <h2 class="text-xl font-bold tracking-tight text-white">Test Raporları</h2>
@@ -211,7 +218,7 @@
                         </div>
                     </div>
 
-                    <!-- Filtreleme, Arama ve Toplu İşlem Barı -->
+                    <!-- Filtreleme, Arama ve Toplu Silme Barı -->
                     <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-3 rounded-xl flex flex-col sm:flex-row items-center gap-3">
                         <div class="relative flex-1 w-full">
                             <i data-lucide="search" class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
@@ -236,7 +243,6 @@
                         </div>
                     </div>
 
-                    <!-- Rapor Listesi Konteyneri -->
                     <div id="reports-container" class="space-y-3">
                         <div id="reports-empty" class="text-xs text-zinc-500 font-medium py-12 text-center bg-[#09090b] border border-[rgba(255,255,255,0.08)] rounded-xl">
                             Bu kriterlere uygun test raporu bulunamadı.
@@ -246,6 +252,7 @@
                     </div>
                 </div>
 
+                <!-- 4. AYARLAR VİEW -->
                 <div id="view-settings" class="view-content space-y-6 hidden animate-fade-in w-full">
                     <div>
                         <h2 class="text-xl font-bold tracking-tight text-white">Sistem Ayarları</h2>
@@ -298,6 +305,7 @@
                     </form>
                 </div>
 
+                <!-- 5. KULLANICI YÖNETİMİ VİEW -->
                 <div id="view-users" class="view-content space-y-6 hidden w-full">
                     <div class="flex items-center justify-between">
                         <div>
@@ -325,6 +333,7 @@
                     </div>
                 </div>
 
+                <!-- Kullanıcı Ekle/Düzenle Modal -->
                 <div id="user-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div class="w-full max-w-md bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl">
                         <form id="user-form" class="space-y-4">
@@ -364,6 +373,7 @@
         </div>
     </div>
 
+    <!-- Proje Oluşturma Modal -->
     <div id="project-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
         <div class="w-full max-w-sm bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-4">
             <div class="flex items-center justify-between">
@@ -383,10 +393,11 @@
         </div>
     </div>
 
+    <!-- Senaryo Oluşturma / Düzenleme Modal -->
     <div id="scenario-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
         <div class="w-full max-w-2xl bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-6 my-8">
             <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-4">
-                <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <h3 id="scenario-modal-title" class="text-sm font-semibold text-white flex items-center gap-2">
                     <i data-lucide="sparkles" class="w-4 h-4 text-[#3b82f6]"></i> Yeni Senaryo Oluştur (<span class="current-project-label"></span>)
                 </h3>
                 <button id="close-scenario-modal" class="text-zinc-500 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
@@ -405,7 +416,6 @@
                                class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
                     </div>
 
-                    <!-- Mevcut Senaryodan Adım Aktarma Alanı (Full Width) -->
                     <div class="col-span-2 sm:col-span-full w-full bg-[#27272a]/30 p-3.5 rounded-xl border border-[rgba(255,255,255,0.06)] mb-4">
                         <label class="block text-[11px] font-semibold text-zinc-400 mb-2 flex items-center gap-1.5">
                             <i data-lucide="copy-plus" class="w-3.5 h-3.5 text-[#3b82f6]"></i> Mevcut Senaryodan Adım İçe Aktar (İsteğe Bağlı)
@@ -419,7 +429,6 @@
                             </button>
                         </div>
                     </div>
-
                 </div>
 
                 <div class="space-y-3">
@@ -440,14 +449,26 @@
                 <div class="flex items-center justify-end gap-3 border-t border-[rgba(255,255,255,0.06)] pt-4">
                     <button type="button" id="cancel-scenario-btn" class="px-4 py-2 bg-transparent hover:bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-zinc-400 hover:text-white rounded-lg text-xs font-medium transition">İptal</button>
                     <button type="submit" id="save-scenario-submit-btn" class="px-4 py-2 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-medium border border-blue-600 transition shadow-sm flex items-center gap-1.5">
-                        <span>Kaydet ve Çevir</span>
+                        <span id="save-scenario-submit-btn-label">Kaydet ve Çevir</span>
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Script dosyası DOM yüklendikten sonra çalışacak şekilde sayfa sonuna çekildi -->
+    <!-- Script dosyası -->
     <script src="js/app.js"></script>
+
+    <!-- Sağ Alt Köşe Geliştirici Rozeti -->
+    <a href="https://github.com/feyzanurdandal/test_tool" target="_blank" rel="noopener noreferrer" 
+       title="GitHub Reposunu İncele" 
+       class="fixed bottom-4 right-4 z-50 flex items-center gap-2 bg-[#18181b]/90 hover:bg-[#27272a] border border-[rgba(255,255,255,0.08)] px-3.5 py-1.5 rounded-full text-xs text-zinc-400 hover:text-white shadow-2xl transition-all duration-300 group backdrop-blur-sm cursor-pointer">
+        <i data-lucide="github" class="w-3.5 h-3.5 text-[#3b82f6] group-hover:scale-110 transition-transform"></i>
+        <span class="font-medium">
+            <span class="inline group-hover:hidden transition-all">Geliştirici</span>
+            <span class="hidden group-hover:inline text-[#3b82f6] font-semibold transition-all">Feyza Nur Dandal</span>
+        </span>
+    </a>
+
 </body>
 </html>
