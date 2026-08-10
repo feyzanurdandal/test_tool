@@ -316,6 +316,22 @@
                         <input type="url" id="new-scenario-url" required placeholder="https://obs.dpu.edu.tr/" 
                                class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
                     </div>
+
+                    <!-- Mevcut Senaryodan Adım Aktarma Alanı (Full Width) -->
+                    <div class="col-span-2 sm:col-span-full w-full bg-[#27272a]/30 p-3.5 rounded-xl border border-[rgba(255,255,255,0.06)] mb-4">
+                        <label class="block text-[11px] font-semibold text-zinc-400 mb-2 flex items-center gap-1.5">
+                            <i data-lucide="copy-plus" class="w-3.5 h-3.5 text-[#3b82f6]"></i> Mevcut Senaryodan Adım İçe Aktar (İsteğe Bağlı)
+                        </label>
+                        <div class="flex items-center gap-2.5 w-full">
+                            <select id="import-scenario-dropdown" class="flex-1 bg-[#18181b] border border-[rgba(255,255,255,0.08)] text-xs text-white p-2.5 rounded-lg outline-none focus:border-[#3b82f6] transition min-w-0">
+                                <option value="" disabled selected>İçe aktarılacak senaryoyu seçin...</option>
+                            </select>
+                            <button type="button" id="import-scenario-steps-btn" class="bg-[#3b82f6]/10 hover:bg-[#3b82f6]/20 text-[#3b82f6] border border-[#3b82f6]/20 text-xs px-4 py-2.5 rounded-lg transition font-medium shrink-0 flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i> Adımları Ekle
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
 
                 <div class="space-y-3">

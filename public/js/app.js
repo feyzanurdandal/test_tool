@@ -1188,6 +1188,7 @@ window.editProject = async function(oldProjectName) {
             const refPanel = document.getElementById("edit-scenario-reference");
             if (refPanel) refPanel.classList.add("hidden");
             updateProjectLabels();
+            populateImportScenarioDropdown();
 
             if (scenarioForm) scenarioForm.reset();
             if (stepsContainer) {
@@ -1213,6 +1214,98 @@ window.editProject = async function(oldProjectName) {
         stepsContainer.scrollTop = stepsContainer.scrollHeight;
         newRow.querySelector(".step-input").focus();
     });
+}
+
+// Mevcut Senaryodan Adımları Çekip İçe Aktarma Buton Olayı
+const importStepsBtn = document.getElementById("import-scenario-steps-btn");
+if (importStepsBtn) {
+    importStepsBtn.addEventListener("click", async () => {
+        const importDropdown = document.getElementById("import-scenario-dropdown");
+        const selectedScenarioToImport = importDropdown ? importDropdown.value : "";
+
+        if (!selectedScenarioToImport) {
+            alert("Lütfen önce içe aktarılacak bir senaryo seçin!");
+            return;
+        }
+
+        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+        const origText = importStepsBtn.innerHTML;
+        importStepsBtn.disabled = true;
+        importStepsBtn.innerHTML = `<span class="animate-pulse">Aktarılıyor...</span>`;
+
+        try {
+            const contentRes = await fetch(`/api/scenarios/content?scenarioName=${encodeURIComponent(selectedScenarioToImport)}&project=${encodeURIComponent(currentProject)}`, {
+                headers: { "X-User-Token": userSession.token || "" }
+            });
+            const contentResult = await contentRes.json();
+
+            if (contentResult.success && contentResult.content) {
+                const adimlar = contentResult.content;
+                const stepsToImport = adimlar.steps || [];
+
+                if (stepsToImport.length === 0) {
+                    alert("Seçilen senaryoda adım bulunamadı.");
+                    return;
+                }
+
+                // Eğer ilk satır boşsa onu temizle
+                if (stepsContainer.children.length === 1) {
+                    const firstInput = stepsContainer.children[0].querySelector(".step-input");
+                    if (firstInput && firstInput.value.trim() === "") {
+                        stepsContainer.innerHTML = "";
+                    }
+                }
+
+                // Çekilen adımları sırayla ekle
+                stepsToImport.forEach(step => {
+                    const stepRow = createStepRow(step.instruction || "");
+                    stepsContainer.appendChild(stepRow);
+                });
+
+                reindexSteps();
+                lucide.createIcons();
+                alert(`"${selectedScenarioToImport}" senaryosunun ${stepsToImport.length} adımı başarıyla eklendi!`);
+            } else {
+                alert("Senaryo adımları getirilemedi.");
+            }
+        } catch (err) {
+            console.error("Adım içe aktarma hatası:", err);
+            alert("Adımlar çekilirken bağlantı hatası oluştu.");
+        } finally {
+            importStepsBtn.disabled = false;
+            importStepsBtn.innerHTML = origText;
+        }
+    });
+}
+
+    // Modal açıldığında içe aktarılacak senaryoları listeleyen fonksiyon
+async function populateImportScenarioDropdown() {
+    const importDropdown = document.getElementById("import-scenario-dropdown");
+    if (!importDropdown || !currentProject) return;
+
+    importDropdown.innerHTML = `<option value="" disabled selected>İçe aktarılacak senaryoyu seçin...</option>`;
+    const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+
+    try {
+        const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}`, {
+            headers: { "X-User-Token": userSession.token || "" }
+        });
+        const result = await res.json();
+
+        if (result.scenarios && result.scenarios.length > 0) {
+            result.scenarios.forEach(scenName => {
+                // Kendi kendini tekrar aktarmasın diye düzenleme modunda mevcut senaryoyu gizleyebiliriz
+                if (typeof globalEditScenarioName !== "undefined" && globalEditScenarioName === scenName) return;
+
+                const opt = document.createElement("option");
+                opt.value = scenName;
+                opt.textContent = scenName;
+                importDropdown.appendChild(opt);
+            });
+        }
+    } catch (err) {
+        console.error("İçe aktarılacak senaryolar listelenirken hata:", err);
+    }
 }
 
     // Araya veya sona dinamik adım satırı ekleyen yardımcı fonksiyon
