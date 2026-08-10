@@ -163,6 +163,71 @@ router.post('/projects/delete', requireAuth, requireAdmin, validate(deleteProjec
     }
 });
 
+// ─── 2.2 API: PROJE ADI GÜNCELLEME (Sadece ADMIN Yetkili) ───
+router.post('/projects/update', requireAuth, requireAdmin, async (req, res, next) => {
+    const { oldProjectName, newProjectName } = req.body;
+
+    if (!oldProjectName || !newProjectName) {
+        return res.status(400).json({ error: "Eksik parametre var!" });
+    }
+
+    if (oldProjectName.trim() === 'Varsayılan Proje') {
+        return res.status(400).json({ error: "Varsayılan projenin adı değiştirilemez!" });
+    }
+
+    const sanitizedNewName = newProjectName.replace(/[^a-zA-Z0-9\s_-]/g, '').trim();
+    if (!sanitizedNewName) {
+        return res.status(400).json({ error: "Geçersiz yeni proje adı!" });
+    }
+
+    try {
+        // 1. Değiştirilmek istenen proje var mı?
+        const projectRes = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: oldProjectName.trim() }
+        });
+
+        if (!projectRes.success || !projectRes.data || projectRes.data.length === 0) {
+            return res.status(404).json({ error: "Güncellenecek proje bulunamadı!" });
+        }
+
+        const foundProj = projectRes.data[0];
+
+        // 2. Yeni isimde başka proje var mı (çakışma kontrolü)?
+        const checkExist = await dpu.selectWhere('projeler', {
+            proje_adi: { eq: sanitizedNewName }
+        });
+
+        if (checkExist.success && checkExist.data && checkExist.data.length > 0) {
+            return res.status(400).json({ error: "Bu isimde bir proje zaten mevcut!" });
+        }
+
+        // 3. Projeler tablosunda güncelle
+        const updateRes = await dpu.update('projeler', foundProj.id, { proje_adi: sanitizedNewName });
+        if (!updateRes.success) {
+            return res.status(500).json({ error: "Proje adı güncellenirken veritabanı hatası oluştu." });
+        }
+
+        // 4. kullanici_projeleri junction tablosundaki eski proje adlarını yeni isimle güncelle
+        const permsRes = await dpu.selectWhere('kullanici_projeleri', {
+            proje_adi: { eq: oldProjectName.trim() }
+        });
+
+        if (permsRes.success && permsRes.data) {
+            for (const perm of permsRes.data) {
+                await dpu.update('kullanici_projeleri', perm.id, { proje_adi: sanitizedNewName });
+            }
+        }
+
+        return res.json({ 
+            success: true, 
+            projectName: sanitizedNewName, 
+            message: `Proje adı "${sanitizedNewName}" olarak başarıyla değiştirildi.` 
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // ─── 3. API: PROJE BAZLI SENARYOLARI LİSTELEME ───
 router.get('/list', requireAuth, requireProjectAccess, async (req, res, next) => {
     const project = req.query.project || req.query.projectName;
