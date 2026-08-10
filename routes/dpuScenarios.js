@@ -461,6 +461,7 @@ router.post('/delete', requireAuth, requireProjectAccess, async (req, res, next)
 
 // ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA ───
 
+// ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA ───
 router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), requireProjectAccess, async (req, res, next) => {
     const { scenarioName, targetUrl, projectName } = req.body;
 
@@ -494,30 +495,44 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), re
 
         const foundScenario = scenariosRes.data[0];
 
-        const rawSteps = foundScenario.adimlar;
+        // 💡 Klasörlerin (cache ve ai-security) varlığı garanti ediliyor
         const cacheDir = path.join(process.cwd(), 'cache');
+        const aiSecurityDir = path.join(cacheDir, 'ai-security');
         if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+        if (!fs.existsSync(aiSecurityDir)) fs.mkdirSync(aiSecurityDir, { recursive: true });
 
         const uniqueFileName = `runtime_steps_${Date.now()}_${Math.random().toString(36).substring(7)}.json`;
         const runtimeStepsPath = path.join(cacheDir, uniqueFileName);
 
+        const rawSteps = foundScenario.adimlar;
         const stepsString = typeof rawSteps === 'string' ? rawSteps : JSON.stringify(rawSteps, null, 2);
         fs.writeFileSync(runtimeStepsPath, stepsString, 'utf-8');
 
         const testResult = await runPlaywrightTest(runtimeStepsPath);
 
+        // Log boyutu çok uzunsa DB sınırına takılmaması için son 50.000 karakter alınır
+        const safeLogContent = testResult.logContent && testResult.logContent.length > 50000 
+            ? testResult.logContent.slice(-50000) 
+            : (testResult.logContent || '');
+
         const reportData = {
             project_id: projectId,
             scenario_name: scenarioName,
             status: testResult.isSuccess ? "SUCCESS" : "FAILED",
-            log_content: testResult.logContent,
+            log_content: safeLogContent,
             created_at: new Date().toISOString()
         };
 
+        // 💡 Rapor veritabanına eklenir ve yanıt kontrol edilir
         try {
-            await dpu.insert('raporlar', reportData);
+            const insertRes = await dpu.insert('raporlar', reportData);
+            if (!insertRes.success) {
+                console.error("❌ Rapor DPU Base veritabanına yazılamadı:", insertRes);
+            } else {
+                console.log("✅ Rapor veritabanına başarıyla kaydedildi.");
+            }
         } catch (dbErr) {
-            console.error("⚠️ Rapor veritabanına yazılırken hata oluştu:", dbErr.message);
+            console.error("⚠️ Rapor veritabanına yazılırken istisna oluştu:", dbErr.message);
         }
 
         if (!testResult.isSuccess) {
@@ -746,6 +761,37 @@ router.post('/reports/delete', requireAuth, async (req, res, next) => {
                 next(error);
             }
         });
+
+
+// ─── API: ÖNBELLEK (CACHE) TEMİZLEME ───
+// ─── API: ÖNBELLEK (CACHE) TEMİZLEME ───
+router.post('/cache/clear', requireAuth, async (req, res, next) => {
+    try {
+        const cacheDir = path.join(process.cwd(), 'cache');
+        const aiSecurityDir = path.join(cacheDir, 'ai-security');
+        
+        if (fs.existsSync(cacheDir)) {
+            const files = fs.readdirSync(cacheDir);
+            for (const file of files) {
+                const curPath = path.join(cacheDir, file);
+                if (fs.lstatSync(curPath).isDirectory()) {
+                    fs.rmSync(curPath, { recursive: true, force: true });
+                } else {
+                    fs.unlinkSync(curPath);
+                }
+            }
+        }
+        
+        // Klasörlerin varlığı temizlik sonrası hemen tekrar kurulur
+        if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+        if (!fs.existsSync(aiSecurityDir)) fs.mkdirSync(aiSecurityDir, { recursive: true });
+
+        return res.json({ success: true, message: "Geçici önbellek (cache) dosyaları başarıyla temizlendi!" });
+    } catch (error) {
+        console.error("Cache temizleme hatası:", error);
+        return res.status(500).json({ error: "Önbellek temizlenirken bir sunucu hatası oluştu." });
+    }
+});
 
 // ─── KULLANICI YÖNETİMİ ───
 

@@ -1099,6 +1099,45 @@ window.editProject = async function(oldProjectName) {
         });
     }
 
+    // Önbellek Temizleme Buton Olayı
+const clearCacheBtn = document.getElementById("clear-cache-btn");
+if (clearCacheBtn) {
+    clearCacheBtn.addEventListener("click", async () => {
+        const confirmClear = confirm("Sunucudaki geçici önbellek dosyaları temizlenecek ve ekrandaki veriler güncellenecek. Onaylıyor musunuz?");
+        if (!confirmClear) return;
+
+        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+        const origHtml = clearCacheBtn.innerHTML;
+        clearCacheBtn.disabled = true;
+        clearCacheBtn.innerHTML = `<span class="text-amber-400 animate-pulse">Temizleniyor...</span>`;
+
+        try {
+            const res = await fetch("/api/scenarios/cache/clear", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-User-Token": userSession.token || ""
+                }
+            });
+
+            const result = await res.json();
+            if (res.ok && result.success) {
+                alert("🎉 " + result.message);
+                await loadProjects(); // Verileri canlı tazelemek için
+            } else {
+                alert("❌ Önbellek temizlenemedi: " + (result.error || "Bilinmeyen hata"));
+            }
+        } catch (err) {
+            console.error("Cache temizleme isteğinde hata:", err);
+            alert("❌ Sunucu bağlantı hatası!");
+        } finally {
+            clearCacheBtn.disabled = false;
+            clearCacheBtn.innerHTML = origHtml;
+            lucide.createIcons();
+        }
+    });
+}
+
     navButtons.forEach(btn => {
         btn.addEventListener("click", () => {
             const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
@@ -1111,6 +1150,11 @@ window.editProject = async function(oldProjectName) {
 
             if (targetViewId === "view-batch") {
                 loadBatchScenarios();
+            }
+
+            
+            if (targetViewId === "view-reports") {
+                loadReports();
             }
 
             navButtons.forEach(b => {
