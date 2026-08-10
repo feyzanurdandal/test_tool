@@ -61,7 +61,7 @@ CRITICAL PARSING RULES:
    - Only exact, literal Turkish UI text (like button names, input labels: e.g., "Giriş Yap", "Kullanıcı Adı") or input values (e.g., "feyza") must remain in Turkish inside double quotes.
    - General action descriptions (e.g., "the text area", "the search input", "the output field") must be translated entirely to English.
    - Do NOT wrap entire descriptive sentences in double quotes. Only wrap the specific target element's label if it exists as-is on the screen.
-
+- CRITICAL FAILURE CONDITION: If any error modal, warning dialog, alert box, or failure notification pop-up is detected on the screen during execution, treat it as a critical failure and terminate the test sequence immediately.
 JSON Output Schema Example:
 {
   "targetUrl": "https://example.com",

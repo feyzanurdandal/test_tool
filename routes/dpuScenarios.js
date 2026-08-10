@@ -73,7 +73,14 @@ const isLogContainsError = (logContent) => {
         'failed to launch',
         'timeout',
         'element not found',
-        'execution context was destroyed'
+        'execution context was destroyed',
+        'hata oluştu',
+        'başarısız',
+        'uyarı:',
+        'geçersiz',
+        'alert:',
+        'modal-error',
+        'lütfen kontrol edin'
     ];
 
     return errorKeywords.some(keyword => lowerLog.includes(keyword));
