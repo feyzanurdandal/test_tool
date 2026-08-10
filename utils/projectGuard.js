@@ -1,39 +1,44 @@
 import dpu from '../config/dpuService.js';
+
 /**
  * Kullanıcının erişmeye çalıştığı projeye yetkisi olup olmadığını kontrol eden merkezi middleware.
- * Request body, query veya params içinden 'projectName' veya 'proje' parametresini otomatik yakalar.
  */
 export const requireProjectAccess = async (req, res, next) => {
     try {
-        // ADMIN her projeye erişebilir
+        // 1. ADMIN her projeye engelsiz erişebilir
         if (req.user && req.user.role === 'ADMIN') {
             return next();
         }
 
-        // Proje adını gelen istekten esnekçe çekiyoruz
-        const projectName = req.body?.projectName || req.body?.proje || req.query?.projectName || req.query?.proje;
+        // 2. Proje adını gelen istekten esnekçe çekiyoruz (project, projectName, proje)
+        const rawProjectName = req.query?.project || req.query?.projectName || req.query?.proje ||
+                               req.body?.project || req.body?.projectName || req.body?.proje;
 
-        if (!projectName) {
+        if (!rawProjectName) {
             return res.status(400).json({ success: false, error: "Proje adı belirtilmelidir!" });
         }
 
-        // Kullanıcı veritabanından sorgulanır
-        const userResult = await dpu.selectWhere('kullanicilar', { kullanici_adi: { eq: req.user.username } });
-        
-        if (!userResult.success || !userResult.data || userResult.data.length === 0) {
-            return res.status(401).json({ success: false, error: "Oturum açan kullanıcı veritabanında bulunamadı!" });
+        const targetProject = String(rawProjectName).trim().toLowerCase();
+        const username = String(req.user?.username || '').trim().toLowerCase();
+
+        // 3. Kullanıcının atandığı projeler 'kullanici_projeleri' tablosundan sorgulanır
+        const permsRes = await dpu.selectWhere('kullanici_projeleri', { 
+            kullanici_adi: { eq: username } 
+        });
+
+        if (!permsRes.success || !permsRes.data) {
+            return res.status(500).json({ success: false, error: "Kullanıcı yetkileri veritabanından çekilemedi." });
         }
 
-        const user = userResult.data[0];
-        const assignedProjects = user.projeler || [];
+        const assignedProjects = permsRes.data.map(p => String(p.proje_adi || '').trim().toLowerCase());
 
-        // Kullanıcının atandığı projeler arasında bu proje var mı?
-        const hasAccess = assignedProjects.includes(projectName);
+        // 4. Harf büyüklüğünden bağımsız yetki kontrolü
+        const hasAccess = assignedProjects.includes(targetProject);
 
         if (!hasAccess) {
             return res.status(403).json({ 
                 success: false, 
-                error: `Erişim Engellendi: '${projectName}' projesine erişim yetkiniz bulunmuyor!` 
+                error: `Erişim Engellendi: '${rawProjectName}' projesine erişim yetkiniz bulunmuyor!` 
             });
         }
 
