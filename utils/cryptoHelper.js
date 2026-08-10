@@ -49,7 +49,7 @@ export function decrypt(encryptedText) {
 
         return decrypted;
     } catch (error) {
-        console.error("❌ Şifre çözme (Decryption) hatası:", error.message);
+        console.error(" Şifre çözme (Decryption) hatası:", error.message);
         return encryptedText; 
     }
 }

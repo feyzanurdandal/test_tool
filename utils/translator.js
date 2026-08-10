@@ -17,7 +17,7 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
 
     // 2. Ayarları DPU Base'den Çekme
     try {
-        console.log("🔄 [Translator Gateway] Ayarlar DPU Base'den sorgulanıyor...");
+        console.log(" [Translator Gateway] Ayarlar DPU Base'den sorgulanıyor...");
         const dpuModule = await import('../config/dpuService.js');
         const dpuClient = dpuModule.default || dpuModule;
 
@@ -29,7 +29,7 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
             
             if (activeTranslatorRow) {
                 chosenApi = activeTranslatorRow.ayar_deger;
-                console.log(`🎯 [Translator Gateway] Aktif Çeviri Sağlayıcısı: ${chosenApi}. Key ve Model yükleniyor...`);
+                console.log(` [Translator Gateway] Aktif Çeviri Sağlayıcısı: ${chosenApi}. Key ve Model yükleniyor...`);
                 
                 const providerRow = settingsRows.find(r => r.ayar_anahtar === chosenApi);
 
@@ -40,12 +40,12 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
             }
         }
     } catch (err) {
-        console.warn("⚠️ DPU Base ayarları okunurken pürüz oluştu, .env fallback aktif:", err.message);
+        console.warn(" DPU Base ayarları okunurken pürüz oluştu, .env fallback aktif:", err.message);
     }
 
-    console.log(`⚙️ [Translator Gateway] Aktif Sağlayıcı: ${chosenApi} | Model: ${chosenModel}`);
+    console.log(` [Translator Gateway] Aktif Sağlayıcı: ${chosenApi} | Model: ${chosenModel}`);
 
-    // 🛡️ 1. SYSTEM PROMPT (Kural & Güvenlik Duvarı)
+    //  1. SYSTEM PROMPT (Kural & Güvenlik Duvarı)
     const systemPrompt = `
 You are a Stagehand automation expert and JSON compiler. Convert Turkish automation commands into a valid Stagehand JSON object.
 
@@ -73,7 +73,7 @@ JSON Output Schema Example:
 }
     `;
 
-    // 👤 2. USER INPUT (Sadece Ham Veri)
+    //  2. USER INPUT (Sadece Ham Veri)
     const userPrompt = `
 Target URL: "${targetUrl}"
 Turkish Commands:
@@ -91,7 +91,7 @@ Turkish Commands:
                 if (!apiKey) throw new Error("Ayarlar panelinde OpenAI için geçerli bir API Key bulunamadı!");
                 
                 const cleanModelName = chosenModel.replace("openai/", "").trim();
-                console.log(`🚀 [OpenAI Direct] İstek fırlatılıyor. Model: ${cleanModelName}`);
+                console.log(` [OpenAI Direct] İstek fırlatılıyor. Model: ${cleanModelName}`);
 
                 const openai = new OpenAI({ apiKey: apiKey });
                 const response = await openai.chat.completions.create({
@@ -121,7 +121,7 @@ Turkish Commands:
                 else if (cleanModelName === "gemini-2.5-flash") cleanModelName = "gemini-2.5-flash";
                 else if (cleanModelName === "gemini-3.1-flash-lite") cleanModelName = "gemini-3.1-flash-lite";
                 
-                console.log(`🚀 [Gemini Direct] İstek fırlatılıyor. Model: models/${cleanModelName}`);
+                console.log(` [Gemini Direct] İstek fırlatılıyor. Model: models/${cleanModelName}`);
 
                 const genAI = new GoogleGenerativeAI(apiKey, { apiVersion: "v1" });
                 const model = genAI.getGenerativeModel({ 
@@ -145,7 +145,7 @@ Turkish Commands:
             case "qwen3:1.7b":
             case "local":
             case "dpu": {
-                console.log(`🚀 [DPU Qwen Direct] ai.dpu.edu.tr üzerinden istek fırlatılıyor. Model: ${chosenModel}`);
+                console.log(` [DPU Qwen Direct] ai.dpu.edu.tr üzerinden istek fırlatılıyor. Model: ${chosenModel}`);
                 
                 const dpuAiUrl = "https://ai.dpu.edu.tr/api/chat"; 
                 const bodyPayload = {
@@ -192,7 +192,7 @@ Turkish Commands:
         return JSON.parse(cleanJsonText);
 
     } catch (error) {
-        console.error("❌ [Translator Gateway Error]:", error.message);
+        console.error("[Translator Gateway Error]:", error.message);
         return null;
     }
 }

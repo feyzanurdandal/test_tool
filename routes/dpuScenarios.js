@@ -35,13 +35,13 @@ const runPlaywrightTest = (stepsFilePath, timeoutMs = 120000) => {
         const childProcess = exec('npx playwright test tests/ai-security.spec.ts', { env, timeout: timeoutMs }, (error, stdout, stderr) => {
             if (error) {
                 if (error.killed) {
-                    console.error(`❌ Playwright Testi Zaman Aşımına Uğradı (${timeoutMs / 1000}sn) ve Öldürüldü!`);
+                    console.error(` Playwright Testi Zaman Aşımına Uğradı (${timeoutMs / 1000}sn) ve Öldürüldü!`);
                 } else {
-                    console.error("❌ Playwright Test Hatası (stdout):", stdout);
-                    console.error("❌ Playwright Test Hatası (stderr):", stderr);
+                    console.error(" Playwright Test Hatası (stdout):", stdout);
+                    console.error(" Playwright Test Hatası (stderr):", stderr);
                 }
             } else {
-                console.log("✅ Playwright Testi Başarıyla Tamamlandı.");
+                console.log(" Playwright Testi Başarıyla Tamamlandı.");
             }
 
             try {
@@ -487,7 +487,6 @@ router.post('/delete', requireAuth, requireProjectAccess, async (req, res, next)
     }
 });
 
-// ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA ───
 
 // ─── 7. API: TEKİL TESTİ PLAYWRIGHT İLE KOŞTURMA ───
 router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), requireProjectAccess, async (req, res, next) => {
@@ -523,7 +522,7 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), re
 
         const foundScenario = scenariosRes.data[0];
 
-        // 💡 Klasörlerin (cache ve ai-security) varlığı garanti ediliyor
+        //  Klasörlerin (cache ve ai-security) varlığı garanti ediliyor
         const cacheDir = path.join(process.cwd(), 'cache');
         const aiSecurityDir = path.join(cacheDir, 'ai-security');
         if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
@@ -543,7 +542,7 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), re
             ? testResult.logContent.slice(-50000) 
             : (testResult.logContent || '');
 
-        // 💡 YENİ STATÜ MANTIĞI:
+        //  YENİ STATÜ MANTIĞI:
         // Playwright başarılı dönse dahi log içinde HATA terimleri varsa statü FAILED yapılır.
         const hasErrorInLog = isLogContainsError(safeLogContent);
         const finalStatus = (testResult.isSuccess && !hasErrorInLog) ? "SUCCESS" : "FAILED";
@@ -556,16 +555,16 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), re
             created_at: new Date().toISOString()
         };
 
-        // 💡 Rapor veritabanına eklenir ve yanıt kontrol edilir
+        //  Rapor veritabanına eklenir ve yanıt kontrol edilir
         try {
             const insertRes = await dpu.insert('raporlar', reportData);
             if (!insertRes.success) {
-                console.error("❌ Rapor DPU Base veritabanına yazılamadı:", insertRes);
+                console.error(" Rapor DPU Base veritabanına yazılamadı:", insertRes);
             } else {
-                console.log("✅ Rapor veritabanına başarıyla kaydedildi.");
+                console.log(" Rapor veritabanına başarıyla kaydedildi.");
             }
         } catch (dbErr) {
-            console.error("⚠️ Rapor veritabanına yazılırken istisna oluştu:", dbErr.message);
+            console.error(" Rapor veritabanına yazılırken istisna oluştu:", dbErr.message);
         }
 
         if (!testResult.isSuccess) {
@@ -578,7 +577,7 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), re
     }
 });
 
-// ─── 8. API: PROJE BAZLI RAPORLARI LİSTELEME ───
+
 // ─── 8. API: PROJE BAZLI RAPORLARI LİSTELEME ───
 router.get('/reports/list', requireAuth, requireProjectAccess, async (req, res, next) => {
     const project = req.query.project || req.query.projectName;
@@ -597,7 +596,7 @@ router.get('/reports/list', requireAuth, requireProjectAccess, async (req, res, 
         
         const projectId = projectRes.data[0].id;
 
-        // 💡 1000 Kayıt Limiti Geçilerek DPU Base'in 50 Kayıt Kısıtı Aşılır
+        //  1000 Kayıt Limiti Geçilerek DPU Base'in 50 Kayıt Kısıtı Aşılır
         let reportsRes = await dpu.selectWhere('raporlar', {
             project_id: { eq: projectId }
         }, { limit: 1000 });
@@ -852,8 +851,6 @@ router.post('/reports/delete-batch', requireAuth, async (req, res, next) => {
     }
 });
 
-
-// ─── API: ÖNBELLEK (CACHE) TEMİZLEME ───
 // ─── API: ÖNBELLEK (CACHE) TEMİZLEME ───
 router.post('/cache/clear', requireAuth, async (req, res, next) => {
     try {

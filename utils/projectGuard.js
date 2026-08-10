@@ -44,7 +44,7 @@ export const requireProjectAccess = async (req, res, next) => {
 
         next();
     } catch (err) {
-        console.error("🚨 [ProjectGuard Middleware Error]:", err.message);
+        console.error(" [ProjectGuard Middleware Error]:", err.message);
         return res.status(500).json({ success: false, error: "Yetki kontrolü sırasında sunucu hatası oluştu." });
     }
 };

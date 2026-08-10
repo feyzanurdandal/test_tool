@@ -20,7 +20,7 @@ class DpuService {
             return this.token;
         }
 
-        console.log("🔄 DPU Base: Yeni JWT Token alınıyor...");
+        console.log(" DPU Base: Yeni JWT Token alınıyor...");
         try {
             const response = await fetch(`${this.baseUrl}/api/v1/auth/token`, {
                 method: "POST",
@@ -39,13 +39,13 @@ class DpuService {
             if (result.success && result.data && result.data.token) {
                 this.token = result.data.token;
                 this.tokenExpiresAt = new Date(result.data.expires_at);
-                console.log("✅ DPU Base: JWT Token başarıyla güncellendi.");
+                console.log(" DPU Base: JWT Token başarıyla güncellendi.");
                 return this.token;
             } else {
                 throw new Error(result.message || "Token alınamadı.");
             }
         } catch (error) {
-            console.error("❌ DPU Base Bağlantı Hatası ! Değerleri kontrol et:", error.message);
+            console.error(" DPU Base Bağlantı Hatası ! Değerleri kontrol et:", error.message);
             throw error;
         }
     }
@@ -88,10 +88,10 @@ class DpuService {
                 if (attempt < options.retries) {
                     // Her başarısız denemede bekleme süresini katla (1sn, 2sn...)
                     const backoffDelay = Math.pow(2, attempt) * 1000;
-                    console.warn(`⚠️ [DPU Base Retry] İstek başarısız oldu (${errorMessage}). ${attempt + 1}/${options.retries} deneme ${backoffDelay}ms sonra yapılacak...`);
+                    console.warn(` [DPU Base Retry] İstek başarısız oldu (${errorMessage}). ${attempt + 1}/${options.retries} deneme ${backoffDelay}ms sonra yapılacak...`);
                     await new Promise(resolve => setTimeout(resolve, backoffDelay));
                 } else {
-                    console.error(`❌ [DPU Base Critical Failure] ${options.retries} deneme sonrası istek tamamen başarısız oldu:`, errorMessage);
+                    console.error(` [DPU Base Critical Failure] ${options.retries} deneme sonrası istek tamamen başarısız oldu:`, errorMessage);
                 }
             }
         }

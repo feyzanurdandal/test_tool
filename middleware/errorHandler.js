@@ -2,7 +2,7 @@
  //1. Tekil Controller/Route Hataları İçin Yardımcı Fonksiyon
 
 export const sendServerError = (res, err, customMessage = "Sunucu Hatası", context = "General") => {
-    console.error(`🚨 [${context} Error]:`, err);
+    console.error(` [${context} Error]:`, err);
     
     const isProduction = process.env.NODE_ENV === 'production';
 
@@ -17,7 +17,7 @@ export const sendServerError = (res, err, customMessage = "Sunucu Hatası", cont
  //2. Express Global Hata Yakalama Middleware'i
 
 export const globalErrorHandler = (err, req, res, next) => {
-    console.error("🚨 [Global Error Handler]:", err);
+    console.error(" [Global Error Handler]:", err);
 
     const statusCode = err.statusCode || 500;
     const isProduction = process.env.NODE_ENV === 'production';

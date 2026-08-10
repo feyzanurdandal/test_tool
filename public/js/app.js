@@ -211,7 +211,7 @@ window.editProject = async function(oldProjectName) {
     // 1. Senaryoları Çekip Akordeon Kartı Yapan Fonksiyon
     async function loadScenarios() {
         if (!currentProject || currentProject === "Varsayılan Proje") {
-            console.log("⚠️ Geçerli bir proje seçilmediği için senaryo isteği iptal edildi.");
+            console.log(" Geçerli bir proje seçilmediği için senaryo isteği iptal edildi.");
             return;
         }
 
@@ -522,7 +522,7 @@ window.editProject = async function(oldProjectName) {
         if (!reportsEmpty || !accordionContainer) return;
 
         try {
-            console.log(`🔄 "${currentProject}" projesi için raporlar yükleniyor...`);
+            console.log(` "${currentProject}" projesi için raporlar yükleniyor...`);
             const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
             const res = await fetch(`/api/scenarios/reports/list?project=${encodeURIComponent(currentProject)}`, {
@@ -794,7 +794,7 @@ window.editProject = async function(oldProjectName) {
                         if (deleteRes.ok && deleteResult.success) {
                             await loadReports();
                         } else {
-                            alert(`❌ Rapor silinemedi: ${deleteResult.error || "Hata oluştu"}`);
+                            alert(` Rapor silinemedi: ${deleteResult.error || "Hata oluştu"}`);
                             deleteReportBtn.disabled = false;
                         }
                     } catch (err) {
@@ -882,7 +882,7 @@ window.editProject = async function(oldProjectName) {
         const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
         try {
-            console.log(`🔄 "${activeProjectName}" projesi için toplu test senaryoları çekiliyor...`);
+            console.log(` "${activeProjectName}" projesi için toplu test senaryoları çekiliyor...`);
             
             const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(activeProjectName)}`, {
                 headers: {
@@ -1200,11 +1200,11 @@ if (clearCacheBtn) {
                 alert("🎉 " + result.message);
                 await loadProjects(); // Verileri canlı tazelemek için
             } else {
-                alert("❌ Önbellek temizlenemedi: " + (result.error || "Bilinmeyen hata"));
+                alert(" Önbellek temizlenemedi: " + (result.error || "Bilinmeyen hata"));
             }
         } catch (err) {
             console.error("Cache temizleme isteğinde hata:", err);
-            alert("❌ Sunucu bağlantı hatası!");
+            alert(" Sunucu bağlantı hatası!");
         } finally {
             clearCacheBtn.disabled = false;
             clearCacheBtn.innerHTML = origHtml;
@@ -1219,7 +1219,7 @@ if (clearCacheBtn) {
             const targetViewId = btn.getAttribute("data-target");
 
             if (targetViewId === "view-settings" && userSession.role === "PM") {
-                alert("⚠️ Bu alana erişim yetkiniz bulunmamaktadır!");
+                alert(" Bu alana erişim yetkiniz bulunmamaktadır!");
                 return;
             }
 
@@ -1249,7 +1249,7 @@ if (clearCacheBtn) {
         addProjectBtn.addEventListener("click", () => {
             const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
             if (userSession.role === "PM") {
-                alert("⚠️ Proje oluşturma yetkiniz bulunmamaktadır!");
+                alert(" Proje oluşturma yetkiniz bulunmamaktadır!");
                 return;
             }
             if (newProjectNameInput) newProjectNameInput.value = "";
@@ -1448,7 +1448,7 @@ async function populateImportScenarioDropdown() {
         // Araya adım ekleme buton olayı
         stepRow.querySelector(".add-step-after-btn").addEventListener("click", () => {
             const newRow = createStepRow();
-            stepRow.after(newRow); // Seçili satırın hemen altına ekler
+            stepRow.after(newRow);
             reindexSteps();
             lucide.createIcons();
             newRow.querySelector(".step-input").focus();
@@ -1539,12 +1539,12 @@ async function populateImportScenarioDropdown() {
 
                 const result = await res.json();
                 if (res.ok && result.success) {
-                    alert(isEditMode ? "🎉 Senaryo başarıyla güncellendi ve yapay zeka tarafından yeniden çevrildi!" : "🎉 Senaryo başarıyla oluşturuldu ve yapay zeka tarafından çevrilip kaydedildi!");
+                    alert(isEditMode ? "Senaryo başarıyla güncellendi ve yapay zeka tarafından yeniden çevrildi!" : "Senaryo başarıyla oluşturuldu ve yapay zeka tarafından çevrilip kaydedildi!");
                     globalEditScenarioName = "";
                     if (scenarioModal) scenarioModal.classList.add("hidden");
                     await loadScenarios();
                 } else {
-                    alert(`❌ Kayıt Hatası: ${result.error || "Bilinmeyen hata"}`);
+                    alert(`Kayıt Hatası: ${result.error || "Bilinmeyen hata"}`);
                 }
             } catch (err) {
                 console.error("Senaryo kaydetme isteğinde hata patladı:", err);
@@ -1967,16 +1967,16 @@ async function populateImportScenarioDropdown() {
 
                 const result = await res.json();
                 if (res.ok && result.success) {
-                    alert(isEditMode ? "🎉 Kullanıcı yetkileri başarıyla güncellendi!" : "🎉 Kullanıcı başarıyla oluşturuldu!");
+                    alert(isEditMode ? "Kullanıcı yetkileri başarıyla güncellendi!" : " Kullanıcı başarıyla oluşturuldu!");
                     if (userModal) userModal.classList.add("hidden");
                     globalEditUserId = ""; 
                     await loadUsers(); 
                 } else {
-                    alert(`❌ Hata: ${result.error || "İşlem başarısız"}`);
+                    alert(`Hata: ${result.error || "İşlem başarısız"}`);
                 }
             } catch (err) {
                 console.error(err);
-                alert("❌ Sunucu bağlantı hatası!");
+                alert("Sunucu bağlantı hatası!");
             }
         });
     }
@@ -2062,11 +2062,11 @@ async function populateImportScenarioDropdown() {
                 if (res.ok && result.success) {
                     await loadReports();
                 } else {
-                    alert(`❌ Silme Hatası: ${result.error || "Hata oluştu"}`);
+                    alert(`Silme Hatası: ${result.error || "Hata oluştu"}`);
                 }
             } catch (err) {
                 console.error("Toplu silmede hata:", err);
-                alert("❌ Sunucu bağlantı hatası!");
+                alert("Sunucu bağlantı hatası!");
             } finally {
                 deleteSelectedBtn.disabled = false;
                 deleteSelectedBtn.innerHTML = origText;
