@@ -156,14 +156,80 @@
                 </div>
 
                 <div id="view-reports" class="view-content space-y-6 hidden">
-                    <div>
-                        <h2 class="text-xl font-bold tracking-tight text-white">Test Raporları</h2>
-                        <p class="text-xs text-zinc-500 mt-0.5"><span class="current-project-label">Yükleniyor</span> projesine ait geçmiş test çıktıları</p>
+                    <!-- Header -->
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h2 class="text-xl font-bold tracking-tight text-white">Test Raporları</h2>
+                            <p class="text-xs text-zinc-500 mt-0.5"><span class="current-project-label">Yükleniyor</span> projesine ait geçmiş test koşturum çıktıları</p>
+                        </div>
+                        <button id="refresh-reports-btn" class="bg-[#18181b] hover:bg-[#27272a] text-zinc-300 border border-[rgba(255,255,255,0.08)] text-xs px-3 py-2 rounded-lg transition flex items-center gap-1.5 self-start md:self-auto cursor-pointer">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-[#3b82f6]"></i>
+                            <span>Raporları Yenile</span>
+                        </button>
                     </div>
-                    
+
+                    <!-- İstatistik Kartları -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-4 rounded-xl flex items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-[#3b82f6] shrink-0">
+                                <i data-lucide="layers" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Toplam Test</span>
+                                <div id="stat-total-reports" class="text-lg font-extrabold text-white font-mono">0</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-4 rounded-xl flex items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Başarılı</span>
+                                <div id="stat-passed-reports" class="text-lg font-extrabold text-emerald-400 font-mono">0</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-4 rounded-xl flex items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+                                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Başarısız</span>
+                                <div id="stat-failed-reports" class="text-lg font-extrabold text-rose-400 font-mono">0</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-4 rounded-xl flex items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                                <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Başarı Oranı</span>
+                                <div id="stat-rate-reports" class="text-lg font-extrabold text-amber-400 font-mono">%0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtreleme ve Arama Barı -->
+                    <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-3 rounded-xl flex flex-col sm:flex-row items-center gap-3">
+                        <div class="relative flex-1 w-full">
+                            <i data-lucide="search" class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                            <input type="text" id="report-search-input" placeholder="Senaryo adına göre arayın..." class="w-full bg-[#09090b] border border-[rgba(255,255,255,0.06)] pl-9 pr-3 py-2 rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                        </div>
+                        <div class="w-full sm:w-48 shrink-0">
+                            <select id="report-filter-status" class="w-full bg-[#09090b] border border-[rgba(255,255,255,0.06)] px-3 py-2 rounded-lg text-xs text-white outline-none cursor-pointer focus:border-[#3b82f6] transition">
+                                <option value="ALL">Tüm Durumlar</option>
+                                <option value="SUCCESS">Sadece Başarılı</option>
+                                <option value="FAILED">Sadece Başarısız</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Rapor Listesi Konteyneri -->
                     <div id="reports-container" class="space-y-3">
                         <div id="reports-empty" class="text-xs text-zinc-500 font-medium py-12 text-center bg-[#09090b] border border-[rgba(255,255,255,0.08)] rounded-xl">
-                            Bu projeye ait henüz geçmiş bir test raporu bulunmuyor.
+                            Bu kriterlere uygun test raporu bulunamadı.
                         </div>
                         
                         <div id="reports-list-accordion" class="space-y-3"></div>

@@ -58,6 +58,27 @@ const runPlaywrightTest = (stepsFilePath, timeoutMs = 120000) => {
     });
 };
 
+// Log iceriginde kritik hata keyword'leri var mi kontrol eden yardımcı fonksiyon
+const isLogContainsError = (logContent) => {
+    if (!logContent) return false;
+    const lowerLog = logContent.toLowerCase();
+    
+    // Testin basarısız kabul edilmesi gereken kritik terimler
+    const errorKeywords = [
+        'error:',
+        'failed',
+        'exception:',
+        'cannot find',
+        'incorrect api key',
+        'failed to launch',
+        'timeout',
+        'element not found',
+        'execution context was destroyed'
+    ];
+
+    return errorKeywords.some(keyword => lowerLog.includes(keyword));
+};
+
 // ─── 1. API: PROJELERİ LİSTELEME ───
 router.get('/projects/list', requireAuth, async (req, res, next) => {
     const userRole = req.user.role;
@@ -510,15 +531,20 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), re
 
         const testResult = await runPlaywrightTest(runtimeStepsPath);
 
-        // Log boyutu çok uzunsa DB sınırına takılmaması için son 50.000 karakter alınır
+// Log boyutu çok uzunsa DB sınırına takılmaması için son 50.000 karakter alınır
         const safeLogContent = testResult.logContent && testResult.logContent.length > 50000 
             ? testResult.logContent.slice(-50000) 
             : (testResult.logContent || '');
 
+        // 💡 YENİ STATÜ MANTIĞI:
+        // Playwright başarılı dönse dahi log içinde HATA terimleri varsa statü FAILED yapılır.
+        const hasErrorInLog = isLogContainsError(safeLogContent);
+        const finalStatus = (testResult.isSuccess && !hasErrorInLog) ? "SUCCESS" : "FAILED";
+
         const reportData = {
             project_id: projectId,
             scenario_name: scenarioName,
-            status: testResult.isSuccess ? "SUCCESS" : "FAILED",
+            status: finalStatus,
             log_content: safeLogContent,
             created_at: new Date().toISOString()
         };
@@ -546,6 +572,7 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), re
 });
 
 // ─── 8. API: PROJE BAZLI RAPORLARI LİSTELEME ───
+// ─── 8. API: PROJE BAZLI RAPORLARI LİSTELEME ───
 router.get('/reports/list', requireAuth, requireProjectAccess, async (req, res, next) => {
     const project = req.query.project || req.query.projectName;
     const selectedProj = (project || '').trim();
@@ -563,9 +590,16 @@ router.get('/reports/list', requireAuth, requireProjectAccess, async (req, res, 
         
         const projectId = projectRes.data[0].id;
 
-        const reportsRes = await dpu.selectWhere('raporlar', {
+        // 💡 1000 Kayıt Limiti Geçilerek DPU Base'in 50 Kayıt Kısıtı Aşılır
+        let reportsRes = await dpu.selectWhere('raporlar', {
             project_id: { eq: projectId }
-        });
+        }, { limit: 1000 });
+
+        if ((!reportsRes.success || !reportsRes.data || reportsRes.data.length === 0) && typeof projectId === 'number') {
+            reportsRes = await dpu.selectWhere('raporlar', {
+                project_id: { eq: String(projectId) }
+            }, { limit: 1000 });
+        }
 
         if (reportsRes.success && reportsRes.data) {
             const sortedReports = reportsRes.data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -618,11 +652,18 @@ router.post('/run-batch', testRunLimiter, requireAuth, validate(runBatchSchema),
 
                 const testResult = await runPlaywrightTest(runtimeStepsPath);
 
+                const safeLogContent = testResult.logContent && testResult.logContent.length > 50000 
+                    ? testResult.logContent.slice(-50000) 
+                    : (testResult.logContent || '');
+
+                const hasErrorInLog = isLogContainsError(safeLogContent);
+                const finalStatus = (testResult.isSuccess && !hasErrorInLog) ? "SUCCESS" : "FAILED";
+
                 const reportData = {
                     project_id: projectId,
                     scenario_name: scenario.senaryo_adi,
-                    status: testResult.isSuccess ? "SUCCESS" : "FAILED",
-                    log_content: testResult.logContent,
+                    status: finalStatus,
+                    log_content: safeLogContent,
                     created_at: new Date().toISOString()
                 };
 
