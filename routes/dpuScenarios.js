@@ -803,6 +803,48 @@ router.post('/reports/delete', requireAuth, async (req, res, next) => {
             }
         });
 
+// ─── 12.1 API: TOPLU TEST RAPORLARINI SİLME ───
+router.post('/reports/delete-batch', requireAuth, async (req, res, next) => {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "Silinecek rapor ID'leri gönderilmedi!" });
+    }
+
+    try {
+        let deletedCount = 0;
+
+        for (const id of ids) {
+            const reportRes = await dpu.selectWhere('raporlar', { id: { eq: id } });
+            if (reportRes.success && reportRes.data && reportRes.data.length > 0) {
+                const report = reportRes.data[0];
+                const projectRes = await dpu.selectWhere('projeler', { id: { eq: report.project_id } });
+
+                let isAllowed = true;
+                if (projectRes.success && projectRes.data && projectRes.data.length > 0) {
+                    const projectName = projectRes.data[0].proje_adi;
+                    if (req.user.role !== 'ADMIN') {
+                        const permsRes = await dpu.selectWhere('kullanici_projeleri', { kullanici_adi: { eq: req.user.username.toLowerCase() } });
+                        isAllowed = permsRes.success && permsRes.data ? permsRes.data.some(p => p.proje_adi.toLowerCase() === projectName.toLowerCase()) : false;
+                    }
+                }
+
+                if (isAllowed) {
+                    const deleteResult = await dpu.delete('raporlar', id);
+                    if (deleteResult.success) deletedCount++;
+                }
+            }
+        }
+
+        return res.status(200).json({ 
+            success: true, 
+            message: `${deletedCount} adet rapor başarıyla silindi.` 
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 
 // ─── API: ÖNBELLEK (CACHE) TEMİZLEME ───
 // ─── API: ÖNBELLEK (CACHE) TEMİZLEME ───

@@ -2623,6 +2623,7 @@ window.editProject = async function(oldProjectName) {
                 card.innerHTML = `
                     <div class="accordion-header flex items-center justify-between p-4 cursor-pointer hover:bg-[#27272a]/30 transition select-none">
                         <div class="flex items-center gap-3">
+                            <input type="checkbox" value="${report.id}" class="report-checkbox w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0 cursor-pointer" onclick="event.stopPropagation();">
                             <div class="w-8 h-8 rounded-lg flex items-center justify-center ${isSuccess ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
                                 <i data-lucide="${isSuccess ? 'check-circle' : 'alert-triangle'}" class="w-4 h-4"></i>
                             </div>
@@ -3899,4 +3900,99 @@ async function populateImportScenarioDropdown() {
             }
         });
     }
+
+// Toplu Rapor Seçimi ve Silme Yönetimi
+    function updateSelectedReportsUI() {
+        const checkboxes = document.querySelectorAll(".report-checkbox:checked");
+        const deleteBtn = document.getElementById("delete-selected-reports-btn");
+        const countLabel = document.getElementById("selected-reports-count");
+        const selectAllCb = document.getElementById("select-all-reports-checkbox");
+        const allCheckboxes = document.querySelectorAll(".report-checkbox");
+
+        const count = checkboxes.length;
+        if (countLabel) countLabel.textContent = count;
+
+        if (deleteBtn) {
+            if (count > 0) {
+                deleteBtn.disabled = false;
+                deleteBtn.classList.remove("opacity-50", "cursor-not-allowed");
+                deleteBtn.classList.add("cursor-pointer");
+            } else {
+                deleteBtn.disabled = true;
+                deleteBtn.classList.add("opacity-50", "cursor-not-allowed");
+                deleteBtn.classList.remove("cursor-pointer");
+            }
+        }
+
+        if (selectAllCb && allCheckboxes.length > 0) {
+            selectAllCb.checked = checkboxes.length === allCheckboxes.length;
+        }
+    }
+
+    // Kartlardaki her checkbox değiştiğinde Buton durumunu güncelle
+    document.addEventListener("change", (e) => {
+        if (e.target.classList.contains("report-checkbox")) {
+            updateSelectedReportsUI();
+        }
+    });
+
+    // "Tümünü Seç" Buton Olayı
+    const selectAllBtn = document.getElementById("select-all-reports-btn");
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener("click", () => {
+            const selectAllCb = document.getElementById("select-all-reports-checkbox");
+            const allCheckboxes = document.querySelectorAll(".report-checkbox");
+            const targetState = !selectAllCb.checked;
+
+            selectAllCb.checked = targetState;
+            allCheckboxes.forEach(cb => cb.checked = targetState);
+            updateSelectedReportsUI();
+        });
+    }
+
+    // "Seçilenleri Sil" Buton Olayı
+    const deleteSelectedBtn = document.getElementById("delete-selected-reports-btn");
+    if (deleteSelectedBtn) {
+        deleteSelectedBtn.addEventListener("click", async () => {
+            const selectedCheckboxes = document.querySelectorAll(".report-checkbox:checked");
+            const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+
+            if (selectedIds.length === 0) return;
+
+            const confirmDelete = confirm(`Seçtiğiniz ${selectedIds.length} adet test raporunu kalıcı olarak silmek istediğinize emin misiniz?`);
+            if (!confirmDelete) return;
+
+            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+            const origText = deleteSelectedBtn.innerHTML;
+
+            try {
+                deleteSelectedBtn.disabled = true;
+                deleteSelectedBtn.innerHTML = `<span class="animate-pulse">Siliniyor...</span>`;
+
+                const res = await fetch("/api/scenarios/reports/delete-batch", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-User-Token": userSession.token || ""
+                    },
+                    body: JSON.stringify({ ids: selectedIds })
+                });
+
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    await loadReports();
+                } else {
+                    alert(`❌ Silme Hatası: ${result.error || "Hata oluştu"}`);
+                }
+            } catch (err) {
+                console.error("Toplu silmede hata:", err);
+                alert("❌ Sunucu bağlantı hatası!");
+            } finally {
+                deleteSelectedBtn.disabled = false;
+                deleteSelectedBtn.innerHTML = origText;
+                lucide.createIcons();
+            }
+        });
+    }
+
 });
