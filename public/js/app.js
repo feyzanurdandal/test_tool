@@ -515,6 +515,93 @@ window.editProject = async function(oldProjectName) {
 // ─── RAPOR YÖNETİMİ ───
     let cachedReportsData = [];
 
+// Log içeriğindeki JSON yanıtlarını "finishReason" kuralına göre ayrıştıran ve başlık oluşturan parser
+function parseLogsToSteps(logContent) {
+    if (!logContent) return [];
+
+    const lines = logContent.split('\n');
+    const parsedSteps = [];
+    
+    let currentStepLogs = [];
+    let isInsideStepBlock = false;
+    let currentActionTitle = "";
+    let isStepFailed = false;
+
+    lines.forEach((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        // 1. Yeni bir AI SDK yanıt bloğu başladığında
+        if (trimmed.includes('category: "aisdk"') || trimmed.includes('"action": {') || trimmed.includes('INFO: response')) {
+            if (!isInsideStepBlock) {
+                isInsideStepBlock = true;
+            }
+        }
+
+        // Akordiyon başlığını dinamik yakalamak için satır satır JSON alanlarını oku
+        if (trimmed.includes('"description":')) {
+            const descMatch = trimmed.match(/"description":\s*"(.*?)"/);
+            if (descMatch) currentActionTitle += (currentActionTitle ? " - " : "") + descMatch[1];
+        }
+        if (trimmed.includes('"method":')) {
+            const methodMatch = trimmed.match(/"method":\s*"(.*?)"/);
+            if (methodMatch) currentActionTitle = `[${methodMatch[1].toUpperCase()}] ` + currentActionTitle;
+        }
+        if (trimmed.includes('"arguments":')) {
+            // Sonraki satırlarda gelen argüman verisini başlığa eklemek için log takibi yapıyoruz
+        }
+
+        // Hata kontrolü
+        if (trimmed.includes('[HATA TESPİT EDİLDİ]') || trimmed.includes('CRITICAL_POPUP_ERROR') || trimmed.includes('Error:')) {
+            isStepFailed = true;
+        }
+
+        // Mevcut satırı adım loguna ekle
+        currentStepLogs.push(trimmed);
+
+        // 2. "finishReason": "stop" görüldüğünde O ADIM BİTER
+        if (trimmed.includes('"finishReason": "stop"')) {
+            // Başlık oluşturulamadıysa varsayılan isim ver
+            let finalTitle = currentActionTitle.trim();
+            if (!finalTitle) {
+                finalTitle = "Yapay Zeka İşlem ve Çıktı Adımı";
+            }
+
+            parsedSteps.push({
+                title: finalTitle,
+                status: isStepFailed ? 'FAILED' : 'PASSED',
+                logs: [...currentStepLogs]
+            });
+
+            // Bir sonraki adım için değişkenleri sıfırla
+            currentStepLogs = [];
+            isInsideStepBlock = false;
+            currentActionTitle = "";
+            isStepFailed = false;
+        }
+    });
+
+    // Eğer geriye kalan sistem/hata logları varsa onları da son adım olarak ekle
+    if (currentStepLogs.length > 0) {
+        let hasError = currentStepLogs.some(l => l.includes('❌') || l.includes('CRITICAL_POPUP_ERROR') || l.includes('failed'));
+        
+        // Eğer içerisinde bir action yoksa ve genel sistem/hata loguysa
+        const errorLine = currentStepLogs.find(l => l.includes('❌ [HATA TESPİT EDİLDİ]') || l.includes('CRITICAL_POPUP_ERROR'));
+        let title = hasError 
+            ? `Hata Tespiti: ${errorLine ? errorLine.replace(/.*CRITICAL_POPUP_ERROR:\s*/i, '').replace(/.*❌ \[HATA TESPİT EDİLDİ\]:\s*/i, '') : 'Test Durduruldu'}`
+            : "Sistem ve Kapanış Logları";
+
+        parsedSteps.push({
+            title: title,
+            status: hasError ? 'FAILED' : 'PASSED',
+            logs: currentStepLogs
+        });
+    }
+
+    return parsedSteps;
+}
+
+
     async function loadReports() {
         const reportsEmpty = document.getElementById("reports-empty");
         const accordionContainer = document.getElementById("reports-list-accordion");
@@ -590,8 +677,8 @@ window.editProject = async function(oldProjectName) {
 
         renderReportsList(filtered);
     }
-
-    function renderReportsList(reports) {
+    
+function renderReportsList(reports) {
         const reportsEmpty = document.getElementById("reports-empty");
         const accordionContainer = document.getElementById("reports-list-accordion");
 
@@ -618,159 +705,53 @@ window.editProject = async function(oldProjectName) {
                 let formattedDate = "Tarih Bilgisi Yok";
                 if (report.created_at) {
                     try {
-                        let dateStr = String(report.created_at).trim();
-
-                        // Boşluklu SQL tarih yapısını ISO formatına getir
-                        dateStr = dateStr.replace(' ', 'T');
-
-                        // Eğer saat dilimi işareti (Z, +, -) silinmişse UTC olduğunu tarayıcıya bildir
-                        if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-')) {
-                            dateStr += 'Z';
-                        }
-
-                        const dateObj = new Date(dateStr);
-
-                        // Kullanıcının bilgisayarı hangi ülkedeyse/saat dilimindeyse otomatik o saate çevrilir
-                        formattedDate = dateObj.toLocaleString(navigator.language || "tr-TR", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit"
+                        let dateStr = String(report.created_at).trim().replace(' ', 'T');
+                        if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-')) dateStr += 'Z';
+                        formattedDate = new Date(dateStr).toLocaleString(navigator.language || "tr-TR", {
+                            day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit"
                         });
-                    } catch (e) {
-                        formattedDate = String(report.created_at);
-                    }
+                    } catch (e) { formattedDate = String(report.created_at); }
                 }
 
-                let errorSummaryHtml = "";
-                if (!isSuccess) {
-                    const linesForError = logContent.split('\n');
-                    const errorLine = linesForError.find(line => 
-                        line && (
-                            line.toLowerCase().includes('error:') || 
-                            line.toLowerCase().includes('failed') || 
-                            line.toLowerCase().includes('exception:') ||
-                            line.toLowerCase().includes('cannot find') ||
-                            line.toLowerCase().includes('incorrect api key') ||
-                            line.toLowerCase().includes('failed to launch')
-                        )
-                    ) || "Test çalıştırılırken beklenmeyen bir hata ile karşılaşıldı.";
-
-                    errorSummaryHtml = `
-                        <div class="bg-rose-500/10 border border-rose-500/20 rounded-lg p-3.5 mb-4 text-rose-400 animate-fade-in">
-                            <div class="flex items-center gap-2 mb-1.5">
-                                <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400 shrink-0"></i>
-                                <span class="text-xs font-bold uppercase tracking-wider">Hata Detayı</span>
-                            </div>
-                            <pre class="text-[11px] font-mono whitespace-pre-wrap leading-relaxed select-text">${escapeHtml(errorLine.trim())}</pre>
-                        </div>
-                    `;
-                }
-
-                const lines = logContent.split('\n');
-                const steps = [];
-                let currentStep = null;
-
-                lines.forEach(line => {
-                    const trimmedLine = (line || '').trim();
-                    if (!trimmedLine) return;
-
-                    const infoRegex = /(?:\[.*?\]\s+)?(INFO|WARN|ERROR):\s*(.*)/i;
-                    const match = trimmedLine.match(infoRegex);
-
-                    if (match) {
-                        if (currentStep) steps.push(currentStep);
-                        const logType = match[1].toUpperCase();
-                        const logMessage = match[2].trim();
-                        currentStep = { title: logMessage, type: logType, rawHeader: trimmedLine, content: [] };
-                    } else {
-                        if (!currentStep) {
-                            currentStep = { title: "Sistem ve Altyapı Başlangıç Logları", type: "SYSTEM", rawHeader: "", content: [] };
-                        }
-                        currentStep.content.push(trimmedLine);
-                    }
-                });
-
-                if (currentStep) steps.push(currentStep);
-
-                let nestedStepsHtml = "";
-                steps.forEach((step, idx) => {
-                    const stepBody = step.content.join('\n').trim();
-                    if (!stepBody && step.type === "SYSTEM") return;
-
-                    let badgeClass = "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
-                    if (step.type === "WARN") badgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-                    if (step.type === "ERROR") badgeClass = "bg-rose-500/10 text-rose-400 border-rose-500/20";
-                    if (step.type === "INFO") badgeClass = "bg-blue-500/10 text-[#3b82f6] border-blue-500/20";
-
-                    nestedStepsHtml += `
-                        <div class="border border-[rgba(255,255,255,0.04)] rounded-lg overflow-hidden bg-[#09090b]/40">
-                            <div class="inner-accordion-header flex items-center justify-between p-3 cursor-pointer hover:bg-[#27272a]/20 transition select-none">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-mono text-[10px] text-zinc-500">${String(idx + 1).padStart(2, '0')}.</span>
-                                    <span class="text-[11px] font-medium text-zinc-300">${escapeHtml(step.title)}</span>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[9px] px-1.5 py-0.5 rounded border ${badgeClass} font-mono font-semibold uppercase">${step.type}</span>
-                                    <i data-lucide="chevron-right" class="inner-chevron w-3.5 h-3.5 text-zinc-600 transition-transform duration-200"></i>
-                                </div>
-                            </div>
-                            <div class="inner-accordion-content max-h-0 overflow-hidden transition-all duration-200 ease-in-out">
-                                <div class="p-3 bg-black/40 border-t border-[rgba(255,255,255,0.02)]">
-                                    ${step.rawHeader ? `<div class="text-[10px] font-mono text-zinc-500 border-b border-[rgba(255,255,255,0.02)] pb-1.5 mb-1.5">Ham Satır: ${escapeHtml(step.rawHeader)}</div>` : ''}
-                                    <pre class="text-[10px] font-mono text-zinc-400 overflow-x-auto whitespace-pre-wrap leading-relaxed select-text">${escapeHtml(stepBody) || 'Ekstra detay logu bulunmuyor.'}</pre>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
+                // Log adımlarını ayrıştır
+                const parsedSteps = parseLogsToSteps(logContent);
 
                 const card = document.createElement("div");
-                card.className = "bg-[#18181b] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden transition-all duration-300";
+                card.className = "bg-[#18181b] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)] rounded-xl overflow-hidden transition-all duration-200 cursor-pointer select-none group";
+                
                 card.innerHTML = `
-                    <div class="accordion-header flex items-center justify-between p-4 cursor-pointer hover:bg-[#27272a]/30 transition select-none">
+                    <div class="flex items-center justify-between p-4">
                         <div class="flex items-center gap-3">
                             <input type="checkbox" value="${report.id}" class="report-checkbox w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0 cursor-pointer" onclick="event.stopPropagation();">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center ${isSuccess ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center ${isSuccess ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
                                 <i data-lucide="${isSuccess ? 'check-circle' : 'alert-triangle'}" class="w-4 h-4"></i>
                             </div>
                             <div>
-                                <h4 class="text-xs font-semibold text-white">${escapeHtml(scenarioName)}</h4>
-                                <span class="text-[10px] text-zinc-500">${formattedDate}</span>
+                                <h4 class="text-xs font-semibold text-white group-hover:text-[#3b82f6] transition-colors">${escapeHtml(scenarioName)}</h4>
+                                <span class="text-[10px] text-zinc-500">${formattedDate} · ${parsedSteps.length} Adım</span>
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
-                            <span class="text-[10px] px-2 py-0.5 font-semibold rounded uppercase tracking-wider ${isSuccess ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}">
+                            <span class="text-[10px] px-2.5 py-1 font-semibold rounded uppercase tracking-wider ${isSuccess ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
                                 ${isSuccess ? 'Başarılı' : 'Hata'}
                             </span>
-                            <button class="delete-report-btn text-zinc-500 hover:text-red-400 transition p-1.5 rounded-lg hover:bg-red-500/10 focus:outline-none" data-id="${report.id}">
+                            <button class="delete-report-btn text-zinc-500 hover:text-red-400 transition p-1.5 rounded-lg hover:bg-red-500/10" data-id="${report.id}" onclick="event.stopPropagation();">
                                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                             </button>
-                            <i data-lucide="chevron-down" class="chevron-icon w-4 h-4 text-zinc-500 transition-transform duration-300"></i>
-                        </div>
-                    </div>
-
-                    <div class="accordion-content max-h-0 overflow-hidden transition-all duration-300 ease-in-out bg-[#09090b]/50 border-t border-[rgba(255,255,255,0)]">
-                        <div class="p-4 space-y-3">
-                            ${errorSummaryHtml}
-                            <div class="flex items-center justify-between">
-                                <span class="text-[10px] uppercase font-semibold tracking-wider text-zinc-500">Adım Bazlı Test Akışı</span>
-                                <button class="copy-log-btn text-[10px] text-zinc-500 hover:text-white transition flex items-center gap-1" data-log="${encodeURIComponent(logContent)}">
-                                    <i data-lucide="copy" class="w-3 h-3"></i> Ham Logu Kopyala
-                                </button>
+                            <div class="text-zinc-500 group-hover:text-white transition-colors pl-1">
+                                <i data-lucide="external-link" class="w-4 h-4"></i>
                             </div>
-                            <div class="space-y-2">${nestedStepsHtml}</div>
                         </div>
                     </div>
                 `;
 
-                const header = card.querySelector(".accordion-header");
-                const content = card.querySelector(".accordion-content");
-                const chevron = card.querySelector(".chevron-icon");
-                const deleteReportBtn = card.querySelector(".delete-report-btn");
+                // Kartın herhangı bir yerine tıklandığında doğrudan Pop-Up Modalı Açılır
+                card.addEventListener("click", () => {
+                    openReportModal(scenarioName, formattedDate, isSuccess, logContent, parsedSteps);
+                });
 
+                // Silme Butonu Olayı
+                const deleteReportBtn = card.querySelector(".delete-report-btn");
                 deleteReportBtn.addEventListener("click", async (e) => {
                     e.stopPropagation();
                     const reportId = deleteReportBtn.getAttribute("data-id");
@@ -794,7 +775,7 @@ window.editProject = async function(oldProjectName) {
                         if (deleteRes.ok && deleteResult.success) {
                             await loadReports();
                         } else {
-                            alert(` Rapor silinemedi: ${deleteResult.error || "Hata oluştu"}`);
+                            alert(`Rapor silinemedi: ${deleteResult.error || "Hata oluştu"}`);
                             deleteReportBtn.disabled = false;
                         }
                     } catch (err) {
@@ -803,58 +784,15 @@ window.editProject = async function(oldProjectName) {
                     }
                 });
 
-                header.addEventListener("click", () => {
-                    const isOpen = content.style.maxHeight && content.style.maxHeight !== "0px";
-                    if (isOpen) {
-                        content.style.maxHeight = "0px";
-                        content.style.borderTopColor = "transparent";
-                        chevron.style.transform = "rotate(0deg)";
-                    } else {
-                        content.style.maxHeight = "none"; 
-                        content.style.borderTopColor = "rgba(255,255,255,0.06)";
-                        chevron.style.transform = "rotate(180deg)";
-                    }
-                });
-
-                const innerCards = card.querySelectorAll(".inner-accordion-header");
-                innerCards.forEach(innerHeader => {
-                    innerHeader.addEventListener("click", (e) => {
-                        e.stopPropagation(); 
-                        const innerContent = innerHeader.nextElementSibling;
-                        const innerChevron = innerHeader.querySelector(".inner-chevron");
-                        const isInnerOpen = innerContent.style.maxHeight && innerContent.style.maxHeight !== "0px";
-
-                        if (isInnerOpen) {
-                            innerContent.style.maxHeight = "0px";
-                            innerChevron.style.transform = "rotate(0deg)";
-                        } else {
-                            innerContent.style.maxHeight = innerContent.scrollHeight + "px";
-                            innerChevron.style.transform = "rotate(90deg)"; 
-                        }
-                    });
-                });
-
-                const copyBtn = card.querySelector(".copy-log-btn");
-                copyBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    const rawLog = decodeURIComponent(copyBtn.getAttribute("data-log"));
-                    navigator.clipboard.writeText(rawLog);
-                    
-                    const origHtml = copyBtn.innerHTML;
-                    copyBtn.innerHTML = `<span class="text-emerald-400">Kopyalandı!</span>`;
-                    setTimeout(() => copyBtn.innerHTML = origHtml, 1500);
-                });
-
                 accordionContainer.appendChild(card);
             } catch (singleErr) {
-                console.error("Kayıt çizilirken hata atlandı:", singleErr);
+                console.error("Rapor kartı çizilirken hata:", singleErr);
             }
         });
 
         lucide.createIcons();
     }
-
-    // Filtreleme ve Arama Dinleyicileri
+    
     const searchInp = document.getElementById("report-search-input");
     const filterSel = document.getElementById("report-filter-status");
     const refreshBtn = document.getElementById("refresh-reports-btn");
@@ -2074,5 +2012,106 @@ async function populateImportScenarioDropdown() {
             }
         });
     }
+
+    // ─── RAPOR DETAY MODALINI AÇAN VE DOLDURAN FONKSİYON ───
+    function openReportModal(scenarioName, formattedDate, isSuccess, rawLogContent, parsedSteps) {
+        const modal = document.getElementById("report-detail-modal");
+        const titleEl = document.getElementById("modal-report-title");
+        const dateEl = document.getElementById("modal-report-date");
+        const iconEl = document.getElementById("modal-report-status-icon");
+        const errorCard = document.getElementById("modal-report-error-card");
+        const errorText = document.getElementById("modal-report-error-text");
+        const stepsContainer = document.getElementById("modal-report-steps-container");
+        const stepCountLabel = document.getElementById("modal-report-step-count");
+        const copyRawBtn = document.getElementById("modal-copy-raw-log-btn");
+
+        if (!modal) return;
+
+        titleEl.textContent = scenarioName;
+        dateEl.textContent = formattedDate;
+        stepCountLabel.textContent = `${parsedSteps.length} Adım Yakalandı`;
+
+        if (isSuccess) {
+            iconEl.className = "w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+            iconEl.innerHTML = `<i data-lucide="check-circle-2" class="w-5 h-5"></i>`;
+            errorCard.classList.add("hidden");
+        } else {
+            iconEl.className = "w-9 h-9 rounded-xl flex items-center justify-center bg-rose-500/10 text-rose-400 border border-rose-500/20";
+            iconEl.innerHTML = `<i data-lucide="alert-triangle" class="w-5 h-5"></i>`;
+            
+            // Hata metnini yakala
+            const lines = rawLogContent.split('\n');
+            const errLine = lines.find(l => l.includes('CRITICAL_POPUP_ERROR') || l.includes('HATA TESPİT EDİLDİ') || l.toLowerCase().includes('error:')) || "Test çalıştırma hatası oluştu.";
+            errorText.textContent = errLine.replace(/.*CRITICAL_POPUP_ERROR:\s*/i, '').trim();
+            errorCard.classList.remove("hidden");
+        }
+
+        // Modaldaki Adımları Doldur ("finishReason" bloğu bazlı)
+        stepsContainer.innerHTML = "";
+        parsedSteps.forEach((st, idx) => {
+            const isFailed = st.status === 'FAILED';
+            const stepDiv = document.createElement("div");
+            
+            stepDiv.className = isFailed 
+                ? "border border-rose-500/30 rounded-xl overflow-hidden bg-rose-500/5 shadow-sm"
+                : "border border-[rgba(255,255,255,0.06)] rounded-xl overflow-hidden bg-[#09090b]";
+
+            stepDiv.innerHTML = `
+                <div class="modal-step-header flex items-center justify-between p-3.5 cursor-pointer ${isFailed ? 'hover:bg-rose-500/10' : 'hover:bg-[#27272a]/40'} transition select-none">
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono text-xs ${isFailed ? 'text-rose-400 font-bold' : 'text-zinc-500'}">${String(idx + 1).padStart(2, '0')}.</span>
+                        <span class="text-xs ${isFailed ? 'text-rose-400 font-bold' : 'text-zinc-200 font-semibold'}">${escapeHtml(st.title)}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] px-2 py-0.5 rounded border ${isFailed ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-bold' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-semibold'} font-mono uppercase">
+                            ${isFailed ? 'HATA' : 'TAMAM'}
+                        </span>
+                        <i data-lucide="chevron-right" class="modal-step-chevron w-4 h-4 ${isFailed ? 'text-rose-400' : 'text-zinc-500'} transition-transform duration-200"></i>
+                    </div>
+                </div>
+                <div class="modal-step-content max-h-0 overflow-hidden transition-all duration-300 ease-in-out">
+                    <div class="p-3.5 ${isFailed ? 'bg-rose-950/20 border-t border-rose-500/20 text-rose-200' : 'bg-black/60 border-t border-[rgba(255,255,255,0.04)] text-zinc-300'}">
+                        <pre class="text-[11px] font-mono whitespace-pre-wrap leading-relaxed select-text">${escapeHtml(st.logs.join('\n'))}</pre>
+                    </div>
+                </div>
+            `;
+
+            const header = stepDiv.querySelector(".modal-step-header");
+            const content = stepDiv.querySelector(".modal-step-content");
+            const chevron = stepDiv.querySelector(".modal-step-chevron");
+
+            header.addEventListener("click", () => {
+                const isOpen = content.style.maxHeight && content.style.maxHeight !== "0px";
+                if (isOpen) {
+                    content.style.maxHeight = "0px";
+                    chevron.style.transform = "rotate(0deg)";
+                } else {
+                    content.style.maxHeight = content.scrollHeight + "px";
+                    chevron.style.transform = "rotate(90deg)";
+                }
+            });
+
+            stepsContainer.appendChild(stepDiv);
+        });
+
+        // Ham log kopyalama butonu
+        copyRawBtn.onclick = () => {
+            navigator.clipboard.writeText(rawLogContent);
+            const orig = copyRawBtn.innerHTML;
+            copyRawBtn.innerHTML = `<span class="text-emerald-400 font-bold">Kopyalandı!</span>`;
+            setTimeout(() => copyRawBtn.innerHTML = orig, 1500);
+        };
+
+        lucide.createIcons();
+        modal.classList.remove("hidden");
+    }
+
+    // Modal Kapatma Dinleyicileri
+    const closeReportModalBtn = document.getElementById("close-report-modal-btn");
+    const closeReportModalFooterBtn = document.getElementById("close-report-modal-footer-btn");
+    const reportDetailModal = document.getElementById("report-detail-modal");
+
+    if (closeReportModalBtn) closeReportModalBtn.addEventListener("click", () => reportDetailModal.classList.add("hidden"));
+    if (closeReportModalFooterBtn) closeReportModalFooterBtn.addEventListener("click", () => reportDetailModal.classList.add("hidden"));
 
 });
