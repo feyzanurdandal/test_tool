@@ -515,7 +515,7 @@ window.editProject = async function(oldProjectName) {
 // ─── RAPOR YÖNETİMİ ───
     let cachedReportsData = [];
 
-// Log içeriğindeki JSON yanıtlarını "finishReason" kuralına göre ayrıştıran ve başlık oluşturan parser
+// Log içeriğini Cache adımlarına ve AI JSON çıktılarına göre kusursuz bölen parser
 function parseLogsToSteps(logContent) {
     if (!logContent) return [];
 
@@ -523,7 +523,6 @@ function parseLogsToSteps(logContent) {
     const parsedSteps = [];
     
     let currentStepLogs = [];
-    let isInsideStepBlock = false;
     let currentActionTitle = "";
     let isStepFailed = false;
 
@@ -531,65 +530,100 @@ function parseLogsToSteps(logContent) {
         const trimmed = line.trim();
         if (!trimmed) return;
 
-        // 1. Yeni bir AI SDK yanıt bloğu başladığında
-        if (trimmed.includes('category: "aisdk"') || trimmed.includes('"action": {') || trimmed.includes('INFO: response')) {
-            if (!isInsideStepBlock) {
-                isInsideStepBlock = true;
-            }
-        }
-
-        // Akordiyon başlığını dinamik yakalamak için satır satır JSON alanlarını oku
-        if (trimmed.includes('"description":')) {
-            const descMatch = trimmed.match(/"description":\s*"(.*?)"/);
-            if (descMatch) currentActionTitle += (currentActionTitle ? " - " : "") + descMatch[1];
-        }
-        if (trimmed.includes('"method":')) {
-            const methodMatch = trimmed.match(/"method":\s*"(.*?)"/);
-            if (methodMatch) currentActionTitle = `[${methodMatch[1].toUpperCase()}] ` + currentActionTitle;
-        }
-        if (trimmed.includes('"arguments":')) {
-            // Sonraki satırlarda gelen argüman verisini başlığa eklemek için log takibi yapıyoruz
-        }
-
-        // Hata kontrolü
-        if (trimmed.includes('[HATA TESPİT EDİLDİ]') || trimmed.includes('CRITICAL_POPUP_ERROR') || trimmed.includes('Error:')) {
+        // A) Hata Kontrolü
+        if (trimmed.includes('❌ [HATA TESPİT EDİLDİ]') || trimmed.includes('CRITICAL_POPUP_ERROR') || /^Error:\s*ERROR:/i.test(trimmed)) {
             isStepFailed = true;
         }
 
-        // Mevcut satırı adım loguna ekle
+        // B) CACHE ADIMI BAŞLANGICI YAKALAMA
+        const isCacheHit = trimmed.includes('act cache hit') || trimmed.includes('category: "cache"');
+        if (isCacheHit) {
+            if (currentStepLogs.length > 0 && currentActionTitle) {
+                parsedSteps.push({
+                    title: currentActionTitle,
+                    status: isStepFailed ? 'FAILED' : 'PASSED',
+                    logs: [...currentStepLogs]
+                });
+                currentStepLogs = [];
+                currentActionTitle = "";
+                isStepFailed = false;
+            }
+        }
+
+        // 💡 DÜZELTME: Instruction (Talimat) Satırında Kaçış Karakterlerini (`\"`) Kesintisiz Yakalama
+        if (trimmed.includes('instruction:')) {
+            // Tırnak kaçışlarını temizleyip tırnaklar arasındaki tüm metni eksiksiz alır
+            const instrMatch = trimmed.match(/instruction:\s*"(.*)"/);
+            if (instrMatch) {
+                const cleanInstr = instrMatch[1]
+                    .replace(/\\"/g, '"')  // \" tırnaklarını normal tırnağa çevirir
+                    .replace(/\\/g, '');   // kalan gereksiz ters eğik çizgileri temizler
+
+                if (!currentActionTitle.includes('[')) {
+                    currentActionTitle = `[CACHE] ${cleanInstr}`;
+                }
+            }
+        }
+
+        // C) NORMAL AI ACTION (method, description, arguments) YAKALAMA
+        if (trimmed.includes('"method":')) {
+            const methodMatch = trimmed.match(/"method":\s*"(.*?)"/);
+            if (methodMatch) {
+                const method = methodMatch[1].toUpperCase();
+                currentActionTitle = `[${method}] ` + currentActionTitle.replace(/^\[.*?\]\s*/, '');
+            }
+        }
+
+        if (trimmed.includes('"description":')) {
+            const descMatch = trimmed.match(/"description":\s*"(.*?)"/);
+            if (descMatch) {
+                const cleanDesc = descMatch[1].replace(/\\"/g, '"').replace(/\\/g, '');
+                currentActionTitle += (currentActionTitle ? " - " : "") + cleanDesc;
+            }
+        }
+
+        if (trimmed.includes('"extracted_data":')) {
+            const extractMatch = trimmed.match(/"extracted_data":\s*"(.*?)"/);
+            const val = extractMatch ? extractMatch[1].replace(/\\"/g, '"').replace(/\\/g, '') : "Ekrandan veri çekildi";
+            currentActionTitle = `[EXTRACT] ${val}`;
+        }
+
         currentStepLogs.push(trimmed);
 
-        // 2. "finishReason": "stop" görüldüğünde O ADIM BİTER
-        if (trimmed.includes('"finishReason": "stop"')) {
-            // Başlık oluşturulamadıysa varsayılan isim ver
+        // D) BİTİŞ NOKTALARI
+        const isFinishStop = trimmed.includes('"finishReason": "stop"');
+        const isNextStepStarting = (trimmed.includes('category: "aisdk"') || trimmed.includes('Starting extraction')) && currentActionTitle.startsWith('[CACHE]');
+
+        if (isFinishStop || isNextStepStarting) {
+            let logsToSave = [...currentStepLogs];
+            if (isNextStepStarting) {
+                logsToSave.pop();
+            }
+
             let finalTitle = currentActionTitle.trim();
             if (!finalTitle) {
-                finalTitle = "Yapay Zeka İşlem ve Çıktı Adımı";
+                finalTitle = "Yapay Zeka Otomasyon Adımı";
             }
 
             parsedSteps.push({
                 title: finalTitle,
                 status: isStepFailed ? 'FAILED' : 'PASSED',
-                logs: [...currentStepLogs]
+                logs: logsToSave
             });
 
-            // Bir sonraki adım için değişkenleri sıfırla
-            currentStepLogs = [];
-            isInsideStepBlock = false;
+            currentStepLogs = isNextStepStarting ? [trimmed] : [];
             currentActionTitle = "";
             isStepFailed = false;
         }
     });
 
-    // Eğer geriye kalan sistem/hata logları varsa onları da son adım olarak ekle
     if (currentStepLogs.length > 0) {
-        let hasError = currentStepLogs.some(l => l.includes('❌') || l.includes('CRITICAL_POPUP_ERROR') || l.includes('failed'));
-        
-        // Eğer içerisinde bir action yoksa ve genel sistem/hata loguysa
+        let hasError = currentStepLogs.some(l => l.includes('❌') || l.includes('CRITICAL_POPUP_ERROR') || l.includes('1 failed'));
         const errorLine = currentStepLogs.find(l => l.includes('❌ [HATA TESPİT EDİLDİ]') || l.includes('CRITICAL_POPUP_ERROR'));
-        let title = hasError 
-            ? `Hata Tespiti: ${errorLine ? errorLine.replace(/.*CRITICAL_POPUP_ERROR:\s*/i, '').replace(/.*❌ \[HATA TESPİT EDİLDİ\]:\s*/i, '') : 'Test Durduruldu'}`
-            : "Sistem ve Kapanış Logları";
+        
+        let title = currentActionTitle || (hasError 
+            ? `Hata Tespiti: ${errorLine ? errorLine.replace(/.*CRITICAL_POPUP_ERROR:\s*/i, '').replace(/.*❌ \[HATA TESPİT EDİLDİ\]:\s*/i, '') : 'Test Başarısız Oldu'}`
+            : "Sistem ve Otomasyon Logları");
 
         parsedSteps.push({
             title: title,
