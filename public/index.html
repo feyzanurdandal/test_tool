@@ -59,7 +59,7 @@
             <div class="flex items-center gap-2">
                 <select id="project-dropdown" class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-md px-3 py-1.5 outline-none cursor-pointer focus:border-[#3b82f6] transition font-medium min-w-[160px]">
                 </select>
-                <button id="add-project-btn" class="w-7 h-7 bg-[#18181b] border border-[rgba(255,255,255,0.08)] rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-[#27272a] transition">
+                <button id="add-project-btn" class="w-7 h-7 bg-[#18181b] border border-[rgba(255,255,255,0.08)] rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-[#27272a] transition" title="Yeni Proje Ekle">
                     <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                 </button>
             </div>
@@ -97,7 +97,7 @@
                         </button>
                     </div>
 
-                    <!-- Grup 2: Siber Güvenlik Testleri (FAZ 2) -->
+                    <!-- Grup 2: Siber Güvenlik Testleri -->
                     <div class="space-y-1 pt-2 border-t border-[rgba(255,255,255,0.04)]">
                         <div class="text-[10px] font-bold uppercase tracking-wider text-amber-400 px-3 py-1 flex items-center gap-1.5">
                             <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-amber-400"></i> <span>Siber Güvenlik Testleri</span>
@@ -135,7 +135,7 @@
                     title="GitHub Reposunu İncele" 
                     class="w-full bg-[#18181b]/50 hover:bg-[#18181b] text-zinc-500 hover:text-zinc-200 border border-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.08)] text-[11px] px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-between group cursor-pointer">
                         <span class="flex items-center gap-2 shrink-0">
-                            <i data-lucide="github" class="w-3.5 h-3.5 text-zinc-400 group-hover:text-[#3b82f6] transition-colors"></i>
+                            <i data-lucide="git-branch" class="w-3.5 h-3.5 text-zinc-400 group-hover:text-[#3b82f6] transition-colors"></i>
                             <span class="font-medium text-zinc-400 group-hover:text-zinc-200 transition-colors">Geliştirici</span>
                         </span>
                         <span class="text-[10px] text-[#3b82f6] font-semibold opacity-0 group-hover:opacity-100 max-w-0 group-hover:max-w-[120px] overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out pl-1">
@@ -421,27 +421,39 @@
         </div>
     </div>
 
-    <!-- Proje Oluşturma Modal -->
+    <!-- 💡 Proje Oluşturma & Düzenleme Modalı (Özel Hata Kalıpları Eklendi) -->
     <div id="project-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-        <div class="w-full max-w-sm bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-4">
-            <div class="flex items-center justify-between">
-                <h3 class="text-sm font-semibold text-white">Yeni Proje Oluştur</h3>
+        <div class="w-full max-w-md bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-3">
+                <h3 id="project-modal-title" class="text-sm font-semibold text-white">Yeni Proje Oluştur</h3>
                 <button id="close-project-modal" class="text-zinc-500 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
-            <div class="space-y-3">
+            <div class="space-y-4">
                 <div>
                     <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Proje Adı</label>
                     <input type="text" id="new-project-name" placeholder="Örn: Auth Service" 
                            class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
                 </div>
-                <button id="save-project-btn" class="w-full py-2 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold tracking-wide transition">
+
+                <!-- 💡 Proje Bazlı Özel Hata Kalıpları -->
+                <div>
+                    <label class="block text-[10px] font-medium text-amber-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>Proje Hata & Engelleme Kalıpları</span>
+                        <span class="text-[9px] text-zinc-500 font-normal lowercase">(Her satıra bir kalıp)</span>
+                    </label>
+                    <textarea id="project-error-keywords" rows="4" placeholder="Yetkisiz erişim&#10;Access Denied&#10;Hatalı parametre girişi&#10;WAF-403" 
+                              class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-zinc-200 outline-none focus:border-amber-400 transition font-mono"></textarea>
+                    <p class="text-[10px] text-zinc-500 mt-1">Siber güvenlik ve UI testlerinde sistemin bu kalıpları hata/engelleme olarak tanımasını sağlar.</p>
+                </div>
+
+                <button id="save-project-btn" class="w-full py-2.5 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold tracking-wide transition">
                     Projeyi Kaydet
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Senaryo Oluşturma / Düzenleme Modal (FAZ 1, 2, 3 Uyumlu) -->
+    <!-- Senaryo Oluşturma / Düzenleme Modal -->
     <div id="scenario-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
         <div class="w-full max-w-2xl bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-6 my-8">
             <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-4">
@@ -464,7 +476,7 @@
                                class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
                     </div>
 
-                    <!-- FAZ 3: Siber Güvenlik Beklenen Sonuç Seçimi (Güvenlik sekmesinde aktifleşir) -->
+                    <!-- Siber Güvenlik Beklenen Sonuç Seçimi -->
                     <div id="expected-outcome-container" class="col-span-2 hidden bg-[#27272a]/30 p-3 rounded-lg border border-amber-500/20">
                         <label class="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                             <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Siber Güvenlik Testi: Beklenen Sonuç Mantığı
@@ -522,7 +534,6 @@
     <div id="report-detail-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto animate-fade-in">
         <div class="w-full max-w-4xl bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl shadow-2xl space-y-6 my-8">
             
-            <!-- Üst Başlık -->
             <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-4">
                 <div class="flex items-center gap-3">
                     <div id="modal-report-status-icon" class="w-9 h-9 rounded-xl flex items-center justify-center">
@@ -540,7 +551,6 @@
                 </button>
             </div>
 
-            <!-- Hata Özet Kartı (Varsa) -->
             <div id="modal-report-error-card" class="hidden bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 text-rose-400">
                 <div class="flex items-center gap-2 mb-1.5">
                     <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400 shrink-0"></i>
@@ -549,7 +559,6 @@
                 <pre id="modal-report-error-text" class="text-xs font-mono whitespace-pre-wrap leading-relaxed select-text font-semibold"></pre>
             </div>
 
-            <!-- Adım Listesi (Akordiyon Panel) -->
             <div class="space-y-3">
                 <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-2">
                     <span class="text-xs uppercase font-bold tracking-wider text-zinc-400 flex items-center gap-1.5">
@@ -562,7 +571,6 @@
                 </div>
             </div>
 
-            <!-- Alt İşlem Barı -->
             <div class="flex items-center justify-between border-t border-[rgba(255,255,255,0.06)] pt-4">
                 <button id="modal-copy-raw-log-btn" class="text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg transition flex items-center gap-1.5">
                     <i data-lucide="copy" class="w-3.5 h-3.5"></i> Tüm Ham Logu Kopyala
