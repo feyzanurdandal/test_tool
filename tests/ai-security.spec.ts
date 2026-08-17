@@ -18,7 +18,7 @@ const ERROR_KEYWORDS = [
     'unauthorized', 'forbidden', 'yanlış', 'yanlis', 'incorrect', 'denied'
 ];
 
-// 💡 Türkçe ve İngilizce büyük/küçük harf duyarsız dinamik regex üretici
+//  Türkçe ve İngilizce büyük/küçük harf duyarsız dinamik regex üretici
 function createTurkishInsensitiveRegex(text: string): RegExp {
     const map: Record<string, string> = {
         'i': '[iİıI]', 'ı': '[iİıI]', 'İ': '[iİıI]', 'I': '[iİıI]',
@@ -38,7 +38,7 @@ function createTurkishInsensitiveRegex(text: string): RegExp {
 }
 
 test('Yapay Zeka Test Otomasyonu', async () => {
-    // 💡 1. Test zaman aşımını 5 dakikaya (300.000 ms) çıkarıyoruz
+    //  1. Test zaman aşımını 5 dakikaya (300.000 ms) çıkarıyoruz
     test.setTimeout(300000);
 
     const __filename = fileURLToPath(import.meta.url);
@@ -159,7 +159,7 @@ test('Yapay Zeka Test Otomasyonu', async () => {
         await pwPage.waitForLoadState('domcontentloaded').catch(() => {});
 
         for (const step of promptData.steps) {
-            // 💡 2. PrimeNG gizli accessibility input'larının AI'ı yanıltmasını engelle
+            //  2. PrimeNG gizli accessibility input'larının AI'ı yanıltmasını engelle
             await pwPage.evaluate(() => {
                 document.querySelectorAll('.p-hidden-accessible input').forEach(el => {
                     el.setAttribute('tabindex', '-1');
@@ -234,61 +234,6 @@ if (step.type === 'act') {
         throw actError;
     }
 }
-    // } catch (actError: any) {
-    //     const errText = actError.message || actError.toString();
-    //     const rawErrorObj = JSON.stringify(actError);
-
-    //     // 💡 1. DİNAMİK KURTARMA: Modelin bulduğu ham elementId'yi Zod'dan kurtarma
-    //     const idMatch = rawErrorObj.match(/"elementId"\s*:\s*"(\d+)"/) || errText.match(/"elementId"\s*:\s*"(\d+)"/);
-        
-    //     if (idMatch && idMatch[1]) {
-    //         const rawId = idMatch[1];
-    //         const normalizedId = `0-${rawId}`;
-    //         console.warn(`⚙️ [Zod Bypass] Model ID üretti (${rawId}). Format tamamlanıp (${normalizedId}) doğrudan tıklanıyor...`);
-            
-    //         try {
-    //             // Stagehand'in tarayıcıya enjekte ettiği dahili xpath/attribute üzerinden tıkla
-    //             const element = pwPage.locator(`[data-stagehand-id="${normalizedId}"], [stagehand-id="${normalizedId}"], [id="${normalizedId}"]`).first();
-    //             if (await element.count() > 0) {
-    //                 await element.click({ force: true, timeout: 3000 });
-    //                 actSuccess = true;
-    //                 console.log(`✅ [Zod Bypass] Başarıyla tıklandı (ID: ${normalizedId})`);
-    //             }
-    //         } catch (e) {
-    //             console.warn(`ID ile tıklama denenemedi, semantik çözücüye geçiliyor...`);
-    //         }
-    //     }
-
-    //     // 💡 2. SEMANTİK DİNAMİK ÇÖZÜCÜ (Türkçe Karakter & PrimeNG Uyumlu)
-    //     if (!actSuccess) {
-    //         const matchText = step.instruction.match(/"([^"]+)"/);
-    //         if (matchText && matchText[1]) {
-    //             const target = matchText[1].trim();
-    //             console.warn(`🎯 [Semantik Çözücü] Hedef aranıyor: "${target}"`);
-
-    //             // Açık dropdown/overlay varsa önce onun içindeki li/span elemanına tıkla
-    //             const overlayItem = pwPage.locator(`.p-dropdown-panel li, .p-multiselect-panel li, .p-overlay li, [role="option"]`)
-    //                 .filter({ hasText: new RegExp(target, 'i') }).first();
-
-    //             if (await overlayItem.count() > 0 && await overlayItem.isVisible()) {
-    //                 await overlayItem.click({ force: true });
-    //                 console.log(`✅ [Semantik Çözücü] Açık listeden seçildi: "${target}"`);
-    //                 actSuccess = true;
-    //             } else {
-    //                 // Açık liste yoksa sayfadaki en uygun görünen butona/metne tıkla
-    //                 const genericElement = pwPage.getByText(new RegExp(target, 'i')).first();
-    //                 await genericElement.waitFor({ state: 'visible', timeout: 3000 });
-    //                 await genericElement.click({ force: true });
-    //                 console.log(`✅ [Semantik Çözücü] Ekranda tıklanabilir metin bulundu ve tıklandı: "${target}"`);
-    //                 actSuccess = true;
-    //             }
-    //         }
-    //     }
-
-    //     if (!actSuccess) {
-    //         throw actError; // Hiçbir şekilde çözülemediyse testi güvenle kır
-    //     }
-    // }
 
     // Dropdown açılış animasyonları beklemesi
     const isDropdown = step.instruction.toLowerCase().includes('dropdown') || 

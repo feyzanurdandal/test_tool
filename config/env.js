@@ -50,7 +50,7 @@ if (missingVars.length > 0) {
     process.exit(1); // Uygulamanın ayağa kalkmasını engelle
 }
 
-// 💡 FAZ 0: ENCRYPTION_KEY format doğrulaması (64 hex karakter - 32 byte AES-256)
+// ENCRYPTION_KEY format doğrulaması (64 hex karakter - 32 byte AES-256)
 const HEX_64_REGEX = /^[a-fA-F0-9]{64}$/;
 if (!HEX_64_REGEX.test(process.env.ENCRYPTION_KEY)) {
     console.error('GÜVENLİK HATASI: ENCRYPTION_KEY formatı geçersiz!');

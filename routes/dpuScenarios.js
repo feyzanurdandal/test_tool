@@ -59,7 +59,7 @@ const runPlaywrightTest = (stepsFilePath, timeoutMs = 300000) => {
     });
 };
 
-// 💡 DİNAMİK VE PROJE BAZLI HATA / GÜVENLİK DEĞERLENDİRİCİ
+//  DİNAMİK VE PROJE BAZLI HATA / GÜVENLİK DEĞERLENDİRİCİ
 const evaluateTestOutcome = (logContent, customKeywordsRaw = '', expectedOutcome = 'SUCCESS_EXPECTED', isExecutionSuccess = true) => {
     if (!logContent) return isExecutionSuccess ? "SUCCESS" : "FAILED";
     const lowerLog = logContent.toLowerCase();
@@ -629,7 +629,7 @@ router.post('/run', testRunLimiter, requireAuth, validate(runScenarioSchema), re
             ? testResult.logContent.slice(-50000) 
             : (testResult.logContent || '');
 
-        // 💡 DİNAMİK STATÜ HESABI (Proje özel hata kelimeleri + Beklenen Sonuç Mantığı)
+        //  DİNAMİK STATÜ HESABI (Proje özel hata kelimeleri + Beklenen Sonuç Mantığı)
         const finalStatus = evaluateTestOutcome(safeLogContent, customKeywords, expectedOutcome, testResult.isSuccess);
 
         const reportData = {
