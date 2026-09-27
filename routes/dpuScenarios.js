@@ -8,6 +8,7 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { aiCallLimiter, testRunLimiter } from '../middleware/rateLimit.js';
 import { isSafeUrl } from '../utils/ipGuard.js';
 import { translateToStagehandJson } from '../utils/translator.js';
+import { stripImportMarkers } from '../utils/stepGroups.js';
 import { encrypt, decrypt } from '../utils/cryptoHelper.js';
 import { validate } from '../middleware/validate.js';
 import { requireProjectAccess } from '../utils/projectGuard.js';
@@ -429,7 +430,8 @@ router.post('/create-and-save', aiCallLimiter, requireAuth, validate(createScena
             }
         }
 
-        const stagehandJson = await translateToStagehandJson(turkishInstructions, targetUrl);
+        // İçe aktarma işaretçileri yalnızca arayüz içindir; çeviriye düz adımlar gider
+        const stagehandJson = await translateToStagehandJson(stripImportMarkers(turkishInstructions), targetUrl);
 
         if (stagehandJson && createdScenarioId) {
             await dpu.update('senaryolar', createdScenarioId, {
@@ -510,7 +512,8 @@ router.post('/update', aiCallLimiter, requireAuth, validate(updateScenarioSchema
 
         await dpu.update('senaryolar', existingScenario.id, updatePayload);
 
-        const stagehandJson = await translateToStagehandJson(turkishInstructions, targetUrl);
+        // İçe aktarma işaretçileri yalnızca arayüz içindir; çeviriye düz adımlar gider
+        const stagehandJson = await translateToStagehandJson(stripImportMarkers(turkishInstructions), targetUrl);
         if (stagehandJson) {
             await dpu.update('senaryolar', existingScenario.id, {
                 adimlar: JSON.stringify(stagehandJson),

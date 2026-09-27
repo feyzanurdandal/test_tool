@@ -53,6 +53,89 @@ document.addEventListener("DOMContentLoaded", () => {
             .replace(/'/g, '&#039;');
     }
 
+    // ─── İÇE AKTARILAN SENARYO GRUPLARI (akordiyon) ───
+    // adimlar_tr içinde içe aktarılan adımlar şu işaretçilerle saklanır:
+    //   [[İÇE_AKTAR:login]] ... [[/İÇE_AKTAR]]
+    // Backend çeviriye göndermeden önce işaretçileri temizler (utils/stepGroups.js).
+    const IMPORT_START_RE = /^\[\[İÇE_AKTAR:(.+)\]\]$/;
+    const IMPORT_END = "[[/İÇE_AKTAR]]";
+
+    // Metni blok listesine çevirir: { type: "step", text } | { type: "group", source, steps: [] }
+    function parseStepBlocks(text) {
+        const blocks = [];
+        let openGroup = null;
+        String(text || "").split('\n').map(l => l.trim()).filter(l => l !== "").forEach(line => {
+            const startMatch = line.match(IMPORT_START_RE);
+            if (startMatch) {
+                if (openGroup && openGroup.steps.length) blocks.push(openGroup);
+                openGroup = { type: "group", source: startMatch[1].trim(), steps: [] };
+                return;
+            }
+            if (line === IMPORT_END) {
+                if (openGroup && openGroup.steps.length) blocks.push(openGroup);
+                openGroup = null;
+                return;
+            }
+            if (openGroup) openGroup.steps.push(line);
+            else blocks.push({ type: "step", text: line });
+        });
+        if (openGroup && openGroup.steps.length) blocks.push(openGroup);
+        return blocks;
+    }
+
+    // Gruplar dahil tüm adımları düz liste olarak döndürür
+    function flattenStepBlocks(text) {
+        return parseStepBlocks(text).flatMap(b => b.type === "group" ? b.steps : [b.text]);
+    }
+
+    function formatStepNo(n) {
+        return n < 10 ? `0${n}.` : `${n}.`;
+    }
+
+    // Senaryo listesindeki salt okunur adım önizlemesi (gruplar akordiyon)
+    function renderStepsPreviewHtml(contentTr) {
+        const stepHtml = (line, no) => `
+            <div class="flex items-start gap-3 bg-[#27272a]/20 p-2.5 rounded-lg border border-[rgba(255,255,255,0.02)]">
+                <span class="font-mono text-[10px] text-zinc-500 mt-0.5">${formatStepNo(no)}</span>
+                <div class="flex-1">
+                    <div class="font-medium text-zinc-200 select-text">${escapeHtml(line)}</div>
+                </div>
+                <span class="text-[9px] px-1.5 py-0.5 rounded border bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/20 font-mono font-bold uppercase shrink-0">ADIM</span>
+            </div>`;
+
+        let counter = 0;
+        return parseStepBlocks(contentTr).map(block => {
+            if (block.type === "step") return stepHtml(block.text, ++counter);
+
+            const first = counter + 1;
+            const inner = block.steps.map(line => stepHtml(line, ++counter)).join("");
+            return `
+                <div class="preview-step-group rounded-lg border border-[#3b82f6]/20 bg-[#3b82f6]/[0.04]">
+                    <button type="button" aria-expanded="false" class="preview-group-toggle w-full flex items-center gap-2 p-2.5 text-left rounded-lg hover:bg-[#3b82f6]/[0.06] transition">
+                        <span class="group-chevron inline-flex transition-transform duration-150"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-400"></i></span>
+                        <i data-lucide="layers" class="w-3.5 h-3.5 text-[#3b82f6] shrink-0"></i>
+                        <span class="font-medium text-zinc-100 truncate">${escapeHtml(block.source)}</span>
+                        <span class="text-[10px] text-zinc-500 shrink-0">${block.steps.length} adım · ${formatStepNo(first).slice(0, -1)}–${formatStepNo(counter).slice(0, -1)}</span>
+                    </button>
+                    <div class="preview-group-body hidden space-y-2 px-2.5 pb-2.5">${inner}</div>
+                </div>`;
+        }).join("");
+    }
+
+    function bindPreviewGroupToggles(container) {
+        container.querySelectorAll(".preview-group-toggle").forEach(toggle => {
+            toggle.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const group = toggle.closest(".preview-step-group");
+                const body = group.querySelector(".preview-group-body");
+                const willOpen = body.classList.contains("hidden");
+                body.classList.toggle("hidden", !willOpen);
+                toggle.setAttribute("aria-expanded", String(willOpen));
+                group.querySelector(".group-chevron").style.transform = willOpen ? "rotate(90deg)" : "";
+            });
+        });
+    }
+
     // ─── GLOBAL PROJE SİLME FONKSİYONU ───
     window.deleteProject = async function(projectName) {
         if (!projectName || projectName === 'Varsayılan Proje') {
@@ -298,23 +381,13 @@ document.addEventListener("DOMContentLoaded", () => {
                                         let stepsHtml = "";
 
                                         if (contentTr && contentTr.trim() !== "") {
-                                            const trLines = contentTr.split('\n').filter(l => l.trim() !== "");
-                                            trLines.forEach((line, stepIdx) => {
-                                                stepsHtml += `
-                                                    <div class="flex items-start gap-3 bg-[#27272a]/20 p-2.5 rounded-lg border border-[rgba(255,255,255,0.02)]">
-                                                        <span class="font-mono text-[10px] text-zinc-500 mt-0.5">${String(stepIdx + 1).padStart(2, '0')}.</span>
-                                                        <div class="flex-1">
-                                                            <div class="font-medium text-zinc-200 select-text">${escapeHtml(line)}</div>
-                                                        </div>
-                                                        <span class="text-[9px] px-1.5 py-0.5 rounded border bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/20 font-mono font-bold uppercase shrink-0">ADIM</span>
-                                                    </div>
-                                                `;
-                                            });
+                                            stepsHtml = renderStepsPreviewHtml(contentTr);
                                         } else {
                                             stepsHtml = `<div class="text-amber-400/80 italic text-[11px] p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">Bu senaryo eski formatta oluşturulmuş, Türkçe adım önizlemesi bulunmuyor. Düzenleyip tekrar kaydederek güncelleyebilirsiniz.</div>`;
                                         }
 
                                         detailsContainer.innerHTML = stepsHtml;
+                                        bindPreviewGroupToggles(detailsContainer);
                                         detailsContainer.setAttribute("data-loaded", "true");
                                         lucide.createIcons();
                                     } else {
@@ -368,10 +441,14 @@ document.addEventListener("DOMContentLoaded", () => {
                             if (stepsContainer) {
                                 stepsContainer.innerHTML = "";
                                 if (contentTr && contentTr.trim() !== "") {
-                                    const trLines = contentTr.split('\n').filter(l => l.trim() !== "");
-                                    trLines.forEach(line => {
-                                        stepsContainer.appendChild(createStepRow(line));
+                                    parseStepBlocks(contentTr).forEach(block => {
+                                        stepsContainer.appendChild(
+                                            block.type === "group"
+                                                ? createStepGroup(block.source, block.steps)
+                                                : createStepRow(block.text)
+                                        );
                                     });
+                                    if (stepsContainer.children.length === 0) stepsContainer.appendChild(createStepRow(""));
                                 } else if (adimlar.steps && adimlar.steps.length > 0) {
                                     adimlar.steps.forEach(s => {
                                         stepsContainer.appendChild(createStepRow(s.instruction || ""));
@@ -1349,7 +1426,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     let stepsToImport = [];
 
                     if (contentTr && contentTr.trim() !== "") {
-                        stepsToImport = contentTr.split('\n').filter(l => l.trim() !== "");
+                        // İçe aktarılan senaryonun kendi grupları varsa düzleştirilir (iç içe grup yok)
+                        stepsToImport = flattenStepBlocks(contentTr);
                     } else if (adimlar.steps) {
                         stepsToImport = adimlar.steps.map(s => s.instruction || "");
                     }
@@ -1366,14 +1444,14 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     }
 
-                    stepsToImport.forEach(stepText => {
-                        const stepRow = createStepRow(stepText);
-                        stepsContainer.appendChild(stepRow);
-                    });
+                    stepsToImport = stepsToImport.map(t => String(t).trim()).filter(t => t !== "");
+                    const groupEl = createStepGroup(selectedScenarioToImport, stepsToImport);
+                    stepsContainer.appendChild(groupEl);
 
                     reindexSteps();
                     lucide.createIcons();
-                    alert(`"${selectedScenarioToImport}" senaryosunun ${stepsToImport.length} adımı başarıyla eklendi!`);
+                    groupEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                    if (importDropdown) importDropdown.selectedIndex = 0;
                 } else {
                     alert("Senaryo adımları getirilemedi.");
                 }
@@ -1450,13 +1528,115 @@ document.addEventListener("DOMContentLoaded", () => {
         return stepRow;
     }    
 
+    // İçe aktarılan senaryo: başlıkta senaryo adı, tıklanınca adımlar açılır
+    function createStepGroup(sourceName, steps) {
+        const group = document.createElement("div");
+        group.className = "step-group rounded-lg border border-[#3b82f6]/20 bg-[#3b82f6]/[0.04] animate-slide-in";
+        group.dataset.source = sourceName;
+
+        group.innerHTML = `
+            <div class="flex items-center gap-1 pr-1.5">
+                <button type="button" aria-expanded="false" class="group-toggle flex-1 min-w-0 flex items-center gap-2 p-2.5 text-left rounded-lg hover:bg-[#3b82f6]/[0.06] transition" title="Adımları göster / gizle">
+                    <span class="group-chevron inline-flex transition-transform duration-150"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-400"></i></span>
+                    <i data-lucide="layers" class="w-3.5 h-3.5 text-[#3b82f6] shrink-0"></i>
+                    <span class="group-name text-xs font-medium text-white truncate"></span>
+                    <span class="group-meta text-[10px] text-zinc-500 shrink-0"></span>
+                </button>
+                <button type="button" class="ungroup-btn text-zinc-500 hover:text-[#3b82f6] transition p-1 rounded hover:bg-[#3b82f6]/10" title="Adımları ayrı ayrı düzenlemek için gruptan çıkar">
+                    <i data-lucide="ungroup" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" class="remove-group-btn text-zinc-500 hover:text-red-400 transition p-1 rounded hover:bg-red-500/10" title="İçe aktarılan senaryoyu kaldır">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+            <div class="group-body hidden border-t border-[#3b82f6]/10 px-2.5 py-2 space-y-1.5"></div>
+        `;
+        group.querySelector(".group-name").textContent = sourceName;
+
+        const body = group.querySelector(".group-body");
+        steps.forEach(text => {
+            const row = document.createElement("div");
+            row.className = "group-step flex items-start gap-2 bg-[#27272a]/40 px-2.5 py-2 rounded-md";
+            row.innerHTML = `
+                <span class="step-number text-[10px] font-mono text-zinc-500 w-5 text-center mt-px"></span>
+                <span class="group-step-text flex-1 text-xs text-zinc-300 select-text"></span>
+            `;
+            row.querySelector(".group-step-text").textContent = text;
+            body.appendChild(row);
+        });
+
+        const toggle = group.querySelector(".group-toggle");
+        toggle.addEventListener("click", () => {
+            const willOpen = body.classList.contains("hidden");
+            body.classList.toggle("hidden", !willOpen);
+            toggle.setAttribute("aria-expanded", String(willOpen));
+            group.querySelector(".group-chevron").style.transform = willOpen ? "rotate(90deg)" : "";
+        });
+
+        // Grubu çöz: adımlar normal, düzenlenebilir satırlara dönüşür
+        group.querySelector(".ungroup-btn").addEventListener("click", () => {
+            const rows = getGroupSteps(group).map(t => createStepRow(t));
+            group.replaceWith(...rows);
+            reindexSteps();
+            lucide.createIcons();
+        });
+
+        group.querySelector(".remove-group-btn").addEventListener("click", () => {
+            if (stepsContainer.children.length === 1) {
+                group.replaceWith(createStepRow());
+            } else {
+                group.remove();
+            }
+            reindexSteps();
+            lucide.createIcons();
+        });
+
+        return group;
+    }
+
+    function getGroupSteps(groupEl) {
+        return Array.from(groupEl.querySelectorAll(".group-step-text"))
+            .map(el => el.textContent.trim())
+            .filter(t => t !== "");
+    }
+
+    // Formdaki blokları (tekil adımlar + gruplar) kaydedilecek metne çevirir
+    function serializeStepBlocks() {
+        const lines = [];
+        let stepCount = 0;
+        Array.from(stepsContainer.children).forEach(child => {
+            if (child.classList.contains("step-group")) {
+                const steps = getGroupSteps(child);
+                if (!steps.length) return;
+                lines.push(`[[İÇE_AKTAR:${child.dataset.source}]]`, ...steps, IMPORT_END);
+                stepCount += steps.length;
+            } else {
+                const input = child.querySelector(".step-input");
+                const val = input ? input.value.trim() : "";
+                if (val) { lines.push(val); stepCount++; }
+            }
+        });
+        return { text: lines.join("\n"), stepCount };
+    }
+
     function reindexSteps() {
         if (!stepsContainer) return;
         const rows = Array.from(stepsContainer.children);
-        rows.forEach((row, i) => {
-            const index = i + 1;
+        let counter = 0;
+        rows.forEach((row) => {
+            if (row.classList.contains("step-group")) {
+                const first = counter + 1;
+                row.querySelectorAll(".group-step .step-number").forEach(numEl => {
+                    numEl.textContent = formatStepNo(++counter);
+                });
+                const meta = row.querySelector(".group-meta");
+                const count = counter - first + 1;
+                if (meta) meta.textContent = `${count} adım · ${formatStepNo(first).slice(0, -1)}–${formatStepNo(counter).slice(0, -1)}`;
+                return;
+            }
+            const index = ++counter;
             const numEl = row.querySelector(".step-number");
-            if (numEl) numEl.textContent = index < 10 ? `0${index}.` : `${index}.`;
+            if (numEl) numEl.textContent = formatStepNo(index);
 
             const removeBtn = row.querySelector(".remove-step-btn");
             if (removeBtn) {
@@ -1476,7 +1656,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const scenarioNameInput = document.getElementById("new-scenario-name");
             const targetUrlInput = document.getElementById("new-scenario-url");
             
-            const stepInputs = document.querySelectorAll(".step-input");
             const submitBtn = document.getElementById("save-scenario-submit-btn") || scenarioForm.querySelector('button[type="submit"]');
 
             const activeProjectName = projectDropdown ? projectDropdown.value : currentProject;
@@ -1485,12 +1664,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const scenarioName = scenarioNameInput ? scenarioNameInput.value.trim() : "";
             const targetUrl = targetUrlInput ? targetUrlInput.value.trim() : "";
             
-            const turkishInstructions = Array.from(stepInputs)
-                .map(inp => inp.value.trim())
-                .filter(val => val !== "")
-                .join("\n");
+            const { text: turkishInstructions, stepCount } = serializeStepBlocks();
 
-            if (!scenarioName || !targetUrl || !turkishInstructions) {
+            if (!scenarioName || !targetUrl || stepCount === 0) {
                 alert("Lütfen senaryo adı, hedef URL ve en az bir test adımı girin!");
                 return;
             }
