@@ -5,6 +5,7 @@ services:
     container_name: test_tool_backend
     restart: always
     environment:
+      - NODE_ENV=production
       - PORT=3000
       - DOCKER_ENV=true
       - DPU_BASE_URL=${DPU_BASE_URL}
@@ -16,24 +17,28 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - JWT_SECRET=${JWT_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - RUN_CONCURRENCY=${RUN_CONCURRENCY:-1}
+      - MAX_QUEUED_RUNS=${MAX_QUEUED_RUNS:-50}
+      - ALLOWED_PRIVATE_HOSTS=${ALLOWED_PRIVATE_HOSTS:-}
       - HEADLESS=true
     volumes:
-      - ./cache:/app/cache # Test adımları ve runtime_steps.json için kalıcı bellek
-    ports:
-      - "3000:3000"
+      - ./cache:/app/cache # Stagehand yapay zeka önbelleği
+    # Port dışarıya AÇILMAZ: yalnızca nginx, compose ağı üzerinden erişir.
+    # Aksi halde nginx atlanıp X-Forwarded-For sahte gönderilerek rate limit aşılabiliyordu.
+    expose:
+      - "3000"
 
-  # 2. SERVİS: Nginx Reverse Proxy
+  # 2. SERVİS: Nginx Reverse Proxy (tek dış giriş noktası)
   nginx:
     image: nginx:alpine
     container_name: test_tool_nginx
     restart: always
     ports:
       - "80:80"
-      - "443:443"  # HTTPS Portu 
+      - "443:443"
     volumes:
-      - ./public:/usr/share/nginx/html # Statik Arayüz dosyalarını Nginx'e bağlıyoruz
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro # Nginx ayar dosyamızı bağlıyoruz
-      - ./certs:/etc/nginx/certs:ro # SSL Sertifikaları 
-      - ./certbot-www:/var/www/certbot # Certbot ACME Yolu 
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./certbot-www:/var/www/certbot
     depends_on:
       - node-backend

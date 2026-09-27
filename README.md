@@ -11,9 +11,9 @@ Sistem, test senaryolarını yazarken manuel kodlama veya statik locator (CSS/XP
 Sistem, birbirine entegre çalışan yüksek performanslı ve modern bir teknoloji yığını üzerine inşa edilmiştir:
 
 - **Stagehand (Yapay Zeka Otomasyon Motoru):** Sayfadaki elementleri insan gibi gözlemleyen, otomatik anlamlandıran ve bütçe dostu LLM modelleri (`gpt-4o-mini`, `gemini-1.5-flash`) ile çalışan otonom web ajanı.
-- **Playwright (TypeScript):** Modern, hızlı, paralel ve izole tarayıcı otomasyon altyapısı.
+- **Playwright (TypeScript):** Modern, hızlı ve izole tarayıcı otomasyon altyapısı. Test dosyası Playwright tarafından derlenir; sunucu düz Node.js ile çalışır.
 - **DPU Base:** Projelerin, test senaryolarının, kullanıcı yetkilerinin (ADMIN/PM) ve test raporlarının bulut ortamında güvenle saklandığı ana veritabanı katmanı.
-- **TSX (TypeScript Execute):** TypeScript dosyalarının runtime üzerinde derlenmeden, havada anlık olarak çözümlenip koşturulmasını sağlayan modern motor altyapısı.
+- **Tailwind CSS (derlemeli):** Arayüz stilleri `styles/tailwind.css` kaynağından `public/css/app.css` dosyasına derlenir. İkonlar (lucide) sabit sürümle yerelden sunulur; sayfa hiçbir dış betik yüklemez.
 - **Express.js:** Rol bazlı yetkilendirme, test tetiklemeleri ve raporlama süreçlerini yöneten modüler backend katmanı.
 - **Docker & Docker Compose:** Tüm uygulamanın bağımlılıklarıyla birlikte izole konteyner ortamında ayağa kaldırılmasını sağlayan kapsülleme yapısı.
 
@@ -56,34 +56,69 @@ ENCRYPTION_KEY=encryption_key
 ```
 
 ## Projeyi Çalıştırma Yöntemleri
-### Docker İle Çalıştırma (Sıfır Kurulum & Önerilen)
-Bilgisayarınıza Node.js veya npm paketleri kurmanıza gerek kalmadan, tüm bağımlılıkları konteyner içinde izole çalıştırmak için:
+### Docker İle Çalıştırma (Production)
+Dışarıya yalnızca nginx açılır (80/443). Node sunucusu (3000) dış ağa kapalıdır.
+`certs/` klasöründe `fullchain.pem` ve `privkey.pem` bulunmalıdır.
 
-1. Konteynırı Ayağa Kaldırın:
 ```Bash
-docker compose up --build
-```
-2. Durdurmak İstediğinizde:
-```Bash
+docker compose up --build -d
 docker compose down
 ```
-- Docker ortamında npm install ve playwright sürücüleri otomatik konteyner içine kurulur. Testler **arka planda (headless)** koşturulur. Web paneline http://localhost:3000 adresinden erişebilirsiniz.
+- Testler **arka planda (headless)** koşturulur. Panel: https://alan-adiniz
+
+### Docker İle Yerel Geliştirme (Sertifikasız)
+```Bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build node-backend
+```
+- Panel: http://localhost:3000 (port yalnızca bu bilgisayara açılır)
 
 ### Lokalde Çalıştırma (Canlı Tarayıcı Penceresi İle)
-Kendi bilgisayarınızda geliştirme yaparken ve test adımlarını **canlı Chromium penceresinde** izlemek istediğinizde:
-
-1. Bağımlılıkları ve Tarayıcı Motorlarını Kurun:
-
 ```Bash
 npm install
-npx playwright install
-```
-2. Sunucuyu Başlatın:
-
-```Bash
-npx tsx server.js
+npx playwright install chromium
+npm run build:css      # arayüz stillerini derler (stil değiştirirken: npm run watch:css)
+npm start              # veya geliştirme için: npm run dev
 ```
 - Web Paneli: http://localhost:3000
+
+## Testler
+```Bash
+npm test
+```
+- `unit-tests/` altında birim testleri (IP koruması, kuyruk, DPU filtreleri, oturum/CSRF, koşucu) ve
+  gerçek sunucuyu sahte bir DPU Base'e karşı çalıştıran uçtan uca API testi bulunur.
+- Sahte DPU, WHERE filtrelerini bilerek yok sayar; sunucunun bu durumda da doğru kayıtlarla çalıştığı doğrulanır.
+
+## Mimari
+```
+server.js                 Giriş noktası: helmet/CSP, CSRF kontrolü, rotaların bağlanması
+config/                   env.js (ilk yüklenir, zorunlu değişkenleri doğrular), DPU istemcisi
+routes/                   auth, projects, scenarios, runs, reports, settings, users, maintenance
+services/                 İş mantığı: proje/kullanıcı/ayar erişimi (kısa TTL önbellekli),
+                          testRunner (çalıştırma + raporlama), jobQueue (test kuyruğu)
+middleware/               Oturum (httpOnly çerez), yetki, doğrulama, hata yakalama, rate limit
+utils/                    ipGuard (SSRF), translator (AI çeviri), stepGroups, şifreleme
+public/js/lib/            utils (kaçış, adım grupları), api (fetch sarmalayıcı, kuyruk takibi), notify
+tests/ai-security.spec.ts Playwright + Stagehand koşucusu (ağ korumalı)
+unit-tests/               node:test testleri
+```
+
+### Test Çalıştırma Akışı
+1. `POST /api/scenarios/run` senaryoyu kuyruğa ekler ve hemen bir iş ID'si döner (202).
+2. Arayüz `GET /api/scenarios/jobs/:id` ile durumu takip eder (sırada / çalışıyor / tamamlandı).
+3. Aynı anda en fazla `RUN_CONCURRENCY` test koşar (varsayılan 1). Kuyruk bellektedir; sunucu
+   yeniden başlarsa bekleyen işler kaybolur, tamamlananların raporları veritabanındadır.
+
+### Güvenlik Notları
+- **Oturum:** JWT httpOnly + SameSite=Strict çerezde tutulur, JavaScript erişemez. Durum değiştiren
+  her API isteği `X-Requested-With: fetch` başlığı ister (CSRF). Kullanıcı silinir veya rolü
+  değişirse en geç 30 saniye içinde etkili olur.
+- **SSRF:** Testin hedef URL'si her zaman veritabanındaki `hedef_url` alanından alınır ve çalıştırma
+  anında yeniden denetlenir. Test sırasında tarayıcının yaptığı her istek de filtrelenir; iç ağ
+  adresleri (IPv4/IPv6, gömülü IPv4 yazımları dahil) engellenir. Bilinçli istisnalar için
+  `ALLOWED_PRIVATE_HOSTS` kullanılır.
+- **API anahtarları:** Ayarlar ekranına maskelenmiş olarak gelir; alan değiştirilmezse mevcut
+  şifreli anahtar korunur.
 
 ## Veritabanı Mimarisi (DPU Base)
 Projedeki hiçbir senaryo veya rapor yerel dosya sisteminde saklanmaz. Tüm veriler DPU Base üzerindeki şu tablolarda dinamik olarak yönetilir:
@@ -94,4 +129,8 @@ Projedeki hiçbir senaryo veya rapor yerel dosya sisteminde saklanmaz. Tüm veri
 
 - **raporlar:** Koşturulan testlerin başarı/başarısızlık durumlarını ve detaylı log çıktılarını saklar.
 
-- **kullanıcılar & ayarlar:** Sistem kullanıcılarını, rol yetkilerini (ADMIN/PM) ve aktif AI sağlayıcı (Gemini, OpenAI vb.) konfigürasyonlarını yönetir.
+- **kullanıcılar & ayarlar:** Sistem kullanıcılarını, rol yetkilerini (ADMIN/PM/USER) ve aktif AI sağlayıcı (Gemini, OpenAI vb.) konfigürasyonlarını yönetir.
+
+> **Not:** Tablolar arası ilişkilerin bir kısmı ID yerine isim üzerinden kuruludur
+> (`kullanici_projeleri.proje_adi`, `raporlar.scenario_name`). Yeniden adlandırmalar ilgili
+> tablolara yayılır; kalıcı çözüm için bu alanların ID'ye taşınması (DPU Base şema değişikliği) önerilir.

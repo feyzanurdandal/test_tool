@@ -83,11 +83,53 @@ export const updateScenarioSchema = z.object({
   })
 });
 
+// Hedef URL artık istekten alınmaz; her zaman senaryonun kayıtlı hedef_url'si kullanılır.
 export const runScenarioSchema = z.object({
   body: z.object({
     scenarioName: scenarioNameSchema,
-    projectName: z.string().trim().min(1, "Proje adı zorunlu!"),
-    targetUrl: z.string().url("Geçersiz URL formatı!").optional()
+    projectName: z.string().trim().min(1, "Proje adı zorunlu!")
+  })
+});
+
+export const deleteScenarioSchema = z.object({
+  body: z.object({
+    scenarioName: scenarioNameSchema,
+    projectName: z.string().trim().min(1, "Proje adı zorunlu!")
+  })
+});
+
+const recordIdSchema = z.union([z.string().trim().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/, "Geçersiz ID!"), z.number().int().nonnegative()]);
+
+export const deleteReportSchema = z.object({
+  body: z.object({ id: recordIdSchema })
+});
+
+export const deleteReportsBatchSchema = z.object({
+  body: z.object({ ids: z.array(recordIdSchema).min(1, "Silinecek rapor seçilmedi!").max(500) })
+});
+
+export const deleteUserSchema = z.object({
+  body: z.object({ id: recordIdSchema })
+});
+
+export const jobIdSchema = z.object({
+  params: z.object({ id: z.string().uuid("Geçersiz iş ID'si!") })
+});
+
+const providerNameSchema = z.string().trim().toLowerCase()
+  .min(1, "Sağlayıcı adı boş olamaz!")
+  .max(40)
+  .regex(/^[a-z0-9_-]+$/, "Sağlayıcı adı yalnızca harf, rakam, - ve _ içerebilir!")
+  .refine(v => v !== 'test_runner_api' && v !== 'translator_api', "Bu sağlayıcı adı sistem tarafından ayrılmıştır!");
+
+export const saveSettingsSchema = z.object({
+  body: z.object({
+    testRunnerApi: z.string().trim().toLowerCase().min(1, "Test çalıştırıcı sağlayıcı seçilmedi!"),
+    translatorApi: z.string().trim().toLowerCase().min(1, "Çeviri sağlayıcısı seçilmedi!"),
+    apiKeys: z.record(providerNameSchema, z.object({
+      key: z.string().max(4096).optional().default(''),
+      model: z.string().trim().max(200).optional().default('')
+    })).optional().default({})
   })
 });
 

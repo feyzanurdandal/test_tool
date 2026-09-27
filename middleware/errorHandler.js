@@ -17,16 +17,18 @@ export const sendServerError = (res, err, customMessage = "Sunucu Hatası", cont
  //2. Express Global Hata Yakalama Middleware'i
 
 export const globalErrorHandler = (err, req, res, next) => {
-    console.error(" [Global Error Handler]:", err);
-
-    const statusCode = err.statusCode || 500;
+    const statusCode = err.statusCode || err.status || 500;
     const isProduction = process.env.NODE_ENV === 'production';
 
+    if (statusCode >= 500) console.error(" [Global Error Handler]:", err);
+
+    // 4xx hataları (kuyruk dolu, bulunamadı, bozuk JSON vb.) kullanıcıya anlamlı mesajla döner;
+    // 5xx ayrıntıları yalnızca geliştirme ortamında gösterilir.
     res.status(statusCode).json({
         success: false,
-        error: isProduction 
-            ? "Sunucuda beklenmeyen bir hata oluştu." 
-            : (err.message || "Sunucu Hatası"),
+        error: (isProduction && statusCode >= 500)
+            ? "Sunucuda beklenmeyen bir hata oluştu."
+            : (err.expose === false ? "İstek işlenemedi." : (err.message || "Sunucu Hatası")),
         ...(isProduction ? {} : { stack: err.stack, details: err.details })
     });
 };

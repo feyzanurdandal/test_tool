@@ -1,3 +1,4 @@
+import './env.js';
 import fetch from 'node-fetch';
 
 class DpuService {
@@ -175,41 +176,77 @@ class DpuService {
 
     // 3. UPDATE 
     async update(tableName, id, data) {
-        return await this.request(`${tableName}/${id}`, "PATCH", data);
+        return await this.request(`${tableName}/${encodeURIComponent(id)}`, "PATCH", data);
     }
 
     // 4. DELETE
     async delete(tableName, id) {
-        return await this.request(`${tableName}/${id}`, "DELETE");
+        return await this.request(`${tableName}/${encodeURIComponent(id)}`, "DELETE");
     }
 
     /**
      * DPU Base veritabanından filtreli (WHERE) veri çeker.
-     * Otomatik JWT Token yenileme ve Retry mekanizmasını (request metodu vasıtasıyla) kullanır.
+     *
+     * - Sayfalama yapar: servis varsayılan limitte keserse kayıtlar kaybolmaz.
+     * - Sonuçları JS tarafında filtreye göre yeniden süzer: servis bir filtreyi
+     *   yok sayarsa (geçmişte görüldü) yanlış kayıt data[0] olarak dönmez.
+     *   Eşleşme büyük/küçük harfe duyarsızdır (servisin davranışıyla uyumlu),
+     *   birebir eşleşen kayıtlar listenin başına alınır.
      * @param {string} tableName - Tablo adı (ör: 'kullanicilar')
      * @param {Object} filters - Filtre objesi (ör: { kullanici_adi: { eq: 'admin' } })
      */
-    async selectWhere(tableName, filters = {}) {
+    async selectWhere(tableName, filters = {}, { pageSize = 100, maxPages = 100 } = {}) {
         try {
-            const queryParams = new URLSearchParams();
+            let allRecords = [];
 
-            Object.entries(filters).forEach(([field, ops]) => {
-                Object.entries(ops).forEach(([op, val]) => {
-                    queryParams.append(`where[${field}][${op}]`, val);
+            for (let page = 1; page <= maxPages; page++) {
+                const queryParams = new URLSearchParams();
+                Object.entries(filters).forEach(([field, ops]) => {
+                    Object.entries(ops).forEach(([op, val]) => {
+                        queryParams.append(`where[${field}][${op}]`, val);
+                    });
                 });
-            });
+                queryParams.append('limit', String(pageSize));
+                queryParams.append('page', String(page));
 
-            const endpoint = `${tableName}?${queryParams.toString()}`;
+                const res = await this.request(`${tableName}?${queryParams.toString()}`, 'GET');
+                if (!res || !res.success) {
+                    if (page === 1) return res;
+                    break;
+                }
 
-            // İstek sonucunu değişkene alıp logluyoruz
-            const res = await this.request(endpoint, 'GET');
+                const rows = Array.isArray(res.data) ? res.data : [];
+                allRecords = allRecords.concat(rows);
+                if (rows.length < pageSize) break;
+            }
 
-            return res;
+            return { success: true, data: applyFilters(allRecords, filters) };
         } catch (error) {
             console.error(`DPU Base WHERE sorgu hatası (${tableName}):`, error);
             return { success: false, error: error.message };
         }
     }
+
+    // Tek kayıt döndüren kısayol (bulunamazsa null)
+    async findOne(tableName, filters = {}) {
+        const res = await this.selectWhere(tableName, filters);
+        if (!res.success) throw new Error(res.error || `${tableName} sorgulanamadı.`);
+        return res.data.length > 0 ? res.data[0] : null;
+    }
+}
+
+const normalize = (v) => String(v ?? '').trim().toLowerCase();
+
+export function applyFilters(rows, filters = {}) {
+    const eqFilters = [];
+    Object.entries(filters).forEach(([field, ops]) => {
+        if (ops && Object.prototype.hasOwnProperty.call(ops, 'eq')) eqFilters.push([field, ops.eq]);
+    });
+    if (eqFilters.length === 0) return rows;
+
+    const matched = rows.filter(row => eqFilters.every(([field, val]) => normalize(row[field]) === normalize(val)));
+    const isExact = (row) => eqFilters.every(([field, val]) => String(row[field] ?? '').trim() === String(val ?? '').trim());
+    return [...matched.filter(isExact), ...matched.filter(r => !isExact(r))];
 }
 
 const dpu = new DpuService();

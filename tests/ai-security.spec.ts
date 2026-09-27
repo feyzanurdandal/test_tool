@@ -6,11 +6,14 @@ import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+// @ts-ignore
 import { CONSTANTS } from '../config/constants.js';
 // @ts-ignore
 import { decrypt } from '../utils/cryptoHelper.js'; 
 // @ts-ignore
 import dpu from '../config/dpuService.js';
+// @ts-ignore
+import { checkHost } from '../utils/ipGuard.js';
 
 const ERROR_KEYWORDS = [
     'hata', 'başarısız', 'basarisiz', 'error', 'failed', 'invalid', 
@@ -140,8 +143,38 @@ test('Yapay Zeka Test Otomasyonu', async () => {
 
     await stagehand.init();
     const browser = await chromium.connectOverCDP({ wsEndpoint: stagehand.connectURL() });
-    const pwPage = browser.contexts()[0].pages()[0];
+    const browserContext = browser.contexts()[0];
+    const pwPage = browserContext.pages()[0];
     await pwPage.setViewportSize({ width: 1280, height: 720 });
+
+    // ─── AĞ KORUMASI (SSRF) ───
+    // Hedef URL sunucuda doğrulanmış olsa da test adımları tarayıcıyı başka
+    // adreslere götürebilir (link tıklama, yönlendirme, form gönderimi).
+    // Tarayıcının yaptığı HER istek burada denetlenir; iç ağa giden istekler kesilir.
+    const hostVerdicts = new Map<string, Promise<{ safe: boolean; reason?: string }>>();
+    await browserContext.route('**/*', async (route) => {
+        let parsed: URL;
+        try {
+            parsed = new URL(route.request().url());
+        } catch {
+            return route.abort('blockedbyclient');
+        }
+
+        if (!['http:', 'https:', 'ws:', 'wss:'].includes(parsed.protocol)) {
+            console.error(`[AĞ KORUMASI] İzin verilmeyen protokol engellendi: ${parsed.protocol}`);
+            return route.abort('blockedbyclient');
+        }
+
+        const host = parsed.hostname;
+        if (!hostVerdicts.has(host)) hostVerdicts.set(host, checkHost(host));
+        const verdict = await hostVerdicts.get(host)!;
+
+        if (!verdict.safe) {
+            console.error(`[AĞ KORUMASI] İstek engellendi: ${host} -> ${verdict.reason}`);
+            return route.abort('blockedbyclient');
+        }
+        return route.continue();
+    });
 
     // Tarayıcının yerel pop-up pencerelerini yakalama
     pwPage.on('dialog', async (dialog) => {

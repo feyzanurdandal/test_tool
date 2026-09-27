@@ -4,15 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yazılım Test Otomasyonu</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Stiller derleme ile üretilir: npm run build:css (kaynak: styles/tailwind.css) -->
+    <link rel="stylesheet" href="css/app.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #09090b; }
-        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
-    </style>
+    <!-- İkonlar sabit sürümle yerelden sunulur (lucide 1.48.0) -->
+    <script src="vendor/lucide.min.js"></script>
 </head>
 <body class="bg-[#09090b] text-[#fafafa] min-h-screen flex flex-col antialiased select-none">
 
@@ -528,6 +524,9 @@
     </div>
 
     <!-- Script dosyası -->
+    <script src="js/lib/utils.js"></script>
+    <script src="js/lib/notify.js"></script>
+    <script src="js/lib/api.js"></script>
     <script src="js/app.js"></script>
 
     <!-- Rapor Detay Pop-Up Modalı -->

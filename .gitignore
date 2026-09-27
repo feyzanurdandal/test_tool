@@ -22,3 +22,5 @@ Thumbs.db
 # SQLite Veri Tabanı Dosyası
 *.db
 *.db-journal
+# Çalışma anı test adım dosyaları
+runtime/

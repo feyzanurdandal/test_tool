@@ -42,117 +42,22 @@ document.addEventListener("DOMContentLoaded", () => {
     let globalEditScenarioName = "";
     let globalEditProjectOldName = ""; // Proje düzenleme modu için
 
-    // XSS Kaçış Fonksiyonu
-    function escapeHtml(str) {
-        if (str === null || str === undefined) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
+    // escapeHtml, parseStepBlocks, renderStepsPreviewHtml vb. → js/lib/utils.js
 
-    // ─── İÇE AKTARILAN SENARYO GRUPLARI (akordiyon) ───
-    // adimlar_tr içinde içe aktarılan adımlar şu işaretçilerle saklanır:
-    //   [[İÇE_AKTAR:login]] ... [[/İÇE_AKTAR]]
-    // Backend çeviriye göndermeden önce işaretçileri temizler (utils/stepGroups.js).
-    const IMPORT_START_RE = /^\[\[İÇE_AKTAR:(.+)\]\]$/;
-    const IMPORT_END = "[[/İÇE_AKTAR]]";
-
-    // Metni blok listesine çevirir: { type: "step", text } | { type: "group", source, steps: [] }
-    function parseStepBlocks(text) {
-        const blocks = [];
-        let openGroup = null;
-        String(text || "").split('\n').map(l => l.trim()).filter(l => l !== "").forEach(line => {
-            const startMatch = line.match(IMPORT_START_RE);
-            if (startMatch) {
-                if (openGroup && openGroup.steps.length) blocks.push(openGroup);
-                openGroup = { type: "group", source: startMatch[1].trim(), steps: [] };
-                return;
-            }
-            if (line === IMPORT_END) {
-                if (openGroup && openGroup.steps.length) blocks.push(openGroup);
-                openGroup = null;
-                return;
-            }
-            if (openGroup) openGroup.steps.push(line);
-            else blocks.push({ type: "step", text: line });
-        });
-        if (openGroup && openGroup.steps.length) blocks.push(openGroup);
-        return blocks;
-    }
-
-    // Gruplar dahil tüm adımları düz liste olarak döndürür
-    function flattenStepBlocks(text) {
-        return parseStepBlocks(text).flatMap(b => b.type === "group" ? b.steps : [b.text]);
-    }
-
-    function formatStepNo(n) {
-        return n < 10 ? `0${n}.` : `${n}.`;
-    }
-
-    // Senaryo listesindeki salt okunur adım önizlemesi (gruplar akordiyon)
-    function renderStepsPreviewHtml(contentTr) {
-        const stepHtml = (line, no) => `
-            <div class="flex items-start gap-3 bg-[#27272a]/20 p-2.5 rounded-lg border border-[rgba(255,255,255,0.02)]">
-                <span class="font-mono text-[10px] text-zinc-500 mt-0.5">${formatStepNo(no)}</span>
-                <div class="flex-1">
-                    <div class="font-medium text-zinc-200 select-text">${escapeHtml(line)}</div>
-                </div>
-                <span class="text-[9px] px-1.5 py-0.5 rounded border bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/20 font-mono font-bold uppercase shrink-0">ADIM</span>
-            </div>`;
-
-        let counter = 0;
-        return parseStepBlocks(contentTr).map(block => {
-            if (block.type === "step") return stepHtml(block.text, ++counter);
-
-            const first = counter + 1;
-            const inner = block.steps.map(line => stepHtml(line, ++counter)).join("");
-            return `
-                <div class="preview-step-group rounded-lg border border-[#3b82f6]/20 bg-[#3b82f6]/[0.04]">
-                    <button type="button" aria-expanded="false" class="preview-group-toggle w-full flex items-center gap-2 p-2.5 text-left rounded-lg hover:bg-[#3b82f6]/[0.06] transition">
-                        <span class="group-chevron inline-flex transition-transform duration-150"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-400"></i></span>
-                        <i data-lucide="layers" class="w-3.5 h-3.5 text-[#3b82f6] shrink-0"></i>
-                        <span class="font-medium text-zinc-100 truncate">${escapeHtml(block.source)}</span>
-                        <span class="text-[10px] text-zinc-500 shrink-0">${block.steps.length} adım · ${formatStepNo(first).slice(0, -1)}–${formatStepNo(counter).slice(0, -1)}</span>
-                    </button>
-                    <div class="preview-group-body hidden space-y-2 px-2.5 pb-2.5">${inner}</div>
-                </div>`;
-        }).join("");
-    }
-
-    function bindPreviewGroupToggles(container) {
-        container.querySelectorAll(".preview-group-toggle").forEach(toggle => {
-            toggle.addEventListener("click", (e) => {
-                e.stopPropagation();
-                const group = toggle.closest(".preview-step-group");
-                const body = group.querySelector(".preview-group-body");
-                const willOpen = body.classList.contains("hidden");
-                body.classList.toggle("hidden", !willOpen);
-                toggle.setAttribute("aria-expanded", String(willOpen));
-                group.querySelector(".group-chevron").style.transform = willOpen ? "rotate(90deg)" : "";
-            });
-        });
-    }
-
-    // ─── GLOBAL PROJE SİLME FONKSİYONU ───
     window.deleteProject = async function(projectName) {
         if (!projectName || projectName === 'Varsayılan Proje') {
-            alert("Varsayılan proje silinemez!");
+            notify("Varsayılan proje silinemez!");
             return;
         }
 
-        const confirmDelete = confirm(`"${projectName}" projesini silmek istediğinize emin misiniz?\n\nBu işlem tüm kullanıcıların bu projeye erişimini kaldıracaktır!`);
+        const confirmDelete = confirm(`"${projectName}" projesini silmek istediğinize emin misiniz?\n\nProjenin tüm senaryoları, raporları ve kullanıcı yetkileri de kalıcı olarak silinecektir!`);
         if (!confirmDelete) return;
 
         try {
-            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
             const response = await fetch('/api/scenarios/projects/delete', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-User-Token': userSession.token || ""
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ projectName: projectName })
             });
@@ -160,15 +65,15 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await response.json();
 
             if (response.ok && result.success) {
-                alert(result.message);
+                notify(result.message);
                 currentProject = "";
                 await loadProjects();
             } else {
-                alert(`Hata: ${result.error || 'Proje silinemedi.'}`);
+                notify(`Hata: ${result.error || 'Proje silinemedi.'}`);
             }
         } catch (err) {
             console.error("Proje silme hatası:", err);
-            alert("Sunucuyla iletişim kurulurken bir hata oluştu.");
+            notify("Sunucuyla iletişim kurulurken bir hata oluştu.");
         }
     };
 
@@ -201,71 +106,65 @@ document.addEventListener("DOMContentLoaded", () => {
             startBatchBtn.className = "bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm animate-pulse cursor-wait";
             
             const activeQueue = [...batchQueue];
+            const projectName = projectDropdown ? projectDropdown.value : currentProject;
 
-            for (let i = 0; i < activeQueue.length; i++) {
-                const scenarioName = activeQueue[i];
-                const remainingCount = activeQueue.length - i; 
-
-                startBatchBtn.textContent = `Çalışacak Test Sayısı: ${remainingCount}...`;
-
-                const rows = document.querySelectorAll("#batch-list tr");
-                
-                rows.forEach(row => {
+            const setRowState = (scenarioName, state, label) => {
+                const styles = {
+                    running: ["border-b border-amber-500/30 bg-amber-500/5 transition h-12", "text-amber-400 animate-pulse font-bold"],
+                    queued: ["border-b border-zinc-700/40 transition h-12", "text-zinc-400 font-bold"],
+                    done: ["border-b border-emerald-500/20 bg-emerald-500/5 transition h-12", "text-emerald-400 font-bold"],
+                    failed: ["border-b border-rose-500/20 bg-rose-500/5 transition h-12", "text-rose-400 font-bold"],
+                }[state];
+                document.querySelectorAll("#batch-list tr").forEach(row => {
                     const checkbox = row.querySelector(".batch-checkbox");
-                    if (checkbox && checkbox.value === scenarioName) {
-                        const targetOrderCell = row.querySelector(".batch-order-cell");
-                        row.className = "border-b border-amber-500/30 bg-amber-500/5 transition h-12";
-                        if (targetOrderCell) {
-                            targetOrderCell.innerHTML = `<span class="text-amber-400 animate-pulse font-bold">Çalışıyor...</span>`;
-                        }
+                    if (!checkbox || checkbox.value !== scenarioName) return;
+                    row.className = styles[0];
+                    const cell = row.querySelector(".batch-order-cell");
+                    if (cell) {
+                        cell.innerHTML = "";
+                        const span = document.createElement("span");
+                        span.className = styles[1];
+                        span.textContent = label;
+                        cell.appendChild(span);
                     }
                 });
+            };
 
-                try {
-                    const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
+            try {
+                const batch = await TestToolApi.runBatch(activeQueue, projectName, currentTestType);
+                (batch.skipped || []).forEach(s => setRowState(s.scenarioName, "failed", "Atlandı"));
 
-                    const res = await fetch("/api/scenarios/run", {
-                        method: "POST",
-                        headers: { 
-                            "Content-Type": "application/json",
-                            "X-User-Token": userSession.token || ""
-                        },
-                        body: JSON.stringify({
-                            scenarioName,
-                            projectName: projectDropdown ? projectDropdown.value : currentProject
-                        })
-                    });
+                if (!batch.ok) {
+                    notify(batch.message);
+                } else {
+                    batch.jobs.forEach(j => setRowState(j.scenarioName, "queued", "Sırada"));
+                    let remaining = batch.jobs.length;
+                    let failedCount = 0;
 
-                    const result = await res.json();
-                    
-                    rows.forEach(row => {
-                        const checkbox = row.querySelector(".batch-checkbox");
-                        if (checkbox && checkbox.value === scenarioName) {
-                            const orderCell = row.querySelector(".batch-order-cell");
-                            if (res.ok && result.success && result.status !== "FAILED") {
-                                row.className = "border-b border-emerald-500/20 bg-emerald-500/5 transition h-12";
-                                if (orderCell) orderCell.innerHTML = `<span class="text-emerald-400 font-bold">Tamamlandı</span>`;
-                            } else {
-                                row.className = "border-b border-rose-500/20 bg-rose-500/5 transition h-12";
-                                if (orderCell) orderCell.innerHTML = `<span class="text-rose-400 font-bold">Başarısız</span>`;
-                            }
+                    for (const { jobId, scenarioName } of batch.jobs) {
+                        startBatchBtn.textContent = `Kalan Test: ${remaining}...`;
+                        const outcome = await TestToolApi.waitForJob(jobId, (job) => {
+                            if (job.status === "running") setRowState(scenarioName, "running", "Çalışıyor...");
+                        });
+                        if (outcome.ok) {
+                            setRowState(scenarioName, "done", "Tamamlandı");
+                        } else {
+                            failedCount++;
+                            setRowState(scenarioName, "failed", "Başarısız");
                         }
-                    });
+                        remaining--;
+                    }
 
-                } catch (err) {
-                    console.error(`[Pipeline] ${scenarioName} hata verdi:`, err);
-                    rows.forEach(row => {
-                        const checkbox = row.querySelector(".batch-checkbox");
-                        if (checkbox && checkbox.value === scenarioName) {
-                            const orderCell = row.querySelector(".batch-order-cell");
-                            row.className = "border-b border-rose-500/20 bg-rose-500/5 transition h-12";
-                            if (orderCell) orderCell.innerHTML = `<span class="text-rose-400 font-bold">Bağlantı Hatası</span>`;
-                        }
-                    });
+                    const skippedNote = batch.skipped.length ? ` ${batch.skipped.length} senaryo atlandı.` : "";
+                    notify(failedCount === 0
+                        ? `Seçilen tüm testler çalıştırıldı ve sonuçlar raporlara kaydedildi.${skippedNote}`
+                        : `${batch.jobs.length} testten ${failedCount} tanesi başarısız oldu. Ayrıntılar raporlarda.${skippedNote}`,
+                        failedCount === 0 ? "success" : "error");
                 }
+            } catch (err) {
+                console.error("[Pipeline] Toplu test hatası:", err);
+                notify("Toplu test sırasında bağlantı hatası oluştu.", "error");
             }
-
-            alert("Seçilen tüm testler çalıştırıldı ve sonuçlar raporlara kaydedildi.");
             
             batchQueue = []; 
             updateBatchButtonState(); 
@@ -287,13 +186,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!scenariosTable || !scenariosEmpty || !scenariosList) return;
 
         try {
-            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
-            const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}&testType=${encodeURIComponent(currentTestType)}`, {
-                headers: {
-                    "X-User-Token": userSession.token || ""
-                }
-            });
+            const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}&testType=${encodeURIComponent(currentTestType)}`);
             const result = await res.json();
 
             if (result.scenarios && result.scenarios.length > 0) {
@@ -316,12 +210,13 @@ document.addEventListener("DOMContentLoaded", () => {
                             <span>${escapeHtml(scenarioName)}</span>
                         </td>
                         <td class="py-3 px-4 target-url-cell text-zinc-400 font-mono text-[11px]">-</td>
-                        <td class="py-3 px-4 text-right" onclick="event.stopPropagation();">
-                            <button class="run-single-btn text-[#3b82f6] hover:text-blue-400 font-medium transition mr-4" data-name="${scenarioName}">Testi Çalıştır</button>
-                            <button class="edit-scenario-btn text-zinc-500 hover:text-amber-400 transition mr-3" data-name="${scenarioName}"><i data-lucide="edit-3" class="w-3.5 h-3.5 inline"></i></button>
-                            <button class="delete-scenario-btn text-zinc-500 hover:text-red-400 transition" data-name="${scenarioName}"><i data-lucide="trash-2" class="w-3.5 h-3.5 inline"></i></button>
+                        <td class="js-stop-propagation py-3 px-4 text-right">
+                            <button class="run-single-btn text-[#3b82f6] hover:text-blue-400 font-medium transition mr-4" data-name="${escapeHtml(scenarioName)}">Testi Çalıştır</button>
+                            <button class="edit-scenario-btn text-zinc-500 hover:text-amber-400 transition mr-3" data-name="${escapeHtml(scenarioName)}" aria-label="Düzenle"><i data-lucide="edit-3" class="w-3.5 h-3.5 inline"></i></button>
+                            <button class="delete-scenario-btn text-zinc-500 hover:text-red-400 transition" data-name="${escapeHtml(scenarioName)}" aria-label="Sil"><i data-lucide="trash-2" class="w-3.5 h-3.5 inline"></i></button>
                         </td>
                     `;
+                    bindStopPropagation(row);
                     scenariosList.appendChild(row);
 
                     const contentRow = document.createElement("tr");
@@ -359,9 +254,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             const detailsContainer = contentRow.querySelector(".steps-details-container");
                             if (detailsContainer.getAttribute("data-loaded") !== "true") {
                                 try {
-                                    const contentRes = await fetch(`/api/scenarios/content?scenarioName=${encodeURIComponent(scenarioName)}&project=${encodeURIComponent(currentProject)}`, {
-                                        headers: { "X-User-Token": userSession.token || "" }
-                                    });
+                                    const contentRes = await fetch(`/api/scenarios/content?scenarioName=${encodeURIComponent(scenarioName)}&project=${encodeURIComponent(currentProject)}`);
                                     const contentResult = await contentRes.json();
 
                                     if (contentResult.success) {
@@ -370,12 +263,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
                                         const targetUrl = adimlarJson.targetUrl || "";
                                         const urlCell = row.querySelector(".target-url-cell");
-                                        if (urlCell && targetUrl) {
+                                        const safeUrl = safeHttpUrl(targetUrl);
+                                        if (urlCell && safeUrl) {
                                             urlCell.innerHTML = `
-                                                <a href="${targetUrl}" target="_blank" onclick="event.stopPropagation();" class="text-[#3b82f6] hover:underline flex items-center gap-1 select-text">
-                                                    ${targetUrl} <i data-lucide="external-link" class="w-3 h-3"></i>
+                                                <a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="js-stop-propagation text-[#3b82f6] hover:underline flex items-center gap-1 select-text">
+                                                    ${escapeHtml(safeUrl)} <i data-lucide="external-link" class="w-3 h-3"></i>
                                                 </a>
                                             `;
+                                            bindStopPropagation(urlCell);
                                         }
 
                                         let stepsHtml = "";
@@ -407,15 +302,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         e.stopPropagation();
                         const scenarioName = btn.getAttribute("data-name");
                         const selectedProjName = projectDropdown ? projectDropdown.value : currentProject;
-                        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
                         try {
-                            const contentRes = await fetch(`/api/scenarios/content?scenarioName=${encodeURIComponent(scenarioName)}&project=${encodeURIComponent(selectedProjName)}`, {
-                                headers: { "X-User-Token": userSession.token || "" }
-                            });
+                            const contentRes = await fetch(`/api/scenarios/content?scenarioName=${encodeURIComponent(scenarioName)}&project=${encodeURIComponent(selectedProjName)}`);
                             const contentResult = await contentRes.json();
                             if (!contentResult.success) {
-                                alert("Senaryo içeriği getirilemedi, düzenlenemiyor.");
+                                notify("Senaryo içeriği getirilemedi, düzenlenemiyor.");
                                 return;
                             }
                             
@@ -463,7 +355,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             if (scenarioModal) scenarioModal.classList.remove("hidden");
                         } catch (err) {
                             console.error("Senaryo düzenleme için içerik alınırken hata:", err);
-                            alert("Bağlantı hatası! Senaryo düzenlenemiyor.");
+                            notify("Bağlantı hatası! Senaryo düzenlenemiyor.");
                         }
                     });
                 });
@@ -480,13 +372,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
                         try {
                             btn.disabled = true;
-                            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
                             const res = await fetch("/api/scenarios/delete", {
                                 method: "POST",
                                 headers: { 
-                                    "Content-Type": "application/json",
-                                    "X-User-Token": userSession.token || ""
+                                    "Content-Type": "application/json"
                                 },
                                 body: JSON.stringify({
                                     scenarioName,
@@ -496,10 +386,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
                             const result = await res.json();
                             if (res.ok && result.success) {
-                                alert("Senaryo başarıyla buluttan silindi!");
+                                notify("Senaryo başarıyla buluttan silindi!");
                                 await loadScenarios(); 
                             } else {
-                                alert(`Silinemedi: ${result.error || "Hata oluştu"}`);
+                                notify(`Silinemedi: ${result.error || "Hata oluştu"}`);
                                 btn.disabled = false;
                             }
                         } catch (err) {
@@ -516,34 +406,24 @@ document.addEventListener("DOMContentLoaded", () => {
                         const scenarioName = btn.getAttribute("data-name");
                         const selectedProjName = projectDropdown ? projectDropdown.value : currentProject;
 
-                        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
                         const originalHtml = btn.innerHTML;
                         btn.disabled = true;
                         btn.innerHTML = `<span class="text-amber-400 animate-pulse">Çalıştırılıyor...</span>`;
 
                         try {
-                            const res = await fetch("/api/scenarios/run", {
-                                method: "POST",
-                                headers: { 
-                                    "Content-Type": "application/json",
-                                    "X-User-Token": userSession.token || ""
-                                },
-                                body: JSON.stringify({
-                                    scenarioName,
-                                    projectName: selectedProjName
-                                })
+                            const outcome = await TestToolApi.runScenario(scenarioName, selectedProjName, (job) => {
+                                const label = TestToolApi.describeJob(job);
+                                if (label) btn.innerHTML = `<span class="text-amber-400 animate-pulse">${escapeHtml(label)}</span>`;
                             });
-
-                            const result = await res.json();
-                            if (res.ok && result.success && result.status !== "FAILED") {
-                                alert(`Başarılı: "${scenarioName}" testi tamamlandı! Sonuç: ${result.status || "SUCCESS"}`);
+                            if (outcome.ok) {
+                                notify(`"${scenarioName}" testi tamamlandı. Sonuç: ${outcome.status || "SUCCESS"}`, "success");
                             } else {
-                                alert(`Test Başarısız / Beklenmeyen Sonuç: ${result.error || result.message || "Hata tespit edildi."}`);
+                                notify(`"${scenarioName}" testi başarısız: ${outcome.message || "Hata tespit edildi."}`, "error");
                             }
                         } catch (err) {
                             console.error("Test çalıştırma isteğinde hata patladı:", err);
-                            alert("Sunucu bağlantı hatası! Playwright çalıştırılamadı.");
+                            notify("Sunucu bağlantı hatası! Playwright çalıştırılamadı.");
                         } finally {
                             btn.disabled = false;
                             btn.innerHTML = originalHtml;
@@ -680,11 +560,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!reportsEmpty || !accordionContainer) return;
 
         try {
-            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
-            const res = await fetch(`/api/scenarios/reports/list?project=${encodeURIComponent(currentProject)}&testType=${encodeURIComponent(currentTestType)}`, {
-                headers: { "X-User-Token": userSession.token || "" }
-            });
+            const res = await fetch(`/api/scenarios/reports/list?project=${encodeURIComponent(currentProject)}&testType=${encodeURIComponent(currentTestType)}`);
             const result = await res.json();
 
             if (result.success && Array.isArray(result.reports)) {
@@ -791,7 +668,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 card.innerHTML = `
                     <div class="flex items-center justify-between p-4">
                         <div class="flex items-center gap-3">
-                            <input type="checkbox" value="${report.id}" class="report-checkbox w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0 cursor-pointer" onclick="event.stopPropagation();">
+                            <input type="checkbox" value="${escapeHtml(report.id)}" aria-label="Raporu seç" class="js-stop-propagation report-checkbox w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0 cursor-pointer">
                             <div class="w-9 h-9 rounded-lg flex items-center justify-center ${isSuccess ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
                                 <i data-lucide="${isSuccess ? 'check-circle' : 'alert-triangle'}" class="w-4 h-4"></i>
                             </div>
@@ -804,7 +681,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <span class="text-[10px] px-2.5 py-1 font-semibold rounded uppercase tracking-wider ${isSuccess ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
                                 ${isSuccess ? 'Başarılı' : 'Hata'}
                             </span>
-                            <button class="delete-report-btn text-zinc-500 hover:text-red-400 transition p-1.5 rounded-lg hover:bg-red-500/10" data-id="${report.id}" onclick="event.stopPropagation();">
+                            <button class="js-stop-propagation delete-report-btn text-zinc-500 hover:text-red-400 transition p-1.5 rounded-lg hover:bg-red-500/10" data-id="${escapeHtml(report.id)}" aria-label="Raporu sil">
                                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                             </button>
                             <div class="text-zinc-500 group-hover:text-white transition-colors pl-1">
@@ -814,6 +691,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                 `;
 
+                bindStopPropagation(card);
                 card.addEventListener("click", () => {
                     openReportModal(scenarioName, formattedDate, isSuccess, logContent, parsedSteps);
                 });
@@ -825,15 +703,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     if (!confirm("Bu test raporunu kalıcı olarak silmek istediğinize emin misiniz?")) return;
 
-                    const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
                     try {
                         deleteReportBtn.disabled = true;
                         const deleteRes = await fetch("/api/scenarios/reports/delete", {
                             method: "POST",
                             headers: { 
-                                "Content-Type": "application/json",
-                                "X-User-Token": userSession.token || ""
+                                "Content-Type": "application/json"
                             },
                             body: JSON.stringify({ id: reportId })
                         });
@@ -842,7 +718,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (deleteRes.ok && deleteResult.success) {
                             await loadReports();
                         } else {
-                            alert(`Rapor silinemedi: ${deleteResult.error || "Hata oluştu"}`);
+                            notify(`Rapor silinemedi: ${deleteResult.error || "Hata oluştu"}`);
                             deleteReportBtn.disabled = false;
                         }
                     } catch (err) {
@@ -884,14 +760,9 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
         try {
-            const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(activeProjectName)}&testType=${encodeURIComponent(currentTestType)}`, {
-                headers: {
-                    "X-User-Token": userSession.token || ""
-                }
-            });
+            const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(activeProjectName)}&testType=${encodeURIComponent(currentTestType)}`);
             const result = await res.json();
 
             batchQueue = [];
@@ -907,7 +778,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     row.className = "border-b border-[rgba(255,255,255,0.04)] hover:bg-[#18181b]/40 transition h-12";
                     row.innerHTML = `
                         <td class="py-3 px-4">
-                            <input type="checkbox" value="${scenarioName}" class="batch-checkbox w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0 cursor-pointer transition">
+                            <input type="checkbox" value="${escapeHtml(scenarioName)}" aria-label="Senaryoyu seç" class="batch-checkbox w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0 cursor-pointer transition">
                         </td>
                         <td class="py-3 px-4 font-mono text-zinc-500 font-semibold batch-order-cell">-</td>
                         <td class="py-3 px-4 font-medium text-white">${escapeHtml(scenarioName)}</td>
@@ -1073,14 +944,9 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadProjects() {
         if (!projectDropdown) return;
 
-        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
         try {
-            const res = await fetch("/api/scenarios/projects/list", {
-                headers: {
-                    "X-User-Token": userSession.token || ""
-                }
-            });
+            const res = await fetch("/api/scenarios/projects/list");
             const result = await res.json();
 
             if (result.success && result.projects) {
@@ -1120,15 +986,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const settingsNavBtn = document.querySelector('[data-target="view-settings"]');
         const usersNavBtn = document.getElementById("nav-users-btn");
 
-        if (user.role === "PM") {
-            if (addProjectBtn) addProjectBtn.classList.add("hidden");
-            if (settingsNavBtn) settingsNavBtn.classList.add("hidden");
-            if (usersNavBtn) usersNavBtn.classList.add("hidden");
-        } else {
-            if (addProjectBtn) addProjectBtn.classList.remove("hidden");
-            if (settingsNavBtn) settingsNavBtn.classList.remove("hidden");
-            if (usersNavBtn) usersNavBtn.classList.remove("hidden");
-        }
+        // Yönetim ekranları yalnızca ADMIN'e görünür (yetki kontrolü sunucuda da yapılır)
+        const isAdmin = user.role === "ADMIN";
+        const clearCacheNavBtn = document.getElementById("clear-cache-btn");
+        [addProjectBtn, settingsNavBtn, usersNavBtn, clearCacheNavBtn].forEach(el => {
+            if (el) el.classList.toggle("hidden", !isAdmin);
+        });
 
         await loadProjects(); 
 
@@ -1143,10 +1006,37 @@ document.addEventListener("DOMContentLoaded", () => {
         updateViewHeadings();
     }
 
-    const savedUser = localStorage.getItem("test_user");
-    if (savedUser) {
-        showDashboard(JSON.parse(savedUser));
+    function showLogin() {
+        localStorage.removeItem("test_user");
+        if (appView) appView.classList.add("hidden");
+        if (loginView) loginView.classList.remove("hidden");
+        if (loginForm) loginForm.reset();
     }
+
+    // Oturum httpOnly çerezde; sayfa açılışında sunucuya doğrulatılır.
+    // localStorage'da yalnızca arayüzün kullandığı ad/rol tutulur (yetki için değil).
+    (async () => {
+        try {
+            const res = await fetch("/api/auth/me");
+            if (res.ok) {
+                const me = await res.json();
+                const session = { username: me.username, role: me.role };
+                localStorage.setItem("test_user", JSON.stringify(session));
+                showDashboard(session);
+            } else {
+                showLogin();
+            }
+        } catch {
+            showLogin();
+        }
+    })();
+
+    window.addEventListener("session-expired", () => {
+        if (appView && !appView.classList.contains("hidden")) {
+            showLogin();
+            notify("Oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.", "error");
+        }
+    });
 
     if (loginForm) {
         loginForm.addEventListener("submit", async (e) => {
@@ -1164,7 +1054,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const result = await res.json();
                 if (res.ok && result.success) {
-                    const session = { username: result.username, role: result.role, token: result.token };
+                    const session = { username: result.username, role: result.role };
                     localStorage.setItem("test_user", JSON.stringify(session));
                     showDashboard(session);
                 } else {
@@ -1183,11 +1073,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (logoutBtn) {
-        logoutBtn.addEventListener("click", () => {
-            localStorage.removeItem("test_user");
-            if (appView) appView.classList.add("hidden");
-            if (loginView) loginView.classList.remove("hidden");
-            if (loginForm) loginForm.reset();
+        logoutBtn.addEventListener("click", async () => {
+            try {
+                await fetch("/api/auth/logout", { method: "POST" });
+            } catch (err) {
+                console.error("Çıkış isteği başarısız:", err);
+            }
+            showLogin();
         });
     }
 
@@ -1198,7 +1090,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const confirmClear = confirm("Sunucudaki geçici önbellek dosyaları temizlenecek ve ekrandaki veriler güncellenecek. Onaylıyor musunuz?");
             if (!confirmClear) return;
 
-            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
             const origHtml = clearCacheBtn.innerHTML;
             clearCacheBtn.disabled = true;
             clearCacheBtn.innerHTML = `<span class="text-amber-400 animate-pulse">Temizleniyor...</span>`;
@@ -1207,21 +1098,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 const res = await fetch("/api/scenarios/cache/clear", {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json",
-                        "X-User-Token": userSession.token || ""
+                        "Content-Type": "application/json"
                     }
                 });
 
                 const result = await res.json();
                 if (res.ok && result.success) {
-                    alert("🎉 " + result.message);
+                    notify("🎉 " + result.message);
                     await loadProjects();
                 } else {
-                    alert(" Önbellek temizlenemedi: " + (result.error || "Bilinmeyen hata"));
+                    notify(" Önbellek temizlenemedi: " + (result.error || "Bilinmeyen hata"));
                 }
             } catch (err) {
                 console.error("Cache temizleme isteğinde hata:", err);
-                alert(" Sunucu bağlantı hatası!");
+                notify(" Sunucu bağlantı hatası!");
             } finally {
                 clearCacheBtn.disabled = false;
                 clearCacheBtn.innerHTML = origHtml;
@@ -1241,8 +1131,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 currentTestType = testTypeAttr;
             }
 
-            if (targetViewId === "view-settings" && userSession.role === "PM") {
-                alert(" Bu alana erişim yetkiniz bulunmamaktadır!");
+            if ((targetViewId === "view-settings" || targetViewId === "view-users") && userSession.role !== "ADMIN") {
+                notify(" Bu alana erişim yetkiniz bulunmamaktadır!");
                 return;
             }
 
@@ -1281,8 +1171,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (addProjectBtn) {
         addProjectBtn.addEventListener("click", () => {
             const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
-            if (userSession.role === "PM") {
-                alert(" Proje oluşturma yetkiniz bulunmamaktadır!");
+            if (userSession.role !== "ADMIN") {
+                notify(" Proje oluşturma yetkiniz bulunmamaktadır!");
                 return;
             }
             globalEditProjectOldName = "";
@@ -1306,9 +1196,8 @@ document.addEventListener("DOMContentLoaded", () => {
         saveProjectBtn.addEventListener("click", async () => {
             const projectName = newProjectNameInput ? newProjectNameInput.value.trim() : "";
             const customErrorKeywords = projectErrorKeywordsInput ? projectErrorKeywordsInput.value.trim() : "";
-            if (!projectName) return alert("Proje adı boş olamaz.");
+            if (!projectName) return notify("Proje adı boş olamaz.");
 
-            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
             const isEdit = globalEditProjectOldName !== "";
 
             const endpoint = isEdit ? "/api/scenarios/projects/update" : "/api/scenarios/projects/create";
@@ -1320,15 +1209,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 const res = await fetch(endpoint, {
                     method: "POST",
                     headers: { 
-                        "Content-Type": "application/json",
-                        "X-User-Token": userSession.token || ""
+                        "Content-Type": "application/json"
                     },
                     body: JSON.stringify(payload)
                 });
 
                 const result = await res.json();
                 if (result.success) {
-                    alert(result.message || (isEdit ? "Proje güncellendi!" : "Proje oluşturuldu!"));
+                    notify(result.message || (isEdit ? "Proje güncellendi!" : "Proje oluşturuldu!"));
                     if (projectModal) projectModal.classList.add("hidden");
                     globalEditProjectOldName = "";
                     await loadProjects();
@@ -1336,11 +1224,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     currentProject = result.projectName || projectName;
                     updateProjectLabels();
                 } else {
-                    alert(result.error || "Proje kaydedilemedi.");
+                    notify(result.error || "Proje kaydedilemedi.");
                 }
             } catch (err) {
                 console.error(err);
-                alert("Sunucu bağlantı hatası!");
+                notify("Sunucu bağlantı hatası!");
             }
         });
     }
@@ -1405,19 +1293,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const selectedScenarioToImport = importDropdown ? importDropdown.value : "";
 
             if (!selectedScenarioToImport) {
-                alert("Lütfen önce içe aktarılacak bir senaryo seçin!");
+                notify("Lütfen önce içe aktarılacak bir senaryo seçin!");
                 return;
             }
 
-            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
             const origText = importStepsBtn.innerHTML;
             importStepsBtn.disabled = true;
             importStepsBtn.innerHTML = `<span class="animate-pulse">Aktarılıyor...</span>`;
 
             try {
-                const contentRes = await fetch(`/api/scenarios/content?scenarioName=${encodeURIComponent(selectedScenarioToImport)}&project=${encodeURIComponent(currentProject)}`, {
-                    headers: { "X-User-Token": userSession.token || "" }
-                });
+                const contentRes = await fetch(`/api/scenarios/content?scenarioName=${encodeURIComponent(selectedScenarioToImport)}&project=${encodeURIComponent(currentProject)}`);
                 const contentResult = await contentRes.json();
 
                 if (contentResult.success) {
@@ -1433,7 +1318,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
 
                     if (stepsToImport.length === 0) {
-                        alert("Seçilen senaryoda adım bulunamadı.");
+                        notify("Seçilen senaryoda adım bulunamadı.");
                         return;
                     }
 
@@ -1453,11 +1338,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     groupEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
                     if (importDropdown) importDropdown.selectedIndex = 0;
                 } else {
-                    alert("Senaryo adımları getirilemedi.");
+                    notify("Senaryo adımları getirilemedi.");
                 }
             } catch (err) {
                 console.error("Adım içe aktarma hatası:", err);
-                alert("Adımlar çekilirken bağlantı hatası oluştu.");
+                notify("Adımlar çekilirken bağlantı hatası oluştu.");
             } finally {
                 importStepsBtn.disabled = false;
                 importStepsBtn.innerHTML = origText;
@@ -1470,12 +1355,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!importDropdown || !currentProject) return;
 
         importDropdown.innerHTML = `<option value="" disabled selected>İçe aktarılacak senaryoyu seçin...</option>`;
-        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
         try {
-            const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}&testType=${encodeURIComponent(currentTestType)}`, {
-                headers: { "X-User-Token": userSession.token || "" }
-            });
+            const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}&testType=${encodeURIComponent(currentTestType)}`);
             const result = await res.json();
 
             if (result.scenarios && result.scenarios.length > 0) {
@@ -1659,7 +1541,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const submitBtn = document.getElementById("save-scenario-submit-btn") || scenarioForm.querySelector('button[type="submit"]');
 
             const activeProjectName = projectDropdown ? projectDropdown.value : currentProject;
-            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
             const scenarioName = scenarioNameInput ? scenarioNameInput.value.trim() : "";
             const targetUrl = targetUrlInput ? targetUrlInput.value.trim() : "";
@@ -1667,7 +1548,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const { text: turkishInstructions, stepCount } = serializeStepBlocks();
 
             if (!scenarioName || !targetUrl || stepCount === 0) {
-                alert("Lütfen senaryo adı, hedef URL ve en az bir test adımı girin!");
+                notify("Lütfen senaryo adı, hedef URL ve en az bir test adımı girin!");
                 return;
             }
 
@@ -1694,24 +1575,23 @@ document.addEventListener("DOMContentLoaded", () => {
                 const res = await fetch(endpoint, {
                     method: "POST",
                     headers: { 
-                        "Content-Type": "application/json",
-                        "X-User-Token": userSession.token || ""
+                        "Content-Type": "application/json"
                     },
                     body: JSON.stringify(bodyData)
                 });
 
                 const result = await res.json();
                 if (res.ok && result.success) {
-                    alert(result.message || (isEditMode ? "Senaryo güncellendi!" : "Senaryo kaydedildi!"));
+                    notify(result.message || (isEditMode ? "Senaryo güncellendi!" : "Senaryo kaydedildi!"));
                     globalEditScenarioName = "";
                     if (scenarioModal) scenarioModal.classList.add("hidden");
                     await loadScenarios();
                 } else {
-                    alert(`Kayıt Hatası: ${result.error || "Bilinmeyen hata"}`);
+                    notify(`Kayıt Hatası: ${result.error || "Bilinmeyen hata"}`);
                 }
             } catch (err) {
                 console.error("Senaryo kaydetme isteğinde hata patladı:", err);
-                alert("İstek esnasında bağlantı hatası patladı.");
+                notify("İstek esnasında bağlantı hatası patladı.");
             } finally {
                 if (submitBtn) {
                     submitBtn.disabled = false;
@@ -1782,14 +1662,9 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadSystemSettings() {
         if (!settingsForm) return;
 
-        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
         try {
-            const res = await fetch("/api/scenarios/settings/get", {
-                headers: {
-                    "X-User-Token": userSession.token || ""
-                }
-            });
+            const res = await fetch("/api/scenarios/settings/get");
             const result = await res.json();
 
             if (result.success && result.settings) {
@@ -1818,12 +1693,12 @@ document.addEventListener("DOMContentLoaded", () => {
         
         row.innerHTML = `
             <div class="md:col-span-3">
-                <input type="text" required placeholder="Sağlayıcı adı" value="${provider}" 
+                <input type="text" required placeholder="Sağlayıcı adı" value="${escapeHtml(provider)}" 
                        class="api-provider-input w-full bg-transparent text-xs text-white outline-none font-mono font-bold border-b md:border-b-0 md:border-r border-[rgba(255,255,255,0.06)] pb-1 md:pb-0 md:pr-2">
             </div>
             
             <div class="md:col-span-5 flex items-center bg-[#18181b] border border-[rgba(255,255,255,0.05)] rounded-lg px-2.5 py-1.5 w-full gap-2">
-                <input type="password" required placeholder="API Key Değeri" value="${keyVal}" 
+                <input type="password" required placeholder="API Key Değeri" title="Kayıtlı anahtar güvenlik için maskelenir; değiştirmek için yenisini yazın." value="${escapeHtml(keyVal)}" 
                        class="api-value-input w-full bg-transparent text-xs text-zinc-300 outline-none font-mono">
                 <button type="button" class="toggle-password-btn text-zinc-500 hover:text-zinc-300 transition focus:outline-none">
                     <i data-lucide="eye" class="w-4 h-4"></i>
@@ -1831,7 +1706,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
             
             <div class="md:col-span-3">
-                <input type="text" required placeholder="Model adı" value="${modelVal}" 
+                <input type="text" required placeholder="Model adı" value="${escapeHtml(modelVal)}" 
                        class="api-model-input w-full bg-[#18181b] border border-[rgba(255,255,255,0.05)] p-2 rounded-lg text-xs text-amber-400 outline-none font-mono">
             </div>
             
@@ -1915,27 +1790,25 @@ document.addEventListener("DOMContentLoaded", () => {
                 apiKeys
             };
             
-            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
             try {
                 const res = await fetch("/api/scenarios/settings/save", {
                     method: "POST",
                     headers: { 
-                        "Content-Type": "application/json",
-                        "X-User-Token": userSession.token || ""
+                        "Content-Type": "application/json"
                     },
                     body: JSON.stringify(payload)
                 });
 
                 const result = await res.json();
                 if (res.ok && result.success) {
-                    alert("Başarılı: Sağlayıcı ayarları ve model isimleri diske başarıyla kaydedildi.");
+                    notify("Başarılı: Sağlayıcı ayarları ve model isimleri diske başarıyla kaydedildi.");
                     await loadSystemSettings();
                 } else {
-                    alert(`Ayarlar kaydedilemedi: ${result.error || "Hata oluştu"}`);
+                    notify(`Ayarlar kaydedilemedi: ${result.error || "Hata oluştu"}`);
                 }
             } catch (err) {
                 console.error("Ayarlar kaydedilirken ağ hatası:", err);
-                alert("Sunucu bağlantı hatası!");
+                notify("Sunucu bağlantı hatası!");
             } finally {
                 if (saveBtn) {
                     saveBtn.disabled = false;
@@ -1963,9 +1836,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (usersTabBtn) usersTabBtn.addEventListener("click", loadUsers);
 
     async function loadUsers() {
-        const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
         try {
-            const res = await fetch("/api/scenarios/users/list", { headers: { "X-User-Token": userSession.token || "" } });
+            const res = await fetch("/api/scenarios/users/list");
             const result = await res.json();
 
             if (result.success && result.users) {
@@ -1988,14 +1860,14 @@ document.addEventListener("DOMContentLoaded", () => {
                         <td class="py-3 px-4 text-zinc-400">${pBadges}</td>
                         <td class="py-3 px-4 text-right flex items-center justify-end gap-2 h-12">
                             <button class="edit-user-btn text-zinc-500 hover:text-amber-400 transition p-1 rounded hover:bg-amber-500/10" 
-                                    data-id="${user.id}" 
-                                    data-username="${user.kullanici_adi}" 
-                                    data-rol="${user.rol}" 
+                                    data-id="${escapeHtml(user.id)}" 
+                                    data-username="${escapeHtml(user.kullanici_adi)}" 
+                                    data-rol="${escapeHtml(user.rol)}" 
                                     data-projeler="${encodeURIComponent(JSON.stringify(user.projeler))}">
                                 <i data-lucide="edit-3" class="w-4 h-4"></i>
                             </button>
                             <button class="delete-user-btn text-zinc-500 hover:text-red-400 transition p-1 rounded hover:bg-red-500/10" 
-                                    data-id="${user.id}" data-username="${user.kullanici_adi}">
+                                    data-id="${escapeHtml(user.id)}" data-username="${escapeHtml(user.kullanici_adi)}">
                                 <i data-lucide="user-minus" class="w-4 h-4"></i>
                             </button>
                         </td>
@@ -2008,11 +1880,13 @@ document.addEventListener("DOMContentLoaded", () => {
                         const id = btn.getAttribute("data-id");
                         const username = btn.getAttribute("data-username");
                         if (confirm(`"${username}" silinsin mi?`)) {
-                            await fetch("/api/scenarios/users/delete", {
+                            const delRes = await fetch("/api/scenarios/users/delete", {
                                 method: "POST",
-                                headers: { "Content-Type": "application/json", "X-User-Token": userSession.token || "" },
-                                body: JSON.stringify({ id, username })
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ id })
                             });
+                            const delResult = await delRes.json().catch(() => ({}));
+                            notify(delResult.message || delResult.error || "İşlem tamamlanamadı.", delRes.ok ? "success" : "error");
                             await loadUsers();
                         }
                     };
@@ -2109,7 +1983,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const selectedProjects = Array.from(document.querySelectorAll(".user-proj-cb:checked")).map(cb => cb.value);
 
             if (!username || (!isEditMode && !password)) {
-                alert("Lütfen zorunlu alanları doldurun!");
+                notify("Lütfen zorunlu alanları doldurun!");
                 return;
             }
 
@@ -2118,27 +1992,26 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (isEditMode) bodyData.id = globalEditUserId;
 
-            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
 
             try {
                 const res = await fetch(endpoint, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json", "X-User-Token": userSession.token || "" },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(bodyData)
                 });
 
                 const result = await res.json();
                 if (res.ok && result.success) {
-                    alert(isEditMode ? "Kullanıcı yetkileri başarıyla güncellendi!" : " Kullanıcı başarıyla oluşturuldu!");
+                    notify(isEditMode ? "Kullanıcı yetkileri başarıyla güncellendi!" : " Kullanıcı başarıyla oluşturuldu!");
                     if (userModal) userModal.classList.add("hidden");
                     globalEditUserId = ""; 
                     await loadUsers(); 
                 } else {
-                    alert(`Hata: ${result.error || "İşlem başarısız"}`);
+                    notify(`Hata: ${result.error || "İşlem başarısız"}`);
                 }
             } catch (err) {
                 console.error(err);
-                alert("Sunucu bağlantı hatası!");
+                notify("Sunucu bağlantı hatası!");
             }
         });
     }
@@ -2201,7 +2074,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const confirmDelete = confirm(`Seçtiğiniz ${selectedIds.length} adet test raporunu kalıcı olarak silmek istediğinize emin misiniz?`);
             if (!confirmDelete) return;
 
-            const userSession = JSON.parse(localStorage.getItem("test_user") || "{}");
             const origText = deleteSelectedBtn.innerHTML;
 
             try {
@@ -2211,8 +2083,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const res = await fetch("/api/scenarios/reports/delete-batch", {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json",
-                        "X-User-Token": userSession.token || ""
+                        "Content-Type": "application/json"
                     },
                     body: JSON.stringify({ ids: selectedIds })
                 });
@@ -2221,11 +2092,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (res.ok && result.success) {
                     await loadReports();
                 } else {
-                    alert(`Silme Hatası: ${result.error || "Hata oluştu"}`);
+                    notify(`Silme Hatası: ${result.error || "Hata oluştu"}`);
                 }
             } catch (err) {
                 console.error("Toplu silmede hata:", err);
-                alert("Sunucu bağlantı hatası!");
+                notify("Sunucu bağlantı hatası!");
             } finally {
                 deleteSelectedBtn.disabled = false;
                 deleteSelectedBtn.innerHTML = origText;

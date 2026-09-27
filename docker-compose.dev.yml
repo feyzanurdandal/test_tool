@@ -1,0 +1,9 @@
+# Yerel geliştirme için: SSL sertifikası olmadan panele erişim.
+# Port yalnızca bu bilgisayara (127.0.0.1) açılır, ağdaki diğer cihazlar erişemez.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build node-backend
+services:
+  node-backend:
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "127.0.0.1:3000:3000"

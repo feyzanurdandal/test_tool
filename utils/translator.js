@@ -1,10 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { OpenAI } from "openai"; 
-import * as dotenv from 'dotenv';
-import dpu from '../config/dpuService.js';
+import '../config/env.js';
 import { decrypt } from './cryptoHelper.js';
-
-dotenv.config();
+import { getSettingsRows } from '../services/settingsService.js';
 
 /**
  * Türkçe otomasyon adımlarını Stagehand JSON formatına çeviren ana modüler fonksiyon
@@ -15,28 +13,18 @@ export async function translateToStagehandJson(turkishInstruction, targetUrl) {
     let chosenModel = "gemini-3.1-flash-lite";
     let apiKey = process.env.GEMINI_API_KEY;
 
-    // 2. Ayarları DPU Base'den Çekme
+    // 2. Ayarları DPU Base'den çekme (kısa süreli önbellekli; her çeviride tablo taranmaz)
     try {
-        console.log(" [Translator Gateway] Ayarlar DPU Base'den sorgulanıyor...");
-        const dpuModule = await import('../config/dpuService.js');
-        const dpuClient = dpuModule.default || dpuModule;
+        const settingsRows = await getSettingsRows();
+        const activeTranslatorRow = settingsRows.find(r => r.ayar_anahtar === 'translator_api');
 
-        const dbResult = await dpuClient.selectAll('ayarlar'); 
+        if (activeTranslatorRow) {
+            chosenApi = activeTranslatorRow.ayar_deger;
+            const providerRow = settingsRows.find(r => r.ayar_anahtar === chosenApi);
 
-        if (dbResult.success && dbResult.data && dbResult.data.length > 0) {
-            const settingsRows = dbResult.data;
-            const activeTranslatorRow = settingsRows.find(r => r.ayar_anahtar === 'translator_api');
-            
-            if (activeTranslatorRow) {
-                chosenApi = activeTranslatorRow.ayar_deger;
-                console.log(` [Translator Gateway] Aktif Çeviri Sağlayıcısı: ${chosenApi}. Key ve Model yükleniyor...`);
-                
-                const providerRow = settingsRows.find(r => r.ayar_anahtar === chosenApi);
-
-                if (providerRow) {
-                    apiKey = decrypt(providerRow.ayar_deger);     
-                    chosenModel = providerRow.ayar_model || chosenModel; 
-                }
+            if (providerRow) {
+                apiKey = decrypt(providerRow.ayar_deger);
+                chosenModel = providerRow.ayar_model || chosenModel;
             }
         }
     } catch (err) {

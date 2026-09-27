@@ -1,84 +1,157 @@
 import net from 'net';
 import dns from 'dns/promises';
 
-/**
- * IP adresinin tehlikeli / dahili ağlarda olup olmadığını denetler.
- */
-function isPrivateIp(ip) {
-    if (!net.isIP(ip)) return false;
+// ─── İÇ AĞ / ÖZEL ADRES LİSTESİ ───
+// Test tarayıcısının ve sunucunun erişmemesi gereken tüm aralıklar.
+const blockList = new net.BlockList();
 
-    // IPv4 Kontrolleri
-    if (net.isIPv4(ip)) {
-        const parts = ip.split('.').map(Number);
+[
+    ['0.0.0.0', 8],        // "bu ağ"
+    ['10.0.0.0', 8],       // özel
+    ['100.64.0.0', 10],    // CGNAT
+    ['127.0.0.0', 8],      // loopback
+    ['169.254.0.0', 16],   // link-local / bulut metadata
+    ['172.16.0.0', 12],    // özel
+    ['192.0.0.0', 24],     // IETF protokol atamaları
+    ['192.0.2.0', 24],     // dokümantasyon
+    ['192.88.99.0', 24],   // 6to4 relay
+    ['192.168.0.0', 16],   // özel
+    ['198.18.0.0', 15],    // benchmark
+    ['198.51.100.0', 24],  // dokümantasyon
+    ['203.0.113.0', 24],   // dokümantasyon
+    ['224.0.0.0', 4],      // multicast
+    ['240.0.0.0', 4],      // rezerve + broadcast
+].forEach(([addr, prefix]) => blockList.addSubnet(addr, prefix, 'ipv4'));
 
-        return (
-            parts[0] === 127 || // Loopback (127.0.0.0/8)
-            parts[0] === 10 ||  // Private Class A (10.0.0.0/8)
-            (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || // Private Class B (172.16.0.0/12)
-            (parts[0] === 192 && parts[1] === 168) || // Private Class C (192.168.0.0/16)
-            (parts[0] === 169 && parts[1] === 254) || // Link-Local / AWS Metadata (169.254.0.0/16)
-            parts[0] === 0 // 0.0.0.0
-        );
+[
+    ['::', 128],           // belirtilmemiş
+    ['::1', 128],          // loopback
+    ['100::', 64],         // discard
+    ['2001:db8::', 32],    // dokümantasyon
+    ['fc00::', 7],         // unique local (fc00::/7 = fc.. ve fd..)
+    ['fe80::', 10],        // link-local
+    ['fec0::', 10],        // site-local (eski)
+    ['ff00::', 8],         // multicast
+].forEach(([addr, prefix]) => blockList.addSubnet(addr, prefix, 'ipv6'));
+
+// IPv6 adresini 8 adet 16-bit gruba açar (IPv4 gömülü yazımı da destekler)
+function expandIpv6(ip) {
+    let addr = ip.toLowerCase().split('%')[0];
+
+    const lastColon = addr.lastIndexOf(':');
+    const tail = addr.slice(lastColon + 1);
+    if (tail.includes('.')) {
+        if (!net.isIPv4(tail)) return null;
+        const p = tail.split('.').map(Number);
+        addr = `${addr.slice(0, lastColon + 1)}${((p[0] << 8) | p[1]).toString(16)}:${((p[2] << 8) | p[3]).toString(16)}`;
     }
 
-    // IPv6 Kontrolleri
-    if (net.isIPv6(ip)) {
-        const lowerIp = ip.toLowerCase();
-        return (
-            lowerIp === '::1' || // Loopback
-            lowerIp.startsWith('fe80:') || // Link-Local
-            lowerIp.startsWith('fc00:') || // Unique Local Address (ULA)
-            lowerIp.startsWith('fd00:')
-        );
-    }
+    const halves = addr.split('::');
+    if (halves.length > 2) return null;
+    const head = halves[0] ? halves[0].split(':') : [];
+    const rest = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+    const missing = 8 - head.length - rest.length;
+    if (halves.length === 1 && head.length !== 8) return null;
+    if (missing < 0) return null;
 
-    return false;
+    const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill('0'), ...rest]
+        .map(g => parseInt(g || '0', 16));
+    return groups.length === 8 && groups.every(g => Number.isInteger(g) && g >= 0 && g <= 0xffff) ? groups : null;
+}
+
+// IPv6 içine gömülü IPv4 adresini çıkarır (mapped, compatible, NAT64)
+function embeddedIpv4(groups) {
+    const toV4 = (hi, lo) => `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+    const firstFiveZero = groups.slice(0, 5).every(g => g === 0);
+
+    if (firstFiveZero && groups[5] === 0xffff) return toV4(groups[6], groups[7]);          // ::ffff:a.b.c.d
+    if (firstFiveZero && groups[5] === 0 && (groups[6] || groups[7] > 1)) return toV4(groups[6], groups[7]); // ::a.b.c.d
+    if (groups[0] === 0x64 && groups[1] === 0xff9b && groups.slice(2, 6).every(g => g === 0)) {
+        return toV4(groups[6], groups[7]);                                                 // 64:ff9b::/96
+    }
+    return null;
 }
 
 /**
- * Gelen URL'in güvenli olup olmadığını (SSRF / IP Guard / DNS Rebinding) denetler.
- * @param {string} urlString 
+ * IP adresinin iç ağ / özel / rezerve bir adres olup olmadığını denetler.
+ * Geçersiz bir IP için de true döner (şüpheli olan engellenir).
+ */
+export function isPrivateIp(ip) {
+    const clean = String(ip || '').replace(/^\[|\]$/g, '');
+
+    if (net.isIPv4(clean)) return blockList.check(clean, 'ipv4');
+
+    if (net.isIPv6(clean)) {
+        const groups = expandIpv6(clean);
+        if (!groups) return true;
+        const v4 = embeddedIpv4(groups);
+        if (v4) return blockList.check(v4, 'ipv4');
+        return blockList.check(clean.split('%')[0], 'ipv6');
+    }
+
+    return true;
+}
+
+// Yönetici tarafından bilinçli olarak izin verilen iç ağ host'ları
+// (örn: ALLOWED_PRIVATE_HOSTS=test.intranet.local,staging.local)
+function allowedPrivateHosts() {
+    return (process.env.ALLOWED_PRIVATE_HOSTS || '')
+        .split(',')
+        .map(h => h.trim().toLowerCase())
+        .filter(Boolean);
+}
+
+/**
+ * Host adının (domain veya IP) güvenli bir dış adrese çözümlenip
+ * çözümlenmediğini denetler.
+ * @returns {Promise<{ safe: boolean, reason?: string }>}
+ */
+export async function checkHost(hostname) {
+    const host = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
+    if (!host) return { safe: false, reason: 'Host adı boş!' };
+    if (allowedPrivateHosts().includes(host)) return { safe: true };
+
+    if (net.isIP(host)) {
+        return isPrivateIp(host)
+            ? { safe: false, reason: `Yerel/özel IP adresine erişim engellendi (${host})` }
+            : { safe: true };
+    }
+
+    try {
+        const addresses = await dns.lookup(host, { all: true, verbatim: true });
+        if (addresses.length === 0) return { safe: false, reason: `DNS çözümlemesi boş döndü (${host})` };
+
+        const blocked = addresses.find(a => isPrivateIp(a.address));
+        if (blocked) {
+            return { safe: false, reason: `Domain'in çözümlendiği IP (${blocked.address}) iç ağa işaret ediyor!` };
+        }
+        return { safe: true };
+    } catch {
+        return { safe: false, reason: `DNS çözümlemesi başarısız: Domain adresi bulunamadı! (${host})` };
+    }
+}
+
+/**
+ * URL'in güvenli olup olmadığını denetler (protokol + SSRF).
+ * Hem kayıt anında hem de test çalıştırılmadan hemen önce çağrılır.
  * @returns {Promise<{ safe: boolean, reason?: string }>}
  */
 export async function isSafeUrl(urlString) {
-    try {
-        if (!urlString || typeof urlString !== 'string') {
-            return { safe: false, reason: "URL boş veya geçersiz formatta!" };
-        }
-
-        const parsedUrl = new URL(urlString);
-        const protocol = parsedUrl.protocol.toLowerCase();
-
-        // Sadece HTTP ve HTTPS protokollerine izin ver
-        if (protocol !== 'http:' && protocol !== 'https:') {
-            return { safe: false, reason: `İzin verilmeyen protokol: ${protocol}` };
-        }
-
-        const hostname = parsedUrl.hostname;
-
-        // 1. Doğrudan IP Kontrolü
-        if (net.isIP(hostname)) {
-            if (isPrivateIp(hostname)) {
-                return { safe: false, reason: "Yerel/Özel IP adreslerine erişim engellendi!" };
-            }
-            return { safe: true };
-        }
-
-        // 2. DNS Resolution Kontrolü (DNS Rebinding Koruması)
-        try {
-            const addresses = await dns.lookup(hostname, { all: true });
-
-            for (const addr of addresses) {
-                if (isPrivateIp(addr.address)) {
-                    return { safe: false, reason: `Domain'in çözümlendiği IP (${addr.address}) iç ağa işaret ediyor!` };
-                }
-            }
-        } catch (dnsErr) {
-            return { safe: false, reason: `DNS çözümlemesi başarısız: Domain adresi bulunamadı! (${hostname})` };
-        }
-
-        return { safe: true };
-    } catch (err) {
-        return { safe: false, reason: "Geçersiz URL yapısı!" };
+    if (!urlString || typeof urlString !== 'string') {
+        return { safe: false, reason: 'URL boş veya geçersiz formatta!' };
     }
+
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(urlString);
+    } catch {
+        return { safe: false, reason: 'Geçersiz URL yapısı!' };
+    }
+
+    const protocol = parsedUrl.protocol.toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') {
+        return { safe: false, reason: `İzin verilmeyen protokol: ${protocol}` };
+    }
+
+    return checkHost(parsedUrl.hostname);
 }

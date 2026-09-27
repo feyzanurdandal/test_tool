@@ -9,7 +9,16 @@ export const validate = (schema) => async (req, res, next) => {
         });
 
         if (validated.body) req.body = validated.body;
-        if (validated.query) Object.assign(req.query, validated.query);
+        // Express 5'te req.query her erişimde yeniden hesaplanan bir getter'dır;
+        // Object.assign ile yapılan değişiklikler kaybolur. Doğrulanmış değeri sabitliyoruz.
+        if (validated.query) {
+            Object.defineProperty(req, 'query', {
+                value: { ...req.query, ...validated.query },
+                writable: true,
+                configurable: true,
+                enumerable: true,
+            });
+        }
         if (validated.params) Object.assign(req.params, validated.params);
 
         next();

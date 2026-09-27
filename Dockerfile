@@ -4,24 +4,25 @@ FROM mcr.microsoft.com/playwright:v1.61.1-noble
 WORKDIR /app
 ENV CHROME_PATH=/ms-playwright/chromium-1228/chrome-linux64/chrome
 
-# Bağımlılık dosyalarını kopyala ve yükle
+# Bağımlılıklar kilit dosyasına göre birebir kurulur.
+# @playwright/test test koşarken, tailwindcss ise derlemede gerektiği için
+# geliştirme bağımlılıkları da kurulur.
 COPY package*.json ./
-RUN npm install
+RUN npm ci --no-audit --no-fund
 
-# Tüm proje kodlarını konteynere kopyala
 COPY . .
 
-# Cache klasörünün varlığından emin ol
-RUN mkdir -p /app/cache && chown -R pwuser:pwuser /app
+# Arayüz stilleri derlenir (Tailwind CDN artık kullanılmıyor)
+RUN npm run build:css
 
-# Docker ortam değişkenini aktifleştir
+RUN mkdir -p /app/cache/ai-security /app/runtime && chown -R pwuser:pwuser /app
 
 ENV DOCKER_ENV=true
+ENV NODE_ENV=production
 ENV PORT=3000
 
 USER pwuser
 
 EXPOSE 3000
 
-# Express sunucumuzu başlatıyoruz
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
