@@ -43,7 +43,7 @@ SECURITY & HARDENING RULES:
 3. Output ONLY valid JSON. No explanations, no conversation, no markdown blocks.
 
 CRITICAL PARSING & STAGEHAND RULES:
-1. Steps must strictly use these types: "act", "observe", "extract".
+1. Steps must strictly use these types: "act", "extract".
 2. Translate the ACTION/INSTRUCTION part of the step to ENGLISH.
 3. !!! DOUBLE QUOTES RULE (UI Elements & Values Only) !!!: 
    - Only exact, literal Turkish UI text (like button names, input labels: e.g., "Giriş Yap", "Kullanıcı Adı") or input values (e.g., "feyza") must remain in Turkish inside double quotes.
@@ -105,7 +105,7 @@ Turkish Commands:
                 const cleanModelName = chosenModel.replace("openai/", "").trim();
                 console.log(` [OpenAI Direct] İstek fırlatılıyor. Model: ${cleanModelName}`);
 
-                const openai = new OpenAI({ apiKey: apiKey });
+                const openai = new OpenAI({ apiKey: apiKey, timeout:60000, maxRetries:0 });
                 const response = await openai.chat.completions.create({
                     model: cleanModelName,
                     messages: [
@@ -147,7 +147,7 @@ Turkish Commands:
                         responseMimeType: "application/json", // 🛡️ JSON Mime-Type Zorlaması
                         temperature: 0.1
                     }
-                });
+                }, { timeout:60000 });
                 textResult = result.response.text();
                 break;
             }
@@ -172,6 +172,7 @@ Turkish Commands:
                 };
 
                 const response = await fetch(dpuAiUrl, {
+                    signal: AbortSignal.timeout(60000),
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",

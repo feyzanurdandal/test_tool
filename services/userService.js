@@ -29,3 +29,8 @@ export function invalidateUser(username) {
     if (username === undefined) userCache.invalidate();
     else userCache.invalidate(key(username));
 }
+
+// Oturum kimliği kullanıcı adı tekrar kullanımından bağımsızdır.
+export async function findUserById(id) {
+    return dpu.findOne('kullanicilar', { id: { eq: String(id) } });
+}

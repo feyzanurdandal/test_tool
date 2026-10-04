@@ -1,8 +1,9 @@
-import { execFile } from 'child_process';
+import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import dpu from '../config/dpuService.js';
+import { runtimeStepsSchema } from '../schemas/runtimeSteps.js';
 import { isSafeUrl } from '../utils/ipGuard.js';
 
 // Çalışma anı adım dosyaları önbellekten AYRI bir klasörde tutulur;
@@ -14,8 +15,10 @@ const MAX_LOG_CHARS = 50_000;
 export class RunPreparationError extends Error {}
 
 // ─── DİNAMİK VE PROJE BAZLI HATA / GÜVENLİK DEĞERLENDİRİCİ ───
-export function evaluateTestOutcome(logContent, customKeywordsRaw = '', expectedOutcome = 'SUCCESS_EXPECTED', isExecutionSuccess = true) {
-    if (!logContent) return isExecutionSuccess ? 'SUCCESS' : 'FAILED';
+export function evaluateTestOutcome(logContent, customKeywordsRaw = '', expectedOutcome = 'SUCCESS_EXPECTED', isExecutionSuccess = true, expectedBlockVerified = false) {
+    if (!isExecutionSuccess) return 'FAILED';
+    if (expectedOutcome === 'ERROR_EXPECTED') return expectedBlockVerified ? 'SUCCESS' : 'FAILED';
+    if (!logContent) return 'SUCCESS';
     const lowerLog = logContent.toLowerCase();
 
     const baseErrorKeywords = [
@@ -31,10 +34,6 @@ export function evaluateTestOutcome(logContent, customKeywordsRaw = '', expected
 
     const detectedKeyword = [...baseErrorKeywords, ...projectCustomKeywords].find(kw => lowerLog.includes(kw));
 
-    if (expectedOutcome === 'ERROR_EXPECTED') {
-        // Güvenlik testi: sistem engellediyse / beklenen hata geldiyse test BAŞARILIDIR
-        return (detectedKeyword || !isExecutionSuccess) ? 'SUCCESS' : 'FAILED';
-    }
     return (isExecutionSuccess && !detectedKeyword) ? 'SUCCESS' : 'FAILED';
 }
 
@@ -62,35 +61,45 @@ export async function buildRuntimeSteps(scenario) {
         throw new RunPreparationError(`Güvenlik Engeli: ${urlCheck.reason}`);
     }
 
-    return { ...parsed, targetUrl };
+    const validated = runtimeStepsSchema.safeParse({ ...parsed, targetUrl,
+        expectedOutcome: scenario.beklenen_sonuc || 'SUCCESS_EXPECTED' });
+    if (!validated.success) throw new RunPreparationError('Senaryo adımları veya beklenen engelleme mesajı geçersiz. Senaryoyu düzenleyip yeniden kaydedin.');
+    return validated.data;
 }
 
 // Playwright testini ayrı süreçte, zaman aşımıyla koşturur
 export function runPlaywrightTest(stepsFilePath, timeoutMs = RUN_TIMEOUT_MS) {
     return new Promise((resolve) => {
-        console.log(`Playwright motoru tetikleniyor... (Dosya: ${path.basename(stepsFilePath)})`);
-
-        const env = { ...process.env, RUNTIME_STEPS_PATH: stepsFilePath };
-        const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-
-        execFile(npx, ['playwright', 'test', 'tests/ai-security.spec.ts'], {
-            env,
-            timeout: timeoutMs,
-            maxBuffer: 20 * 1024 * 1024,
-            shell: process.platform === 'win32',
-        }, (error, stdout = '', stderr = '') => {
-            if (error) {
-                if (error.killed) console.error(`Playwright testi zaman aşımına uğradı (${timeoutMs / 1000}sn) ve durduruldu.`);
-                else console.error('Playwright test hatası:', error.message);
-            }
-
-            fs.promises.unlink(stepsFilePath).catch(() => {});
-
-            resolve({
-                isSuccess: !error,
-                logContent: stdout + (stderr ? `\n--- Hatalar ---\n${stderr}` : '') + (error?.killed ? '\n[HATA]: Test zaman aşımına uğradı.' : '')
-            });
+        const resultPath = `${stepsFilePath}.result.json`;
+        const cli = path.join(process.cwd(), 'node_modules', '@playwright', 'test', 'cli.js');
+        const child = spawn(process.execPath, [cli, 'test', 'tests/ai-security.spec.ts', '--reporter=line', '--workers=1', '--retries=0'], {
+            env: { ...process.env, RUNTIME_STEPS_PATH:stepsFilePath, RUNTIME_RESULT_PATH:resultPath, PLAYWRIGHT_HTML_OPEN:'never', PLAYWRIGHT_OUTPUT_DIR:`${stepsFilePath}.artifacts` },
+            shell:false, detached:process.platform !== 'win32', windowsHide:true,
+            stdio:['ignore','pipe','pipe'],
         });
+        let logContent = '', timedOut = false, finished = false;
+        const capture = chunk => { logContent = (logContent + String(chunk)).slice(-MAX_LOG_CHARS); };
+        child.stdout.on('data',capture); child.stderr.on('data',capture);
+        const timer = setTimeout(() => {
+            timedOut = true;
+            if (process.platform === 'win32') {
+                spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], {windowsHide:true,stdio:'ignore'}).on('error',()=>child.kill());
+            } else {
+                try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
+            }
+        },timeoutMs);
+        async function finish(code, error) {
+            if (finished) return; finished = true; clearTimeout(timer);
+            let result;
+            try { result = JSON.parse(await fs.promises.readFile(resultPath,'utf8')); } catch {}
+            await Promise.allSettled([fs.promises.rm(stepsFilePath,{force:true}), fs.promises.rm(resultPath,{force:true}), fs.promises.rm(`${stepsFilePath}.artifacts`,{recursive:true,force:true})]);
+            const isSuccess = code === 0 && !timedOut && !error && result?.completed === true;
+            if (!isSuccess) logContent += '\n[KOŞUCU_HATASI]: Test tamamlanamadı; altyapı hatası beklenen güvenlik engeli sayılmaz.';
+            if (timedOut) logContent += '\n[HATA]: Test zaman aşımına uğradı.';
+            resolve({isSuccess, logContent, expectedBlockVerified:isSuccess && result?.expectedBlockVerified === true});
+        }
+        child.on('error',err=>finish(null,err));
+        child.on('close',code=>finish(code));
     });
 }
 
@@ -125,14 +134,14 @@ export async function executeScenario(project, scenario) {
 
     await fs.promises.mkdir(RUNTIME_DIR, { recursive: true });
     const runtimeStepsPath = path.join(RUNTIME_DIR, `runtime_steps_${Date.now()}_${crypto.randomBytes(6).toString('hex')}.json`);
-    await fs.promises.writeFile(runtimeStepsPath, JSON.stringify(runtimeSteps, null, 2), 'utf-8');
+    await fs.promises.writeFile(runtimeStepsPath, JSON.stringify(runtimeSteps, null, 2), {encoding:'utf-8',mode:0o600});
 
     const testResult = await runPlaywrightTest(runtimeStepsPath);
     const logContent = testResult.logContent || '';
     const safeLogContent = logContent.length > MAX_LOG_CHARS ? logContent.slice(-MAX_LOG_CHARS) : logContent;
 
     const expectedOutcome = (scenario.beklenen_sonuc || 'SUCCESS_EXPECTED').toUpperCase();
-    const status = evaluateTestOutcome(safeLogContent, project.hata_anahtar_kelimeleri || '', expectedOutcome, testResult.isSuccess);
+    const status = evaluateTestOutcome(safeLogContent, project.hata_anahtar_kelimeleri || '', expectedOutcome, testResult.isSuccess, testResult.expectedBlockVerified);
 
     await saveReport({ ...baseReport, status, log_content: safeLogContent, created_at: new Date().toISOString() });
 

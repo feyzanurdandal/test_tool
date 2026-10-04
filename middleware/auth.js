@@ -1,6 +1,8 @@
 import '../config/env.js';
 import jwt from 'jsonwebtoken';
-import { findUserByName } from '../services/userService.js';
+import { findUserById } from '../services/userService.js';
+
+import { createSession, readSession, revokeSession, credentialFingerprint } from '../services/sessionService.js';
 
 const SECRET_KEY = process.env.JWT_SECRET;
 
@@ -24,15 +26,27 @@ export function parseCookies(header = '') {
     return cookies;
 }
 
-export function signSession(username) {
-    return jwt.sign({ username }, SECRET_KEY, { expiresIn: Math.floor(SESSION_TTL_MS / 1000), algorithm: 'HS256' });
+export async function signSession(user) {
+    const session = await createSession(user, SESSION_TTL_MS);
+    return jwt.sign({ sid: session.id }, SECRET_KEY, {
+        subject: String(user.id), expiresIn: Math.floor(SESSION_TTL_MS / 1000), algorithm: 'HS256',
+    });
+}
+
+export async function revokeSessionToken(token) {
+    try {
+        const decoded = jwt.verify(token, SECRET_KEY, { algorithms: ['HS256'] });
+        if (typeof decoded.sid === 'string') await revokeSession(decoded.sid);
+    } catch (err) {
+        if (!(err instanceof jwt.JsonWebTokenError) && !(err instanceof jwt.TokenExpiredError)) throw err;
+    }
 }
 
 export function sessionCookieOptions(req) {
     return {
         httpOnly: true,
         sameSite: 'strict',
-        secure: req.secure || process.env.COOKIE_SECURE === 'true',
+        secure: process.env.NODE_ENV === 'production' || req.secure || process.env.COOKIE_SECURE === 'true',
         maxAge: SESSION_TTL_MS,
         path: '/',
     };
@@ -54,8 +68,15 @@ export async function requireAuth(req, res, next) {
     }
 
     try {
-        const user = await findUserByName(decoded.username);
-        if (!user) {
+        if (typeof decoded.sub !== 'string' || typeof decoded.sid !== 'string') {
+            return res.status(401).json({ error: 'Lütfen yeniden giriş yapın.' });
+        }
+        const session = await readSession(decoded.sid);
+        if (!session || session.userId !== decoded.sub) {
+            return res.status(401).json({ error: 'Oturum iptal edilmiş veya süresi dolmuş.' });
+        }
+        const user = await findUserById(decoded.sub);
+        if (!user || session.fingerprint !== credentialFingerprint(user)) {
             return res.status(401).json({ error: 'Hesap bulunamadı veya silinmiş. Lütfen tekrar giriş yapın.' });
         }
         req.user = {

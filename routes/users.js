@@ -7,6 +7,8 @@ import { createUserSchema, updateUserSchema, deleteUserSchema } from '../schemas
 import { findUserByName, invalidateUser } from '../services/userService.js';
 import { invalidatePermissions } from '../services/projectService.js';
 
+import { revokeUserSessions } from '../services/sessionService.js';
+
 const router = express.Router();
 const lower = (v) => String(v || '').trim().toLowerCase();
 
@@ -87,6 +89,7 @@ router.post('/users/delete', requireAuth, requireAdmin, validate(deleteUserSchem
         const deleteUser = await dpu.delete('kullanicilar', user.id);
         if (!deleteUser.success) return res.status(500).json({ error: 'Kullanıcı silinemedi.' });
 
+        await revokeUserSessions(user.id);
         // Yetkiler istemcinin gönderdiği addan değil, veritabanındaki gerçek addan silinir
         await replaceUserProjects(user.kullanici_adi, user.kullanici_adi, []);
         invalidateUser(user.kullanici_adi);
@@ -123,6 +126,8 @@ router.post('/users/update', requireAuth, requireAdmin, validate(updateUserSchem
         if (!updateRes?.success) {
             return res.status(500).json({ error: 'Kullanıcı bilgileri güncellenirken veritabanı hatası oluştu.' });
         }
+
+        if (password || isRename || finalRole !== String(existingUser.rol || 'USER').toUpperCase()) await revokeUserSessions(existingUser.id);
 
         // Eski addaki yetkiler silinir (eskiden yeni adla aranıyordu ve eski yetkiler öksüz kalıyordu)
         if (Array.isArray(selectedProjects)) {

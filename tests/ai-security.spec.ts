@@ -13,7 +13,11 @@ import { decrypt } from '../utils/cryptoHelper.js';
 // @ts-ignore
 import dpu from '../config/dpuService.js';
 // @ts-ignore
-import { checkHost } from '../utils/ipGuard.js';
+import { startNetworkProxy, browserNetworkArgs, installBrowserNetworkGuard } from '../utils/networkProxy.js';
+// @ts-ignore
+import { runtimeStepsSchema } from '../schemas/runtimeSteps.js';
+// @ts-ignore
+import { verifyExpectedBlock } from '../utils/testOutcome.js';
 
 const ERROR_KEYWORDS = [
     'hata', 'başarısız', 'basarisiz', 'error', 'failed', 'invalid', 
@@ -54,7 +58,12 @@ test('Yapay Zeka Test Otomasyonu', async () => {
         throw new Error(`Test dosyası belirtilen proje klasöründe bulunamadı: ${stepsFilePath}`);
     }
 
-    const promptData = JSON.parse(fs.readFileSync(stepsFilePath, 'utf-8'));
+    const promptData = runtimeStepsSchema.parse(JSON.parse(fs.readFileSync(stepsFilePath, 'utf-8')));
+    let expectedBlockVerified = false;
+    const writeResult = () => {
+        if (process.env.RUNTIME_RESULT_PATH) fs.writeFileSync(process.env.RUNTIME_RESULT_PATH, JSON.stringify({completed:true,expectedBlockVerified}), {mode:0o600});
+    };
+    const expectedMatch = (text: string) => promptData.expectedOutcome === 'ERROR_EXPECTED' && verifyExpectedBlock(text, promptData.expectedErrorText);
 
     // DİNAMİK AYARLARI OKUMA
     let activeModel = 'openai/gpt-4o-mini';
@@ -127,20 +136,25 @@ test('Yapay Zeka Test Otomasyonu', async () => {
 
     const isDockerEnv = process.env.DOCKER_ENV === 'true';
 
-    const stagehand = new Stagehand({
+    const networkProxy = await startNetworkProxy();
+    let stagehand: Stagehand | undefined;
+    try {
+    stagehand = new Stagehand({
         env: 'LOCAL',
         model: activeModel as any,
         cacheDir: path.resolve(__dirname, '../cache/ai-security'),
         domSettleTimeout: 15000,
         localBrowserLaunchOptions: { 
             headless: isDockerEnv ? true : false,
-            args: isDockerEnv ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'] : []
+            proxy: { server: networkProxy.url, bypass: '<-loopback>' },
+            args: [...browserNetworkArgs(networkProxy.url), ...(isDockerEnv ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'] : [])]
         },
         ...(customBaseUrl ? { 
             configuration: localConfig
         } : {})
     });
 
+    try {
     await stagehand.init();
     const browser = await chromium.connectOverCDP({ wsEndpoint: stagehand.connectURL() });
     const browserContext = browser.contexts()[0];
@@ -151,45 +165,23 @@ test('Yapay Zeka Test Otomasyonu', async () => {
     // Hedef URL sunucuda doğrulanmış olsa da test adımları tarayıcıyı başka
     // adreslere götürebilir (link tıklama, yönlendirme, form gönderimi).
     // Tarayıcının yaptığı HER istek burada denetlenir; iç ağa giden istekler kesilir.
-    const hostVerdicts = new Map<string, Promise<{ safe: boolean; reason?: string }>>();
-    await browserContext.route('**/*', async (route) => {
-        let parsed: URL;
-        try {
-            parsed = new URL(route.request().url());
-        } catch {
-            return route.abort('blockedbyclient');
-        }
-
-        if (!['http:', 'https:', 'ws:', 'wss:'].includes(parsed.protocol)) {
-            console.error(`[AĞ KORUMASI] İzin verilmeyen protokol engellendi: ${parsed.protocol}`);
-            return route.abort('blockedbyclient');
-        }
-
-        const host = parsed.hostname;
-        if (!hostVerdicts.has(host)) hostVerdicts.set(host, checkHost(host));
-        const verdict = await hostVerdicts.get(host)!;
-
-        if (!verdict.safe) {
-            console.error(`[AĞ KORUMASI] İstek engellendi: ${host} -> ${verdict.reason}`);
-            return route.abort('blockedbyclient');
-        }
-        return route.continue();
-    });
-
+    await installBrowserNetworkGuard(browserContext);
+    let dialogFailure = '';
     // Tarayıcının yerel pop-up pencerelerini yakalama
     pwPage.on('dialog', async (dialog) => {
         const dialogText = dialog.message();
         await dialog.dismiss();
         
         const lowerDialog = dialogText.toLowerCase();
-        if (ERROR_KEYWORDS.some(kw => lowerDialog.includes(kw))) {
-            throw new Error(`ERROR: Ekranda hata uyarı dialogu çıktı: "${dialogText}"`);
+        if (expectedMatch(dialogText)) expectedBlockVerified = true;
+        else if (ERROR_KEYWORDS.some(kw => lowerDialog.includes(kw))) {
+            dialogFailure = `ERROR: Ekranda hata uyarı dialogu çıktı: "${dialogText}"`;
         }
     });
 
-    try {
         await pwPage.goto(promptData.targetUrl);
         await pwPage.waitForLoadState('domcontentloaded').catch(() => {});
+        if (expectedMatch(await pwPage.locator('body').innerText())) { expectedBlockVerified = true; writeResult(); return; }
 
         for (const step of promptData.steps) {
             //  2. PrimeNG gizli accessibility input'larının AI'ı yanıltmasını engelle
@@ -292,6 +284,7 @@ if (step.type === 'act') {
                     
                     console.log(`*** [BAŞARIYLA AYIKLANDI] ${fieldName} ->`, extractedValue);
 
+                    if (expectedMatch(extractedValue)) { expectedBlockVerified = true; writeResult(); return; }
                     const lowerExtracted = extractedValue.toLowerCase();
                     const detectedKeyword = ERROR_KEYWORDS.find(kw => lowerExtracted.includes(kw));
 
@@ -308,6 +301,10 @@ if (step.type === 'act') {
 
                     expect(extractedValue).toBeDefined();
                     expect(extractedValue.length).toBeGreaterThan(0);
+                }
+                if (dialogFailure) throw new Error(dialogFailure);
+                if (expectedBlockVerified || expectedMatch(await pwPage.locator('body').innerText())) {
+                    expectedBlockVerified = true; writeResult(); return;
                 }
             } catch (e: any) {
                 const errMsg = e.message || '';
@@ -329,7 +326,12 @@ if (step.type === 'act') {
                 throw new Error(`STEP_FAILED: ${step.instruction} - Detay: ${errMsg}`);
             }
         }
+        if (promptData.expectedOutcome === 'ERROR_EXPECTED' && !expectedBlockVerified) {
+            throw new Error('EXPECTED_BLOCK_NOT_FOUND: Beklenen engelleme mesajı hedefte doğrulanamadı.');
+        }
+        writeResult();
     } finally {
         await stagehand.close();
     }
+    } finally { await networkProxy.close(); }
 });

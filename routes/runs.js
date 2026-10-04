@@ -58,8 +58,13 @@ router.post('/run-batch', requireAuth, testRunLimiter, validate(runBatchSchema),
         const jobs = [];
         const skipped = [];
 
+        const eligible = [...new Set(scenarioNames)].filter(name => byName.get(name)?.adimlar);
+        if (eligible.length > runQueue.maxQueued - runQueue.pending.length) {
+            return res.status(429).json({ error:'Test kuyruğunda bu toplu işlem için yeterli yer yok.' });
+        }
+
         // Kullanıcının seçtiği sıra korunur
-        for (const name of scenarioNames) {
+        for (const name of [...new Set(scenarioNames)]) {
             const scenario = byName.get(name);
             if (!scenario) {
                 skipped.push({ scenarioName: name, reason: 'Senaryo bulunamadı.' });

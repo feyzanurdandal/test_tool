@@ -23,7 +23,7 @@ class DpuService {
 
         console.log(" DPU Base: Yeni JWT Token alınıyor...");
         try {
-            const response = await fetch(`${this.baseUrl}/api/v1/auth/token`, {
+            const result = await this.fetchWithTimeoutAndRetry(`${this.baseUrl}/api/v1/auth/token`, {
                 method: "POST",
                 headers: {
                     "X-API-Key": this.apiKey,
@@ -34,9 +34,8 @@ class DpuService {
                     email: this.email,
                     password: this.password
                 })
-            });
+            }, {timeoutMs:8000,retries:0});
 
-            const result = await response.json();
             if (result.success && result.data && result.data.token) {
                 this.token = result.data.token;
                 this.tokenExpiresAt = new Date(result.data.expires_at);
@@ -63,10 +62,9 @@ class DpuService {
             try {
                 const response = await fetch(url, {
                     ...config,
-                    signal: controller.signal
+                    signal: controller.signal,
+                    size: 2 * 1024 * 1024,
                 });
-
-                clearTimeout(timeoutId);
 
                 // Eğer HTTP statüsü 5xx ise ve retry hakkımız varsa yeniden denemek üzere catch'e düşür
                 if (!response.ok && response.status >= 500 && attempt < options.retries) {
@@ -74,7 +72,9 @@ class DpuService {
                 }
 
                 // 2xx veya 4xx durumunda doğrudan cevabı döndür (4xx hatalarında retry atılmaz)
-                return await response.json();
+                const result = await response.json();
+                clearTimeout(timeoutId);
+                return result;
 
             } catch (error) {
                 clearTimeout(timeoutId);
@@ -120,7 +120,8 @@ class DpuService {
         }
 
         // Doğrudan fetch yerine Timeout + Retry mekanizmasını çağırıyoruz
-        return await this.fetchWithTimeoutAndRetry(`${this.baseUrl}/api/v1/${endpoint}`, config);
+        return await this.fetchWithTimeoutAndRetry(`${this.baseUrl}/api/v1/${endpoint}`, config,
+            {timeoutMs:8000,retries:['GET','HEAD'].includes(method) ? 2 : 0});
     }
 
     // 1. LIST / SEARCH
@@ -139,7 +140,7 @@ class DpuService {
             let currentPage = 1;
             let hasMore = true;
 
-            while (hasMore) {
+            while (hasMore && currentPage <= 100) {
                 let url = `${tableName}?limit=${pageSize}&page=${currentPage}`;
                 if (where) {
                     url += `&where=${encodeURIComponent(where)}`;
@@ -158,10 +159,10 @@ class DpuService {
                     }
                 } else {
                     // İstek başarısızsa veya veri yoksa döngüyü kır
-                    hasMore = false;
+                    return {success:false,error:'DPU Base kayıt listesi tamamlanamadı.',data:[]};
                 }
             }
-
+            if (hasMore) return {success:false,error:'DPU Base sayfalama sınırı aşıldı.',data:[]};
             return { success: true, data: allRecords };
         } catch (error) {
             console.error(`DPU Base SelectAll Hatası (${tableName}):`, error);
@@ -211,13 +212,13 @@ class DpuService {
 
                 const res = await this.request(`${tableName}?${queryParams.toString()}`, 'GET');
                 if (!res || !res.success) {
-                    if (page === 1) return res;
-                    break;
+                    return res || {success:false,error:'DPU Base sorgusu tamamlanamadı.'};
                 }
 
                 const rows = Array.isArray(res.data) ? res.data : [];
                 allRecords = allRecords.concat(rows);
                 if (rows.length < pageSize) break;
+                if (page === maxPages) return {success:false,error:'DPU Base sayfalama sınırı aşıldı.'};
             }
 
             return { success: true, data: applyFilters(allRecords, filters) };

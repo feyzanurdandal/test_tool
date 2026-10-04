@@ -11,6 +11,7 @@ import { globalErrorHandler, notFoundHandler } from './middleware/errorHandler.j
 import authRouter from './routes/auth.js';
 import apiRouter from './routes/index.js';
 
+process.umask(0o077);
 const app = express();
 
 // Yalnızca önündeki tek nginx'e güvenilir (docker-compose'da Node dışarıya kapalı)

@@ -11,7 +11,7 @@ test('normal testte hata kelimesi FAILED yapar', () => {
 });
 
 test('güvenlik testinde beklenen engelleme SUCCESS sayılır', () => {
-    assert.equal(evaluateTestOutcome('istek engellendi: waf', 'engellendi', 'ERROR_EXPECTED', true), 'SUCCESS');
+    assert.equal(evaluateTestOutcome('istek engellendi: waf', 'engellendi', 'ERROR_EXPECTED', true, true), 'SUCCESS');
     assert.equal(evaluateTestOutcome('sorunsuz geçti', 'engellendi', 'ERROR_EXPECTED', true), 'FAILED');
 });
 

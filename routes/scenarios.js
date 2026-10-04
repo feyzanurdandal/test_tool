@@ -1,11 +1,13 @@
 import express from 'express';
 import dpu from '../config/dpuService.js';
 import { requireAuth } from '../middleware/auth.js';
+import { withAiCapacity } from '../middleware/aiCapacity.js';
 import { aiCallLimiter } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import { requireProjectAccess } from '../utils/projectGuard.js';
 import { isSafeUrl } from '../utils/ipGuard.js';
 import { translateToStagehandJson } from '../utils/translator.js';
+import { runtimeStepsSchema } from '../schemas/runtimeSteps.js';
 import { stripImportMarkers } from '../utils/stepGroups.js';
 import {
     listScenariosSchema, getScenarioContentSchema, createScenarioSchema, updateScenarioSchema, deleteScenarioSchema
@@ -22,11 +24,12 @@ const toInstructionText = (turkishInstructions) =>
 // Türkçe adımları yapay zekaya çevirtir. İçe aktarma işaretçileri yalnızca
 // arayüz içindir; çeviriye düz adımlar gider. Hedef URL her zaman kullanıcının
 // girdiği ve doğrulanan değerdir, modelin ürettiği değer kullanılmaz.
-async function translateScenario(turkishInstructions, targetUrl) {
+async function translateScenario(turkishInstructions, targetUrl, expectedErrorText = '') {
     const input = typeof turkishInstructions === 'string' ? stripImportMarkers(turkishInstructions) : turkishInstructions;
     const stagehandJson = await translateToStagehandJson(input, targetUrl);
     if (!stagehandJson || typeof stagehandJson !== 'object') return null;
-    return { ...stagehandJson, targetUrl };
+    const checked = runtimeStepsSchema.safeParse({ ...stagehandJson, targetUrl, expectedErrorText });
+    return checked.success ? checked.data : null;
 }
 
 // ─── PROJE BAZLI SENARYOLARI LİSTELEME ───
@@ -89,8 +92,8 @@ router.get('/content', requireAuth, validate(getScenarioContentSchema), requireP
 });
 
 // ─── SENARYO KAYDETME VE AI ÇEVİRİSİ ───
-router.post('/create-and-save', requireAuth, aiCallLimiter, validate(createScenarioSchema), requireProjectAccess, async (req, res, next) => {
-    const { scenarioName, turkishInstructions, targetUrl, projectName, testType, expectedOutcome } = req.body;
+router.post('/create-and-save', requireAuth, aiCallLimiter, validate(createScenarioSchema), requireProjectAccess, withAiCapacity(async (req, res, next) => {
+    const { scenarioName, turkishInstructions, targetUrl, projectName, testType, expectedOutcome, expectedErrorText } = req.body;
 
     const urlCheck = await isSafeUrl(targetUrl);
     if (!urlCheck.safe) return res.status(400).json({ error: `Güvenlik Engeli: ${urlCheck.reason}` });
@@ -122,7 +125,7 @@ router.post('/create-and-save', requireAuth, aiCallLimiter, validate(createScena
         const createdId = insertResult.data?.id || insertResult.data?.insertId
             || (await getScenario(project.id, scenarioName))?.id;
 
-        const stagehandJson = await translateScenario(turkishInstructions, targetUrl);
+        const stagehandJson = await translateScenario(turkishInstructions, targetUrl, expectedErrorText);
         if (stagehandJson && createdId) {
             await dpu.update('senaryolar', createdId, {
                 adimlar: JSON.stringify(stagehandJson),
@@ -139,11 +142,11 @@ router.post('/create-and-save', requireAuth, aiCallLimiter, validate(createScena
     } catch (error) {
         next(error);
     }
-});
+}));
 
 // ─── SENARYO GÜNCELLEME ───
-router.post('/update', requireAuth, aiCallLimiter, validate(updateScenarioSchema), requireProjectAccess, async (req, res, next) => {
-    const { scenarioName, originalScenarioName, turkishInstructions, targetUrl, projectName, testType, expectedOutcome } = req.body;
+router.post('/update', requireAuth, aiCallLimiter, validate(updateScenarioSchema), requireProjectAccess, withAiCapacity(async (req, res, next) => {
+    const { scenarioName, originalScenarioName, turkishInstructions, targetUrl, projectName, testType, expectedOutcome, expectedErrorText } = req.body;
 
     const urlCheck = await isSafeUrl(targetUrl);
     if (!urlCheck.safe) return res.status(400).json({ error: `Güvenlik Engeli: ${urlCheck.reason}` });
@@ -167,6 +170,7 @@ router.post('/update', requireAuth, aiCallLimiter, validate(updateScenarioSchema
             senaryo_adi: scenarioName,
             hedef_url: targetUrl,
             adimlar_tr: toInstructionText(turkishInstructions),
+            adimlar: '', // Yeni çeviri başarısızsa eski adımlar yeni hedefte çalıştırılmaz.
             test_tipi: testType ? testType.toUpperCase() : (existing.test_tipi || 'UI'),
             beklenen_sonuc: expectedOutcome ? expectedOutcome.toUpperCase() : (existing.beklenen_sonuc || 'SUCCESS_EXPECTED'),
             updated_at: new Date().toISOString()
@@ -188,7 +192,7 @@ router.post('/update', requireAuth, aiCallLimiter, validate(updateScenarioSchema
             }
         }
 
-        const stagehandJson = await translateScenario(turkishInstructions, targetUrl);
+        const stagehandJson = await translateScenario(turkishInstructions, targetUrl, expectedErrorText);
         if (stagehandJson) {
             await dpu.update('senaryolar', existing.id, {
                 adimlar: JSON.stringify(stagehandJson),
@@ -201,7 +205,7 @@ router.post('/update', requireAuth, aiCallLimiter, validate(updateScenarioSchema
     } catch (error) {
         next(error);
     }
-});
+}));
 
 // ─── SENARYO SİLME ───
 router.post('/delete', requireAuth, validate(deleteScenarioSchema), requireProjectAccess, async (req, res, next) => {

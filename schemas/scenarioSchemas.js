@@ -63,24 +63,28 @@ export const getScenarioContentSchema = z.object({
 export const createScenarioSchema = z.object({
   body: z.object({
     scenarioName: scenarioNameSchema,
-    turkishInstructions: z.union([z.string(), z.array(z.string()), z.object({})]),
+    turkishInstructions: z.union([z.string().min(1).max(50000), z.array(z.string().min(1).max(4000)).min(1).max(100)]),
     targetUrl: z.string().url("Geçerli bir URL giriniz!"),
     projectName: z.string().optional().default('Varsayılan Proje'),
     testType: testTypeSchema.optional().default("UI"),
-    expectedOutcome: expectedOutcomeSchema.optional().default("SUCCESS_EXPECTED")
-  })
+    expectedOutcome: expectedOutcomeSchema.optional().default("SUCCESS_EXPECTED"),
+    expectedErrorText: z.string().trim().max(500).optional().default('')
+  }).refine(value => value.expectedOutcome !== 'ERROR_EXPECTED' || value.expectedErrorText.length >= 3,
+    { message: 'Beklenen engelleme mesajını en az 3 karakterle belirtin.', path: ['expectedErrorText'] })
 });
 
 export const updateScenarioSchema = z.object({
   body: z.object({
     scenarioName: scenarioNameSchema,
     originalScenarioName: scenarioNameSchema,
-    turkishInstructions: z.union([z.string(), z.array(z.string()), z.object({})]),
+    turkishInstructions: z.union([z.string().min(1).max(50000), z.array(z.string().min(1).max(4000)).min(1).max(100)]),
     targetUrl: z.string().url("Geçerli bir URL giriniz!"),
     projectName: z.string().optional().default('Varsayılan Proje'),
     testType: testTypeSchema.optional().default("UI"),
-    expectedOutcome: expectedOutcomeSchema.optional().default("SUCCESS_EXPECTED")
-  })
+    expectedOutcome: expectedOutcomeSchema.optional().default("SUCCESS_EXPECTED"),
+    expectedErrorText: z.string().trim().max(500).optional().default('')
+  }).refine(value => value.expectedOutcome !== 'ERROR_EXPECTED' || value.expectedErrorText.length >= 3,
+    { message: 'Beklenen engelleme mesajını en az 3 karakterle belirtin.', path: ['expectedErrorText'] })
 });
 
 // Hedef URL artık istekten alınmaz; her zaman senaryonun kayıtlı hedef_url'si kullanılır.
@@ -135,16 +139,19 @@ export const saveSettingsSchema = z.object({
 
 export const runBatchSchema = z.object({
   body: z.object({
-    scenarioNames: z.array(scenarioNameSchema).min(1, "Kuyruk için en az bir senaryo gereklidir!"),
+    scenarioNames: z.array(scenarioNameSchema).min(1, "Kuyruk için en az bir senaryo gereklidir!").max(50),
     projectName: z.string().trim().min(1, "Proje adı zorunlu!"),
     testType: testTypeSchema.optional().default("UI")
   })
 });
 
+export const passwordSchema = z.string().min(12, 'Şifre en az 12 karakter olmalıdır!')
+  .refine(value => Buffer.byteLength(value, 'utf8') <= 72, 'Şifre UTF-8 olarak en fazla 72 byte olabilir!');
+
 export const createUserSchema = z.object({
   body: z.object({
     username: usernameSchema,
-    password: z.string().min(6, "Şifre en az 6 karakter olmalıdır!"),
+    password: passwordSchema,
     role: z.enum(["ADMIN", "PM", "USER"], { errorMap: () => ({ message: "Geçersiz rol seçimi!" }) }),
     selectedProjects: z.array(z.string()).optional().default([])
   })
@@ -154,7 +161,7 @@ export const updateUserSchema = z.object({
   body: z.object({
     id: z.union([z.string(), z.number()]),
     username: usernameSchema,
-    password: z.string().optional(),
+    password: z.union([z.literal(''), passwordSchema]).optional(),
     role: z.enum(["ADMIN", "PM", "USER"]).optional(),
     selectedProjects: z.array(z.string()).optional()
   })

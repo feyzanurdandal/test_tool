@@ -15,3 +15,8 @@ cache
 runtime
 playwright-report
 test-results
+
+sessions
+certs
+certbot-www
+SECURITY_TEST_RESULTS.txt

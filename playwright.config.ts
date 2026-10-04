@@ -22,6 +22,7 @@ const isHeadless = process.env.HEADLESS === 'true';
 
 export default defineConfig({
   testDir: './tests',
+  outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR || './test-results',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

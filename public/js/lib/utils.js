@@ -46,6 +46,10 @@
                 openGroup = { type: "group", source: startMatch[1].trim(), steps: [] };
                 return;
             }
+            if (line === "[[İÇE_AKTAR_DÜZENLENDİ]]") {
+                if (openGroup) openGroup.edited = true;
+                return;
+            }
             if (line === IMPORT_END) {
                 if (openGroup && openGroup.steps.length) blocks.push(openGroup);
                 openGroup = null;
@@ -86,6 +90,7 @@
                         <span class="group-chevron inline-flex transition-transform duration-150"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-400"></i></span>
                         <i data-lucide="layers" class="w-3.5 h-3.5 text-[#3b82f6] shrink-0"></i>
                         <span class="font-medium text-zinc-100 truncate">${escapeHtml(block.source)}</span>
+                        ${block.edited ? '<span class="text-[10px] text-amber-400 shrink-0">Düzenlendi</span>' : ""}
                         <span class="text-[10px] text-zinc-500 shrink-0">${block.steps.length} adım · ${formatStepNo(first).slice(0, -1)}–${formatStepNo(counter).slice(0, -1)}</span>
                     </button>
                     <div class="preview-group-body hidden space-y-2 px-2.5 pb-2.5">${inner}</div>

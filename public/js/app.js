@@ -32,6 +32,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const expectedOutcomeContainer = document.getElementById("expected-outcome-container");
     const expectedOutcomeSelect = document.getElementById("new-scenario-expected-outcome");
 
+    const expectedErrorInput = document.getElementById("new-scenario-expected-error");
+    function updateExpectedErrorField() {
+        const required = currentTestType === "SECURITY" && expectedOutcomeSelect?.value === "ERROR_EXPECTED";
+        document.getElementById("expected-error-text-container")?.classList.toggle("hidden", !required);
+        if (expectedErrorInput) expectedErrorInput.required = required;
+    }
+    expectedOutcomeSelect?.addEventListener("change", updateExpectedErrorField);
+
     // Durum Değişkenleri
     let currentProject = "";
     let currentTestType = "UI"; // 'UI' | 'SECURITY'
@@ -330,13 +338,16 @@ document.addEventListener("DOMContentLoaded", () => {
                                 expectedOutcomeSelect.value = contentResult.expectedOutcome;
                             }
 
+                            if (expectedErrorInput) expectedErrorInput.value = adimlar.expectedErrorText || "";
+                            expectedOutcomeContainer?.classList.toggle("hidden", currentTestType !== "SECURITY");
+                            updateExpectedErrorField();
                             if (stepsContainer) {
                                 stepsContainer.innerHTML = "";
                                 if (contentTr && contentTr.trim() !== "") {
                                     parseStepBlocks(contentTr).forEach(block => {
                                         stepsContainer.appendChild(
                                             block.type === "group"
-                                                ? createStepGroup(block.source, block.steps)
+                                                ? createStepGroup(block.source, block.steps, block.edited)
                                                 : createStepRow(block.text)
                                         );
                                     });
@@ -674,7 +685,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             </div>
                             <div>
                                 <h4 class="text-xs font-semibold text-white group-hover:text-[#3b82f6] transition-colors">${escapeHtml(scenarioName)}</h4>
-                                <span class="text-[10px] text-zinc-500">${formattedDate} · ${parsedSteps.length} Adım</span>
+                                <span class="text-[10px] text-zinc-500">${escapeHtml(formattedDate)} · ${parsedSteps.length} Adım</span>
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
@@ -1258,9 +1269,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (expectedOutcomeSelect) expectedOutcomeSelect.value = "SUCCESS_EXPECTED";
 
             updateProjectLabels();
-            populateImportScenarioDropdown();
 
             if (scenarioForm) scenarioForm.reset();
+            updateExpectedErrorField();
             if (stepsContainer) {
                 stepsContainer.innerHTML = "";
                 stepsContainer.appendChild(createStepRow());
@@ -1285,6 +1296,33 @@ document.addEventListener("DOMContentLoaded", () => {
             newRow.querySelector(".step-input").focus();
         });
     }
+
+    const importModal = document.getElementById("import-scenario-modal");
+    const openImportBtn = document.getElementById("open-import-scenario-btn");
+    function closeImportModal() {
+        importModal.classList.add("hidden");
+        openImportBtn.focus();
+    }
+    openImportBtn.addEventListener("click", async () => {
+        importModal.classList.remove("hidden");
+        document.getElementById("import-scenario-title").textContent = currentTestType === "SECURITY"
+            ? "Güvenlik Senaryosu İçe Aktar" : "UI Senaryosu İçe Aktar";
+        document.getElementById("import-scenario-dropdown").focus();
+        await populateImportScenarioDropdown();
+    });
+    ["close-import-scenario-modal", "cancel-import-scenario-btn"].forEach(id => {
+        document.getElementById(id).addEventListener("click", closeImportModal);
+    });
+    importModal.addEventListener("click", e => { if (e.target === importModal) closeImportModal(); });
+    importModal.addEventListener("keydown", e => {
+        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeImportModal(); }
+        if (e.key === "Tab") {
+            const controls = Array.from(importModal.querySelectorAll("button, select")).filter(el => !el.disabled);
+            const first = controls[0], last = controls[controls.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+    });
 
     const importStepsBtn = document.getElementById("import-scenario-steps-btn");
     if (importStepsBtn) {
@@ -1337,6 +1375,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     lucide.createIcons();
                     groupEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
                     if (importDropdown) importDropdown.selectedIndex = 0;
+                    closeImportModal();
                 } else {
                     notify("Senaryo adımları getirilemedi.");
                 }
@@ -1346,6 +1385,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } finally {
                 importStepsBtn.disabled = false;
                 importStepsBtn.innerHTML = origText;
+                lucide.createIcons();
             }
         });
     }
@@ -1354,6 +1394,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const importDropdown = document.getElementById("import-scenario-dropdown");
         if (!importDropdown || !currentProject) return;
 
+        const status = document.getElementById("import-scenario-status");
+        status.textContent = "Senaryolar yükleniyor...";
+        importDropdown.disabled = true;
         importDropdown.innerHTML = `<option value="" disabled selected>İçe aktarılacak senaryoyu seçin...</option>`;
 
         try {
@@ -1371,7 +1414,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             }
         } catch (err) {
+            status.textContent = "Senaryolar yüklenemedi. Pencereyi tekrar açarak deneyin.";
             console.error("İçe aktarılacak senaryolar listelenirken hata:", err);
+        } finally {
+            importDropdown.disabled = false;
+            if (status.textContent === "Senaryolar yükleniyor...") status.textContent = importDropdown.options.length > 1 ? "" : "İçe aktarılabilecek senaryo bulunamadı.";
         }
     }
 
@@ -1394,6 +1441,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         stepRow.querySelector(".add-step-after-btn").addEventListener("click", () => {
             const newRow = createStepRow();
+            if (stepRow.closest(".step-group")) newRow.classList.add("group-step");
             stepRow.after(newRow);
             reindexSteps();
             lucide.createIcons();
@@ -1401,7 +1449,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         stepRow.querySelector(".remove-step-btn").addEventListener("click", () => {
-            if (stepsContainer.children.length > 1) {
+            if (stepRow.closest(".step-group") ? stepRow.parentElement.children.length > 1 : stepsContainer.children.length > 1) {
                 stepRow.remove();
                 reindexSteps();
             }
@@ -1411,10 +1459,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }    
 
     // İçe aktarılan senaryo: başlıkta senaryo adı, tıklanınca adımlar açılır
-    function createStepGroup(sourceName, steps) {
+    function createStepGroup(sourceName, steps, edited = false) {
         const group = document.createElement("div");
         group.className = "step-group rounded-lg border border-[#3b82f6]/20 bg-[#3b82f6]/[0.04] animate-slide-in";
         group.dataset.source = sourceName;
+        group.dataset.edited = String(edited);
 
         group.innerHTML = `
             <div class="flex items-center gap-1 pr-1.5">
@@ -1422,9 +1471,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span class="group-chevron inline-flex transition-transform duration-150"><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-400"></i></span>
                     <i data-lucide="layers" class="w-3.5 h-3.5 text-[#3b82f6] shrink-0"></i>
                     <span class="group-name text-xs font-medium text-white truncate"></span>
+                    <span class="group-edited hidden text-[10px] text-amber-400 shrink-0">Düzenlendi</span>
                     <span class="group-meta text-[10px] text-zinc-500 shrink-0"></span>
                 </button>
-                <button type="button" class="ungroup-btn text-zinc-500 hover:text-[#3b82f6] transition p-1 rounded hover:bg-[#3b82f6]/10" title="Adımları ayrı ayrı düzenlemek için gruptan çıkar">
+                <button type="button" class="ungroup-btn text-zinc-500 hover:text-[#3b82f6] transition p-1 rounded hover:bg-[#3b82f6]/10" title="Adımları gruptan çıkar">
                     <i data-lucide="ungroup" class="w-3.5 h-3.5"></i>
                 </button>
                 <button type="button" class="remove-group-btn text-zinc-500 hover:text-red-400 transition p-1 rounded hover:bg-red-500/10" title="İçe aktarılan senaryoyu kaldır">
@@ -1436,15 +1486,23 @@ document.addEventListener("DOMContentLoaded", () => {
         group.querySelector(".group-name").textContent = sourceName;
 
         const body = group.querySelector(".group-body");
+        const badge = group.querySelector(".group-edited");
+        badge.classList.toggle("hidden", !edited);
         steps.forEach(text => {
-            const row = document.createElement("div");
-            row.className = "group-step flex items-start gap-2 bg-[#27272a]/40 px-2.5 py-2 rounded-md";
-            row.innerHTML = `
-                <span class="step-number text-[10px] font-mono text-zinc-500 w-5 text-center mt-px"></span>
-                <span class="group-step-text flex-1 text-xs text-zinc-300 select-text"></span>
-            `;
-            row.querySelector(".group-step-text").textContent = text;
+            const row = createStepRow(text);
+            row.classList.add("group-step");
+            row.querySelector(".step-input").setAttribute("aria-label", `${sourceName} senaryo adımı`);
             body.appendChild(row);
+        });
+        const markEdited = () => {
+            group.dataset.edited = "true";
+            badge.classList.remove("hidden");
+        };
+        body.addEventListener("input", markEdited);
+        body.addEventListener("click", e => {
+            const add = e.target.closest(".add-step-after-btn");
+            const remove = e.target.closest(".remove-step-btn");
+            if (add || (remove && !body.contains(remove))) markEdited();
         });
 
         const toggle = group.querySelector(".group-toggle");
@@ -1477,8 +1535,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function getGroupSteps(groupEl) {
-        return Array.from(groupEl.querySelectorAll(".group-step-text"))
-            .map(el => el.textContent.trim())
+        return Array.from(groupEl.querySelectorAll(".step-input"))
+            .map(el => el.value.trim())
             .filter(t => t !== "");
     }
 
@@ -1490,7 +1548,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (child.classList.contains("step-group")) {
                 const steps = getGroupSteps(child);
                 if (!steps.length) return;
-                lines.push(`[[İÇE_AKTAR:${child.dataset.source}]]`, ...steps, IMPORT_END);
+                lines.push(`[[İÇE_AKTAR:${child.dataset.source}]]`);
+                if (child.dataset.edited === "true") lines.push("[[İÇE_AKTAR_DÜZENLENDİ]]");
+                lines.push(...steps, IMPORT_END);
                 stepCount += steps.length;
             } else {
                 const input = child.querySelector(".step-input");
@@ -1532,6 +1592,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (scenarioForm) {
+        scenarioForm.addEventListener("invalid", e => {
+            const group = e.target.closest(".step-group");
+            if (group && group.querySelector(".group-body").classList.contains("hidden")) group.querySelector(".group-toggle").click();
+        }, true);
         scenarioForm.addEventListener("submit", async (e) => {
             e.preventDefault();
 
@@ -1567,7 +1631,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 targetUrl,
                 projectName: activeProjectName,
                 testType: currentTestType,
-                expectedOutcome: expectedOutcomeSelect ? expectedOutcomeSelect.value : "SUCCESS_EXPECTED"
+                expectedOutcome: currentTestType === "SECURITY" && expectedOutcomeSelect ? expectedOutcomeSelect.value : "SUCCESS_EXPECTED",
+                expectedErrorText: expectedErrorInput?.required ? expectedErrorInput.value.trim() : ""
             };
             if (isEditMode) bodyData.originalScenarioName = globalEditScenarioName;
 

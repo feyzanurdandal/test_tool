@@ -27,6 +27,9 @@ const blockList = new net.BlockList();
     ['::', 128],           // belirtilmemiş
     ['::1', 128],          // loopback
     ['100::', 64],         // discard
+    ['64:ff9b:1::', 48],    // yerel NAT64
+    ['2001::', 32],        // Teredo
+    ['2002::', 16],        // 6to4
     ['2001:db8::', 32],    // dokümantasyon
     ['fc00::', 7],         // unique local (fc00::/7 = fc.. ve fd..)
     ['fe80::', 10],        // link-local
@@ -106,29 +109,40 @@ function allowedPrivateHosts() {
  * çözümlenmediğini denetler.
  * @returns {Promise<{ safe: boolean, reason?: string }>}
  */
-export async function checkHost(hostname) {
+export async function resolveSafeHost(hostname, lookup = dns.lookup) {
     const host = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
     if (!host) return { safe: false, reason: 'Host adı boş!' };
-    if (allowedPrivateHosts().includes(host)) return { safe: true };
-
-    if (net.isIP(host)) {
-        return isPrivateIp(host)
-            ? { safe: false, reason: `Yerel/özel IP adresine erişim engellendi (${host})` }
-            : { safe: true };
-    }
-
+    const hosts = (process.env.ALLOWED_TEST_HOSTS || '').split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
+    if (hosts.length && !hosts.includes(host)) return { safe: false, reason: 'Host test izin listesinde yok.' };
+    const privateAllowed = allowedPrivateHosts().includes(host);
     try {
-        const addresses = await dns.lookup(host, { all: true, verbatim: true });
-        if (addresses.length === 0) return { safe: false, reason: `DNS çözümlemesi boş döndü (${host})` };
-
-        const blocked = addresses.find(a => isPrivateIp(a.address));
-        if (blocked) {
-            return { safe: false, reason: `Domain'in çözümlendiği IP (${blocked.address}) iç ağa işaret ediyor!` };
+        let timer;
+        const addresses = net.isIP(host) ? [{ address: host, family: net.isIP(host) }]
+            : await Promise.race([
+                lookup(host, {all:true, verbatim:true}),
+                new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('DNS timeout')), 3000); }),
+            ]).finally(() => clearTimeout(timer));
+        if (!Array.isArray(addresses) || !addresses.length || addresses.some(a => !net.isIP(a.address))) {
+            return {safe:false,reason:'DNS çözümlemesi geçersiz.'};
         }
-        return { safe: true };
+        if (!privateAllowed && addresses.some(a => isPrivateIp(a.address))) {
+            return {safe:false, reason:'Yerel/özel veya rezerve IP adresine erişim engellendi.'};
+        }
+        // Proxy yalnızca burada kontrol edilen IP'ye bağlanır; tekrar DNS çözmez.
+        const selected = addresses.find(a => net.isIP(a.address) === 4) || addresses[0];
+        return {safe:true, address:selected.address, family:net.isIP(selected.address)};
     } catch {
-        return { safe: false, reason: `DNS çözümlemesi başarısız: Domain adresi bulunamadı! (${host})` };
+        return {safe:false, reason:'DNS çözümlemesi başarısız veya zaman aşımına uğradı.'};
     }
+}
+
+export async function checkHost(hostname) {
+    const { safe, reason } = await resolveSafeHost(hostname);
+    return reason ? {safe,reason} : {safe};
+}
+
+export function isAllowedTestPort(port) {
+    return (process.env.ALLOWED_TEST_PORTS || '80,443').split(',').map(p => Number(p.trim())).includes(Number(port));
 }
 
 /**
@@ -153,5 +167,8 @@ export async function isSafeUrl(urlString) {
         return { safe: false, reason: `İzin verilmeyen protokol: ${protocol}` };
     }
 
+    if (parsedUrl.username || parsedUrl.password) return {safe:false,reason:'URL içinde kullanıcı adı/şifre kullanılamaz.'};
+    const port = Number(parsedUrl.port || (protocol === 'https:' ? 443 : 80));
+    if (!isAllowedTestPort(port)) return {safe:false,reason:'Hedef port test izin listesinde yok.'};
     return checkHost(parsedUrl.hostname);
 }

@@ -28,6 +28,25 @@ if (missingDpu.length > 0) {
     console.warn(`UYARI: DPU Base bağlantı değişkenleri eksik: ${missingDpu.join(', ')}`);
 }
 
+if (process.env.NODE_ENV === 'production') {
+    const secret = process.env.JWT_SECRET;
+    if (secret.length < 32 || new Set(secret).size < 10 || /your_|test-secret|change.?me|placeholder/i.test(secret)) {
+        console.error('Production JWT_SECRET güçlü ve rastgele olmalıdır (en az 32 karakter).');
+        process.exit(1);
+    }
+    if (missingDpu.length) {
+        console.error('Production DPU bağlantı ayarları zorunludur.');
+        process.exit(1);
+    }
+    try {
+        const base = new URL(process.env.DPU_BASE_URL);
+        if (base.protocol !== 'https:' || base.username || base.password) throw new Error();
+    } catch {
+        console.error('Production DPU_BASE_URL kimlik bilgisi içermeyen HTTPS adresi olmalıdır.');
+        process.exit(1);
+    }
+}
+
 export const env = {
     NODE_ENV: process.env.NODE_ENV || 'development',
     PORT: Number(process.env.PORT) || 3000,

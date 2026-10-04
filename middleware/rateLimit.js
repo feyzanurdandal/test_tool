@@ -21,7 +21,7 @@ export const aiCallLimiter = rateLimit({
             return `user:${req.user.username}`;
         }
         // Giriş yapmamışsa IPv4/IPv6 güvenli IP anahtarlayıcısını kullan
-        return ipKeyGenerator(req, res);
+        return ipKeyGenerator(req.ip);
     },
     message: { error: "Bu saat için AI istek limitine ulaşıldı. Lütfen daha sonra tekrar deneyin." },
 });
@@ -36,7 +36,7 @@ export const testRunLimiter = rateLimit({
         if (req.user && req.user.username) {
             return `user:${req.user.username}`;
         }
-        return ipKeyGenerator(req, res);
+        return ipKeyGenerator(req.ip);
     },
     message: { error: "Çok sık test tetikleme isteği. Lütfen bir dakika bekleyin." },
 });

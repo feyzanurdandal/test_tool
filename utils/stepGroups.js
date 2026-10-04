@@ -14,7 +14,7 @@ export const IMPORT_END = '[[/İÇE_AKTAR]]';
 
 export const isImportMarker = (line) => {
     const t = String(line || '').trim();
-    return t === IMPORT_END || IMPORT_START_RE.test(t);
+    return t === '[[İÇE_AKTAR_DÜZENLENDİ]]' || t === IMPORT_END || IMPORT_START_RE.test(t);
 };
 
 // İşaretçileri kaldırıp yalnızca gerçek adımları satır satır döndürür.
