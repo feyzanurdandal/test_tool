@@ -5,6 +5,7 @@ services:
     container_name: test_tool_backend
     restart: always
     init: true
+    command: ["sh", "-c", "mkdir -p /tmp/chromium-config /tmp/chromium-cache && exec node server.js"]
     mem_limit: 2g
     cpus: 2.0
     pids_limit: 512
@@ -21,8 +22,8 @@ services:
       - DPU_API_KEY=${DPU_API_KEY}
       - DPU_USER_EMAIL=${DPU_USER_EMAIL}
       - DPU_USER_PASSWORD=${DPU_USER_PASSWORD}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - JWT_SECRET=${JWT_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - RUN_CONCURRENCY=${RUN_CONCURRENCY:-1}
@@ -32,6 +33,8 @@ services:
       - ALLOWED_TEST_PORTS=${ALLOWED_TEST_PORTS:-80,443}
       - SESSION_DIR=/app/sessions
       - HEADLESS=true
+      - XDG_CONFIG_HOME=/tmp/chromium-config
+      - XDG_CACHE_HOME=/tmp/chromium-cache
     volumes:
       - test-cache:/app/cache
       - test-sessions:/app/sessions
