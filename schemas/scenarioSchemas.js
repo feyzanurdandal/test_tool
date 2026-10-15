@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { testDataSchema } from './testData.js';
 
 // XSS ve Script Enjeksiyonunu Önleyen Karakter Kontrolü
 const safeTextRule = (val) => !/[<>"'\\]/.test(val);
@@ -68,6 +69,7 @@ export const createScenarioSchema = z.object({
     projectName: z.string().optional().default('Varsayılan Proje'),
     testType: testTypeSchema.optional().default("UI"),
     expectedOutcome: expectedOutcomeSchema.optional().default("SUCCESS_EXPECTED"),
+    testData: testDataSchema.optional(),
     expectedErrorText: z.string().trim().max(500).optional().default('')
   }).refine(value => value.expectedOutcome !== 'ERROR_EXPECTED' || value.expectedErrorText.length >= 3,
     { message: 'Beklenen engelleme mesajını en az 3 karakterle belirtin.', path: ['expectedErrorText'] })
@@ -82,6 +84,7 @@ export const updateScenarioSchema = z.object({
     projectName: z.string().optional().default('Varsayılan Proje'),
     testType: testTypeSchema.optional().default("UI"),
     expectedOutcome: expectedOutcomeSchema.optional().default("SUCCESS_EXPECTED"),
+    testData: testDataSchema.optional(),
     expectedErrorText: z.string().trim().max(500).optional().default('')
   }).refine(value => value.expectedOutcome !== 'ERROR_EXPECTED' || value.expectedErrorText.length >= 3,
     { message: 'Beklenen engelleme mesajını en az 3 karakterle belirtin.', path: ['expectedErrorText'] })

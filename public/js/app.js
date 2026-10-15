@@ -268,6 +268,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     if (contentResult.success) {
                                         const adimlarJson = contentResult.content || {};
                                         const contentTr = contentResult.contentTr;
+                            //testDataEditor?.load(adimlar.testData);
 
                                         const targetUrl = adimlarJson.targetUrl || "";
                                         const urlCell = row.querySelector(".target-url-cell");
@@ -284,7 +285,8 @@ document.addEventListener("DOMContentLoaded", () => {
                                         let stepsHtml = "";
 
                                         if (contentTr && contentTr.trim() !== "") {
-                                            stepsHtml = renderStepsPreviewHtml(contentTr);
+                                            // stepsHtml = renderStepsPreviewHtml(window.readableDataSteps(contentTr, adimlar.testData));
+                                            stepsHtml = renderStepsPreviewHtml(window.readableDataSteps(contentTr, adimlarJson.testData));
                                         } else {
                                             stepsHtml = `<div class="text-amber-400/80 italic text-[11px] p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">Bu senaryo eski formatta oluşturulmuş, Türkçe adım önizlemesi bulunmuyor. Düzenleyip tekrar kaydederek güncelleyebilirsiniz.</div>`;
                                         }
@@ -321,6 +323,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             
                             const adimlar = contentResult.content || {};
                             const contentTr = contentResult.contentTr;
+                            testDataEditor?.load(adimlar.testData);
 
                             globalEditScenarioName = scenarioName;
 
@@ -1352,7 +1355,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         // İçe aktarılan senaryonun kendi grupları varsa düzleştirilir (iç içe grup yok)
                         stepsToImport = flattenStepBlocks(contentTr);
                     } else if (adimlar.steps) {
-                        stepsToImport = adimlar.steps.map(s => s.instruction || "");
+                        stepsToImport = adimlar.steps.map(s => s.type === "form" ? `[[FORM:${s.form.key}]]` : s.instruction || "");
                     }
 
                     if (stepsToImport.length === 0) {
@@ -1368,6 +1371,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
 
                     stepsToImport = stepsToImport.map(t => String(t).trim()).filter(t => t !== "");
+                    stepsToImport = testDataEditor?.importSteps(stepsToImport, adimlar.testData) || stepsToImport;
                     const groupEl = createStepGroup(selectedScenarioToImport, stepsToImport);
                     stepsContainer.appendChild(groupEl);
 
@@ -1455,6 +1459,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
+        testDataEditor?.decorate(stepRow, value);
         return stepRow;
     }    
 
@@ -1536,7 +1541,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function getGroupSteps(groupEl) {
         return Array.from(groupEl.querySelectorAll(".step-input"))
-            .map(el => el.value.trim())
+            .map(el => el.closest("[data-form-key]") ? `[[FORM:${el.closest("[data-form-key]").dataset.formKey}]]` : el.value.trim())
             .filter(t => t !== "");
     }
 
@@ -1554,7 +1559,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 stepCount += steps.length;
             } else {
                 const input = child.querySelector(".step-input");
-                const val = input ? input.value.trim() : "";
+                const val = child.dataset.formKey ? `[[FORM:${child.dataset.formKey}]]` : (input ? input.value.trim() : "");
                 if (val) { lines.push(val); stepCount++; }
             }
         });
@@ -1590,6 +1595,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    const testDataEditor = scenarioForm && window.TestDataEditor ? new window.TestDataEditor({form:scenarioForm, steps:stepsContainer, addRow:createStepRow, reindex:reindexSteps, notify}) : null;
 
     if (scenarioForm) {
         scenarioForm.addEventListener("invalid", e => {
@@ -1632,6 +1639,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 projectName: activeProjectName,
                 testType: currentTestType,
                 expectedOutcome: currentTestType === "SECURITY" && expectedOutcomeSelect ? expectedOutcomeSelect.value : "SUCCESS_EXPECTED",
+                testData: testDataEditor?.get(),
                 expectedErrorText: expectedErrorInput?.required ? expectedErrorInput.value.trim() : ""
             };
             if (isEditMode) bodyData.originalScenarioName = globalEditScenarioName;

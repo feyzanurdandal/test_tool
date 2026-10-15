@@ -32,12 +32,14 @@ services:
       - ALLOWED_TEST_HOSTS=${ALLOWED_TEST_HOSTS:-}
       - ALLOWED_TEST_PORTS=${ALLOWED_TEST_PORTS:-80,443}
       - SESSION_DIR=/app/sessions
+      - RUN_DATA_DIR=/app/run-data
       - HEADLESS=true
       - XDG_CONFIG_HOME=/tmp/chromium-config
       - XDG_CACHE_HOME=/tmp/chromium-cache
     volumes:
       - test-cache:/app/cache
       - test-sessions:/app/sessions
+      - test-run-data:/app/run-data
     # Port dışarıya AÇILMAZ: yalnızca nginx, compose ağı üzerinden erişir.
     # Aksi halde nginx atlanıp X-Forwarded-For sahte gönderilerek rate limit aşılabiliyordu.
     expose:
@@ -61,3 +63,4 @@ services:
 volumes:
   test-cache:
   test-sessions:
+  test-run-data:

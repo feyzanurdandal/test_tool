@@ -20,3 +20,5 @@ sessions
 certs
 certbot-www
 SECURITY_TEST_RESULTS.txt
+
+run-data/

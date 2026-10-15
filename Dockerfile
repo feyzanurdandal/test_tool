@@ -17,7 +17,7 @@ RUN npm run build:css
 
 RUN npm prune --omit=dev --no-audit --no-fund
 
-RUN mkdir -p /app/cache/ai-security /app/runtime /app/sessions && chown -R pwuser:pwuser /app
+RUN mkdir -p /app/cache/ai-security /app/runtime /app/sessions /app/run-data && chown -R pwuser:pwuser /app
 
 ENV DOCKER_ENV=true
 ENV NODE_ENV=production

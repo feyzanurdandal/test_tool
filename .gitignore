@@ -28,3 +28,5 @@ runtime/
 sessions/
 certs/
 certbot-www/
+
+run-data/

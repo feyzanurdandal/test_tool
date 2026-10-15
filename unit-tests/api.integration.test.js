@@ -311,3 +311,13 @@ test('regresyon: kalıcı oturum kayıtları yeniden başlatınca çalışır; s
         assert.equal((await fetch(`http://127.0.0.1:${extraPort}/api/auth/me`,{headers:{Cookie:adminCookie}})).status,401);
     } finally {extra.kill();}
 });
+
+test('JSON senaryosu AI çağrısı olmadan kaydedilir, alan ayarları güncellemede korunur', async()=>{
+ adminCookie=await login('admin','admin123');
+ const field={key:'email',label:'E-Posta',value:'f@example.com',action:'fill',selectionMode:'text',rule:'email',scope:''};
+ const body={scenarioName:'JSON form',projectName:'Alfa',targetUrl:'https://1.1.1.1/',turkishInstructions:'[[FORM:email]]',testData:{enabled:true,fields:[field],variables:[]}};
+ const saved=await api('/api/scenarios/create-and-save',{method:'POST',cookie:adminCookie,body});assert.equal(saved.json.status,'SUCCESS',JSON.stringify(saved.json));
+ const read=await api('/api/scenarios/content?project=Alfa&scenarioName=JSON%20form',{cookie:adminCookie});assert.equal(read.json.content.steps[0].type,'form');assert.equal(read.json.content.testData.enabled,true);assert.equal(read.json.content.steps[0].form.label,'E-Posta');
+ const updated=await api('/api/scenarios/update',{method:'POST',cookie:adminCookie,body:{...body,originalScenarioName:'JSON form',testData:{enabled:false,fields:[{...field,value:'new@example.com'}]}}});assert.equal(updated.json.status,'SUCCESS',JSON.stringify(updated.json));
+ const again=await api('/api/scenarios/content?project=Alfa&scenarioName=JSON%20form',{cookie:adminCookie});assert.equal(again.json.content.testData.enabled,false);assert.equal(again.json.content.steps[0].form.value,'new@example.com');
+});

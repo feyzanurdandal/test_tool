@@ -4,6 +4,8 @@ import path from 'path';
 import crypto from 'crypto';
 import dpu from '../config/dpuService.js';
 import { runtimeStepsSchema } from '../schemas/runtimeSteps.js';
+import { applyScenarioData, needsSequence } from '../utils/scenarioData.js';
+import { reserveRunSequence } from './runSequence.js';
 import { isSafeUrl } from '../utils/ipGuard.js';
 
 // Çalışma anı adım dosyaları önbellekten AYRI bir klasörde tutulur;
@@ -64,7 +66,10 @@ export async function buildRuntimeSteps(scenario) {
     const validated = runtimeStepsSchema.safeParse({ ...parsed, targetUrl,
         expectedOutcome: scenario.beklenen_sonuc || 'SUCCESS_EXPECTED' });
     if (!validated.success) throw new RunPreparationError('Senaryo adımları veya beklenen engelleme mesajı geçersiz. Senaryoyu düzenleyip yeniden kaydedin.');
-    return validated.data;
+    try {
+        const sequence=needsSequence(validated.data.testData) ? await reserveRunSequence(String(scenario.project_id)+':'+String(scenario.id || scenario.senaryo_adi)) : '0';
+        return applyScenarioData(validated.data,sequence);
+    } catch(e) { throw new RunPreparationError(e.message); }
 }
 
 // Playwright testini ayrı süreçte, zaman aşımıyla koşturur
@@ -137,7 +142,7 @@ export async function executeScenario(project, scenario) {
     await fs.promises.writeFile(runtimeStepsPath, JSON.stringify(runtimeSteps, null, 2), {encoding:'utf-8',mode:0o600});
 
     const testResult = await runPlaywrightTest(runtimeStepsPath);
-    const logContent = testResult.logContent || '';
+    const logContent = (runtimeSteps.runSequence !== '0' ? `[VERİ_KOŞUSU]: ${runtimeSteps.runSequence}\n` : '') + (testResult.logContent || '');
     const safeLogContent = logContent.length > MAX_LOG_CHARS ? logContent.slice(-MAX_LOG_CHARS) : logContent;
 
     const expectedOutcome = (scenario.beklenen_sonuc || 'SUCCESS_EXPECTED').toUpperCase();

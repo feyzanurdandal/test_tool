@@ -247,3 +247,8 @@ npm audit
 - ayarlar: AI sağlayıcı/model bilgileri ve şifreli API anahtarları
 
 Bazı ilişkiler kimlik yerine isim kullanır (ör. kullanici_projeleri.proje_adi, raporlar.scenario_name). Yeniden adlandırmalar ilgili kayıtlara yayılır; ID ilişkilerine geçiş ayrıca DPU şema çalışması gerektirir.
+
+
+## JSON form adımları ve değişken test verisi
+
+Senaryo ekranındaki **JSON’dan Adım Oluştur** ve **Değişecek Değerleri Seç** düğmeleri ile bu özellikleri kullanabilirsiniz. Ayrıntılı kullanım, sayaç yedekleme, seçim yöntemleri ve sınırlar için [JSON_VERI_DEGISIKLIKLERI.md](JSON_VERI_DEGISIKLIKLERI.md) dosyasını okuyun.

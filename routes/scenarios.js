@@ -7,6 +7,7 @@ import { validate } from '../middleware/validate.js';
 import { requireProjectAccess } from '../utils/projectGuard.js';
 import { isSafeUrl } from '../utils/ipGuard.js';
 import { translateToStagehandJson } from '../utils/translator.js';
+import { compileScenarioData } from '../utils/scenarioData.js';
 import { runtimeStepsSchema } from '../schemas/runtimeSteps.js';
 import { stripImportMarkers } from '../utils/stepGroups.js';
 import {
@@ -24,9 +25,9 @@ const toInstructionText = (turkishInstructions) =>
 // Türkçe adımları yapay zekaya çevirtir. İçe aktarma işaretçileri yalnızca
 // arayüz içindir; çeviriye düz adımlar gider. Hedef URL her zaman kullanıcının
 // girdiği ve doğrulanan değerdir, modelin ürettiği değer kullanılmaz.
-async function translateScenario(turkishInstructions, targetUrl, expectedErrorText = '') {
+async function translateScenario(turkishInstructions, targetUrl, expectedErrorText = '', testData = {}) {
     const input = typeof turkishInstructions === 'string' ? stripImportMarkers(turkishInstructions) : turkishInstructions;
-    const stagehandJson = await translateToStagehandJson(input, targetUrl);
+    const stagehandJson = await compileScenarioData(input, testData, translateToStagehandJson, targetUrl);
     if (!stagehandJson || typeof stagehandJson !== 'object') return null;
     const checked = runtimeStepsSchema.safeParse({ ...stagehandJson, targetUrl, expectedErrorText });
     return checked.success ? checked.data : null;
@@ -93,7 +94,7 @@ router.get('/content', requireAuth, validate(getScenarioContentSchema), requireP
 
 // ─── SENARYO KAYDETME VE AI ÇEVİRİSİ ───
 router.post('/create-and-save', requireAuth, aiCallLimiter, validate(createScenarioSchema), requireProjectAccess, withAiCapacity(async (req, res, next) => {
-    const { scenarioName, turkishInstructions, targetUrl, projectName, testType, expectedOutcome, expectedErrorText } = req.body;
+    const { scenarioName, turkishInstructions, targetUrl, projectName, testType, expectedOutcome, expectedErrorText, testData } = req.body;
 
     const urlCheck = await isSafeUrl(targetUrl);
     if (!urlCheck.safe) return res.status(400).json({ error: `Güvenlik Engeli: ${urlCheck.reason}` });
@@ -125,7 +126,7 @@ router.post('/create-and-save', requireAuth, aiCallLimiter, validate(createScena
         const createdId = insertResult.data?.id || insertResult.data?.insertId
             || (await getScenario(project.id, scenarioName))?.id;
 
-        const stagehandJson = await translateScenario(turkishInstructions, targetUrl, expectedErrorText);
+        const stagehandJson = await translateScenario(turkishInstructions, targetUrl, expectedErrorText, testData);
         if (stagehandJson && createdId) {
             await dpu.update('senaryolar', createdId, {
                 adimlar: JSON.stringify(stagehandJson),
@@ -146,7 +147,7 @@ router.post('/create-and-save', requireAuth, aiCallLimiter, validate(createScena
 
 // ─── SENARYO GÜNCELLEME ───
 router.post('/update', requireAuth, aiCallLimiter, validate(updateScenarioSchema), requireProjectAccess, withAiCapacity(async (req, res, next) => {
-    const { scenarioName, originalScenarioName, turkishInstructions, targetUrl, projectName, testType, expectedOutcome, expectedErrorText } = req.body;
+    const { scenarioName, originalScenarioName, turkishInstructions, targetUrl, projectName, testType, expectedOutcome, expectedErrorText, testData } = req.body;
 
     const urlCheck = await isSafeUrl(targetUrl);
     if (!urlCheck.safe) return res.status(400).json({ error: `Güvenlik Engeli: ${urlCheck.reason}` });
@@ -192,7 +193,7 @@ router.post('/update', requireAuth, aiCallLimiter, validate(updateScenarioSchema
             }
         }
 
-        const stagehandJson = await translateScenario(turkishInstructions, targetUrl, expectedErrorText);
+        const stagehandJson = await translateScenario(turkishInstructions, targetUrl, expectedErrorText, testData);
         if (stagehandJson) {
             await dpu.update('senaryolar', existing.id, {
                 adimlar: JSON.stringify(stagehandJson),

@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yazılım Test Otomasyonu</title>
+    <!-- Stiller derleme ile üretilir: npm run build:css (kaynak: styles/tailwind.css) -->
+    <link rel="stylesheet" href="css/app.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- İkonlar sabit sürümle yerelden sunulur (lucide 1.48.0) -->
+    <script src="vendor/lucide.min.js"></script>
+</head>
+<body class="bg-[#09090b] text-[#fafafa] min-h-screen flex flex-col antialiased select-none">
+
+    <!-- Giriş Ekranı -->
+    <div id="login-view" class="flex-1 flex flex-col items-center justify-center p-6">
+        <div class="w-full max-w-sm bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-6">
+            <div class="flex flex-col items-center space-y-2">
+                <div class="w-10 h-10 rounded-lg bg-[#3b82f6]/10 flex items-center justify-center border border-[#3b82f6]/20">
+                    <i data-lucide="flask-conical" class="w-5 h-5 text-[#3b82f6]"></i>
+                </div>
+                <h1 class="text-sm font-semibold tracking-tight text-white mt-2">Yazılım Test Otomasyonu</h1>
+                <p class="text-[11px] text-[#71717a]">Giriş yapmak için bilgilerinizi girin</p>
+            </div>
+            <div id="login-error" class="hidden bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] p-2.5 rounded-lg text-center"></div>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Kullanıcı Adı</label>
+                    <input type="text" id="login-username" required placeholder="Kullanıcı adı" 
+                           class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Şifre</label>
+                    <input type="password" id="login-password" required placeholder="Şifre" 
+                           class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                </div>
+                <button type="submit" class="w-full py-2 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold tracking-wide transition flex items-center justify-center gap-1.5">
+                    <span>Giriş Yap</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Ana Uygulama Ekranı -->
+    <div id="app-view" class="hidden h-screen w-screen flex flex-col overflow-hidden">
+        
+        <!-- Header -->
+        <header class="h-14 border-b border-[rgba(255,255,255,0.06)] flex items-center px-6 gap-4 bg-[#09090b] z-20 shrink-0 select-none">
+            <div class="flex items-center gap-2.5">
+                <i data-lucide="flask-conical" class="w-4 h-4 text-[#3b82f6]"></i>
+                <span class="text-sm font-bold tracking-tight text-white">Yazılım Test Otomasyonu</span>
+            </div>
+            <div class="w-px h-4 bg-[rgba(255,255,255,0.1)] mx-2"></div>
+            
+            <div class="flex items-center gap-2">
+                <select id="project-dropdown" class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-md px-3 py-1.5 outline-none cursor-pointer focus:border-[#3b82f6] transition font-medium min-w-[160px]">
+                </select>
+                <button id="add-project-btn" class="w-7 h-7 bg-[#18181b] border border-[rgba(255,255,255,0.08)] rounded-md flex items-center justify-center text-zinc-400 hover:text-white hover:bg-[#27272a] transition" title="Yeni Proje Ekle">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+
+            <div class="ml-auto flex items-center gap-4">
+                <span class="text-[10px] font-mono bg-[#18181b] border border-[rgba(255,255,255,0.06)] text-zinc-500 px-2 py-0.5 rounded">v2.5.0</span>
+                <span id="user-badge" class="text-xs font-mono text-[#71717a]"></span>
+                <button id="logout-btn" class="text-xs text-zinc-500 hover:text-red-400 transition flex items-center gap-1">
+                    <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- İçerik Kapsayıcısı -->
+        <div class="flex flex-1 h-[calc(100vh-3.5rem)] overflow-hidden">
+            
+            <!-- Sol Sabit Menü -->
+            <aside class="w-60 border-r border-[rgba(255,255,255,0.06)] bg-[#09090b] p-4 flex flex-col justify-between shrink-0 h-full select-none">
+                
+                <div class="space-y-4 overflow-y-auto pr-1">
+                    
+                    <!-- Grup 1: UI Testleri -->
+                    <div class="space-y-1">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 px-3 py-1 flex items-center gap-1.5">
+                            <i data-lucide="layout" class="w-3.5 h-3.5 text-[#3b82f6]"></i> <span>UI / Fonksiyonel Testler</span>
+                        </div>
+                        <button data-target="view-scenarios" data-test-type="UI" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition text-[#3b82f6] bg-[#3b82f6]/10">
+                            <i data-lucide="microscope" class="w-4 h-4"></i> <span>Test Senaryoları</span>
+                        </button>
+                        <button data-target="view-batch" data-test-type="UI" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
+                            <i data-lucide="layers" class="w-4 h-4"></i> <span>Toplu Testler</span>
+                        </button>
+                        <button data-target="view-reports" data-test-type="UI" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
+                            <i data-lucide="file-text" class="w-4 h-4"></i> <span>Raporlar</span>
+                        </button>
+                    </div>
+
+                    <!-- Grup 2: Siber Güvenlik Testleri -->
+                    <div class="space-y-1 pt-2 border-t border-[rgba(255,255,255,0.04)]">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-amber-400 px-3 py-1 flex items-center gap-1.5">
+                            <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-amber-400"></i> <span>Güvenlik Testleri</span>
+                        </div>
+                        <button data-target="view-scenarios" data-test-type="SECURITY" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
+                            <i data-lucide="shield" class="w-4 h-4"></i> <span>Güvenlik Senaryoları</span>
+                        </button>
+                        <button data-target="view-batch" data-test-type="SECURITY" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
+                            <i data-lucide="layers" class="w-4 h-4"></i> <span>Toplu Güvenlik Testi</span>
+                        </button>
+                        <button data-target="view-reports" data-test-type="SECURITY" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
+                            <i data-lucide="file-check" class="w-4 h-4"></i> <span>Güvenlik Raporları</span>
+                        </button>
+                    </div>
+
+                    <!-- Sistem Yönetimi -->
+                    <div class="space-y-1 pt-2 border-t border-[rgba(255,255,255,0.04)]">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 px-3 py-1">Yönetim</div>
+                        <button data-target="view-settings" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b]">
+                            <i data-lucide="settings" class="w-4 h-4"></i> <span>Ayarlar</span>
+                        </button>
+                        <button id="nav-users-btn" data-target="view-users" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition text-zinc-400 hover:text-zinc-200 hover:bg-[#18181b] hidden">
+                            <i data-lucide="users" class="w-4 h-4"></i> <span>Kullanıcı Yönetimi</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Önbellek Temizle Butonu -->
+                <div class="pt-4 border-t border-[rgba(255,255,255,0.06)] shrink-0 space-y-2">
+                    <button id="clear-cache-btn" type="button" title="Geçici Önbelleği Temizle" class="w-full bg-[#18181b] hover:bg-[#27272a] text-zinc-400 hover:text-white border border-[rgba(255,255,255,0.08)] text-xs px-3 py-2.5 rounded-lg transition flex items-center justify-center gap-2 cursor-pointer shadow-sm">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+                        <span>Önbelleği Temizle</span>
+                    </button>
+                    <a href="https://github.com/feyzanurdandal/test_tool" target="_blank" rel="noopener noreferrer" 
+                    title="GitHub Reposunu İncele" 
+                    class="w-full bg-[#18181b]/50 hover:bg-[#18181b] text-zinc-500 hover:text-zinc-200 border border-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.08)] text-[11px] px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-between group cursor-pointer">
+                        <span class="flex items-center gap-2 shrink-0">
+                            <i data-lucide="git-branch" class="w-3.5 h-3.5 text-zinc-400 group-hover:text-[#3b82f6] transition-colors"></i>
+                            <span class="font-medium text-zinc-400 group-hover:text-zinc-200 transition-colors">Geliştirici</span>
+                        </span>
+                        <span class="text-[10px] text-[#3b82f6] font-semibold opacity-0 group-hover:opacity-100 max-w-0 group-hover:max-w-[120px] overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out pl-1">
+                            Feyza Nur Dandal
+                        </span>
+                    </a>
+                </div>
+            </aside>
+
+            <!-- Sağ Dinamik İçerik Alanı -->
+            <main class="flex-1 bg-[#09090b] p-8 overflow-y-auto h-full">
+                
+                <!-- 1. TEST SENARYOLARI VİEW -->
+                <div id="view-scenarios" class="view-content space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 id="scenarios-view-title" class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                                <span id="scenarios-title-text">Test Senaryoları</span>
+                                <span id="scenarios-badge-type" class="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">UI</span>
+                            </h2>
+                            <p class="text-xs text-zinc-500 mt-0.5"><span class="scenario-count">0</span> senaryo · <span class="current-project-label">Yükleniyor</span></p>
+                        </div>
+                        <button id="open-new-scenario-btn" class="bg-[#3b82f6] hover:bg-blue-500 text-white text-xs font-medium px-4 py-2 rounded-lg transition border border-blue-600 flex items-center gap-1.5 shadow-sm">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Yeni Senaryo
+                        </button>
+                    </div>
+                    <div class="bg-[#09090b] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden min-h-[200px] flex flex-col justify-center items-center p-8">
+                        <div id="scenarios-empty" class="text-xs text-zinc-500 font-medium">Bu projeye ait henüz senaryo bulunamadı.</div>
+                        <table id="scenarios-table" class="w-full text-left border-collapse hidden">
+                            <thead>
+                                <tr class="border-b border-[rgba(255,255,255,0.06)] text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                                    <th class="py-3 px-4 w-12">#</th>
+                                    <th class="py-3 px-4">Senaryo Adı</th>
+                                    <th class="py-3 px-4">Hedef URL</th>
+                                    <th class="py-3 px-4 text-right">İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scenarios-list" class="text-xs text-zinc-300 divide-y divide-[rgba(255,255,255,0.04)]"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 2. TOPLU TESTLER VİEW -->
+                <div id="view-batch" class="view-content space-y-6 hidden">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 id="batch-view-title" class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                                <span id="batch-title-text">Sıralı Toplu Test Pipeline Yapısı</span>
+                                <span id="batch-badge-type" class="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">UI</span>
+                            </h2>
+                            <p class="text-xs text-zinc-500 mt-0.5"><span id="selected-batch-count">0</span> test seçildi · Sıralama tıklama sıranıza göre belirlenir</p>
+                        </div>
+                        <button id="start-batch-btn" disabled class="bg-[#18181b] text-zinc-500 border border-[rgba(255,255,255,0.08)] text-xs font-medium px-4 py-2 rounded-lg transition flex items-center gap-1.5 cursor-not-allowed">
+                            Seçilen Test Kuyruğunu Başlat (0)
+                        </button>
+                    </div>
+                    <div class="bg-[#09090b] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden min-h-[200px] flex flex-col justify-center items-center p-8">
+                        <div id="batch-empty" class="text-xs text-zinc-500 font-medium">Bu projede sıraya dizilecek senaryo bulunamadı.</div>
+                        <table id="batch-table" class="w-full text-left border-collapse hidden">
+                            <thead>
+                                <tr class="border-b border-[rgba(255,255,255,0.06)] text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                                    <th class="py-3 px-4 w-16">Seç</th>
+                                    <th class="py-3 px-4 w-20">Sıra No</th>
+                                    <th class="py-3 px-4">Senaryo Adı</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batch-list" class="text-xs text-zinc-300 divide-y divide-[rgba(255,255,255,0.04)]"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 3. RAPORLAR VİEW -->
+                <div id="view-reports" class="view-content space-y-6 hidden">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h2 id="reports-view-title" class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                                <span id="reports-title-text">Test Raporları</span>
+                                <span id="reports-badge-type" class="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">UI</span>
+                            </h2>
+                            <p class="text-xs text-zinc-500 mt-0.5"><span class="current-project-label">Yükleniyor</span> projesine ait geçmiş test koşturum çıktıları</p>
+                        </div>
+                        <button id="refresh-reports-btn" class="bg-[#18181b] hover:bg-[#27272a] text-zinc-300 border border-[rgba(255,255,255,0.08)] text-xs px-3 py-2 rounded-lg transition flex items-center gap-1.5 self-start md:self-auto cursor-pointer">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-[#3b82f6]"></i>
+                            <span>Raporları Yenile</span>
+                        </button>
+                    </div>
+
+                    <!-- İstatistik Kartları -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-4 rounded-xl flex items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-[#3b82f6] shrink-0">
+                                <i data-lucide="layers" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Toplam Test</span>
+                                <div id="stat-total-reports" class="text-lg font-extrabold text-white font-mono">0</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-4 rounded-xl flex items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Başarılı</span>
+                                <div id="stat-passed-reports" class="text-lg font-extrabold text-emerald-400 font-mono">0</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-4 rounded-xl flex items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+                                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Başarısız</span>
+                                <div id="stat-failed-reports" class="text-lg font-extrabold text-rose-400 font-mono">0</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-4 rounded-xl flex items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                                <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Başarı Oranı</span>
+                                <div id="stat-rate-reports" class="text-lg font-extrabold text-amber-400 font-mono">%0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtreleme, Arama ve Toplu Silme Barı -->
+                    <div class="bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-3 rounded-xl flex flex-col sm:flex-row items-center gap-3">
+                        <div class="relative flex-1 w-full">
+                            <i data-lucide="search" class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                            <input type="text" id="report-search-input" placeholder="Senaryo adına göre arayın..." class="w-full bg-[#09090b] border border-[rgba(255,255,255,0.06)] pl-9 pr-3 py-2 rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                        </div>
+                        <div class="w-full sm:w-44 shrink-0">
+                            <select id="report-filter-status" class="w-full bg-[#09090b] border border-[rgba(255,255,255,0.06)] px-3 py-2 rounded-lg text-xs text-white outline-none cursor-pointer focus:border-[#3b82f6] transition">
+                                <option value="ALL">Tüm Durumlar</option>
+                                <option value="SUCCESS">Sadece Başarılı</option>
+                                <option value="FAILED">Sadece Başarısız</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
+                            <button id="select-all-reports-btn" type="button" class="bg-[#09090b] hover:bg-[#27272a] text-zinc-300 border border-[rgba(255,255,255,0.08)] text-xs px-3 py-2 rounded-lg transition flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" id="select-all-reports-checkbox" class="w-3.5 h-3.5 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0 pointer-events-none">
+                                <span>Tümünü Seç</span>
+                            </button>
+                            <button id="delete-selected-reports-btn" type="button" disabled class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs px-3 py-2 rounded-lg transition flex items-center gap-1.5 opacity-50 cursor-not-allowed">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                <span>Seçilenleri Sil (<span id="selected-reports-count">0</span>)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="reports-container" class="space-y-3">
+                        <div id="reports-empty" class="text-xs text-zinc-500 font-medium py-12 text-center bg-[#09090b] border border-[rgba(255,255,255,0.08)] rounded-xl">
+                            Bu kriterlere uygun test raporu bulunamadı.
+                        </div>
+                        
+                        <div id="reports-list-accordion" class="space-y-3"></div>
+                    </div>
+                </div>
+
+                <!-- 4. AYARLAR VİEW -->
+                <div id="view-settings" class="view-content space-y-6 hidden animate-fade-in w-full">
+                    <div>
+                        <h2 class="text-xl font-bold tracking-tight text-white">Sistem Ayarları</h2>
+                        <p class="text-xs text-zinc-500 mt-0.5">Yapay zeka sağlayıcılarını ve bunlara ait anahtar/model ikililerini dinamik yönetin</p>
+                    </div>
+
+                    <form id="settings-form" class="space-y-6 w-full bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl">
+                        
+                        <div class="space-y-3">
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider border-b border-[rgba(255,255,255,0.06)] pb-2 flex items-center gap-1.5 text-amber-400">
+                                <i data-lucide="play-circle" class="w-4 h-4"></i> Test Senaryosu Çalıştırma (Stagehand)
+                            </h3>
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Aktif Test Sağlayıcısı</label>
+                                <select id="setting-test-runner-api" class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-lg outline-none focus:border-[#3b82f6] transition font-medium cursor-pointer">
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 pt-2">
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider border-b border-[rgba(255,255,255,0.06)] pb-2 flex items-center gap-1.5 text-[#3b82f6]">
+                                <i data-lucide="languages" class="w-4 h-4"></i> Senaryo Çevirisi (Türkçe ➡️ JSON)
+                            </h3>
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Aktif Çeviri Sağlayıcısı</label>
+                                <select id="setting-translator-api" class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-lg outline-none focus:border-[#3b82f6] transition font-medium cursor-pointer">
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 pt-2">
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider border-b border-[rgba(255,255,255,0.06)] pb-2 flex items-center justify-between">
+                                <span class="flex items-center gap-1.5 text-zinc-300">
+                                    <i data-lucide="key-round" class="w-4 h-4"></i> Sağlayıcı Tanımlamaları (Key & Model)
+                                </span>
+                                <button type="button" id="add-api-key-btn" class="text-[10px] text-[#3b82f6] hover:text-blue-400 font-semibold transition flex items-center gap-1">
+                                    <i data-lucide="plus" class="w-3.5 h-3.5"></i> Yeni Sağlayıcı Ekle
+                                </button>
+                            </h3>
+                            
+                            <div id="api-keys-container" class="space-y-3 overflow-y-auto pr-1">
+                            </div>
+                        </div>
+
+                        <div class="border-t border-[rgba(255,255,255,0.06)] pt-4 flex justify-end">
+                            <button type="submit" id="save-settings-btn" class="px-5 py-2.5 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold border border-blue-600 transition shadow-sm flex items-center gap-1.5">
+                                <i data-lucide="save" class="w-4 h-4"></i> Ayarları Kaydet
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 5. KULLANICI YÖNETİMİ VİEW -->
+                <div id="view-users" class="view-content space-y-6 hidden w-full">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-xl font-bold tracking-tight text-white">Kullanıcı Yönetimi</h2>
+                            <p class="text-xs text-zinc-500 mt-0.5">Sistem kullanıcılarını ve proje yetkilerini yönetin</p>
+                        </div>
+                        <button id="open-new-user-modal-btn" class="bg-[#3b82f6] hover:bg-blue-500 text-white text-xs font-medium px-4 py-2 rounded-lg transition border border-blue-600 flex items-center gap-1.5 shadow-sm">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i> Yeni Kullanıcı
+                        </button>
+                    </div>
+
+                    <div class="bg-[#09090b] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden min-h-[200px] flex flex-col justify-center items-center p-8">
+                        <div id="users-empty" class="text-xs text-zinc-500 font-medium hidden">Sistemde kayıtlı kullanıcı bulunmuyor.</div>
+                        <table id="users-table" class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-[rgba(255,255,255,0.06)] text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                                    <th class="py-3 px-4">Kullanıcı Adı</th>
+                                    <th class="py-3 px-4">Rol</th>
+                                    <th class="py-3 px-4">Atanmış Projeler</th>
+                                    <th class="py-3 px-4 text-right">İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-list" class="text-xs text-zinc-300 divide-y divide-[rgba(255,255,255,0.04)]"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Kullanıcı Ekle/Düzenle Modal -->
+                <div id="user-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div class="w-full max-w-md bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl">
+                        <form id="user-form" class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 id="user-modal-title" class="text-sm font-semibold text-white">Kullanıcı İşlemi</h3>
+                                <button type="button" id="close-user-modal" class="text-zinc-500 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Kullanıcı Adı</label>
+                                <input type="text" id="new-user-username" required class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Şifre <span id="password-hint" class="text-[9px] text-zinc-500 lowercase hidden">(Değiştirmek istemiyorsanız boş bırakın)</span></label>
+                                <input type="password" id="new-user-password" class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Rolü</label>
+                                <select id="new-user-role" required class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-lg outline-none cursor-pointer">
+                                    <option value="PM">PM (Proje Yöneticisi)</option>
+                                    <option value="ADMIN">ADMIN (Tam Yetkili)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Çalışabileceği Projeler</label>
+                                <div id="user-projects-checkboxes" class="space-y-1.5 max-h-[120px] overflow-y-auto bg-[#27272a]/40 p-3 rounded-lg border border-[rgba(255,255,255,0.04)]"></div>
+                            </div>
+                            
+                            <button type="submit" id="user-modal-submit-btn" class="w-full py-2 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition">
+                                Kaydet
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!--  Proje Oluşturma & Düzenleme Modalı (Özel Hata Kalıpları Eklendi) -->
+    <div id="project-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div class="w-full max-w-md bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-3">
+                <h3 id="project-modal-title" class="text-sm font-semibold text-white">Yeni Proje Oluştur</h3>
+                <button id="close-project-modal" class="text-zinc-500 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Proje Adı</label>
+                    <input type="text" id="new-project-name" placeholder="Örn: Auth Service" 
+                           class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                </div>
+
+                <!--  Proje Bazlı Özel Hata Kalıpları -->
+                <div>
+                    <label class="block text-[10px] font-medium text-amber-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>Proje Hata & Engelleme Kalıpları</span>
+                        <span class="text-[9px] text-zinc-500 font-normal lowercase">(Her satıra bir kalıp)</span>
+                    </label>
+                    <textarea id="project-error-keywords" rows="4" placeholder="Yetkisiz erişim&#10;Access Denied&#10;Hatalı parametre girişi&#10;WAF-403" 
+                              class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-zinc-200 outline-none focus:border-amber-400 transition font-mono"></textarea>
+                    <p class="text-[10px] text-zinc-500 mt-1">Siber güvenlik ve UI testlerinde sistemin bu kalıpları hata/engelleme olarak tanımasını sağlar.</p>
+                </div>
+
+                <button id="save-project-btn" class="w-full py-2.5 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold tracking-wide transition">
+                    Projeyi Kaydet
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Senaryo Oluşturma / Düzenleme Modal -->
+    <div id="scenario-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+        <div class="w-full max-w-2xl bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl space-y-6 my-8">
+            <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-4">
+                <h3 id="scenario-modal-title" class="text-sm font-semibold text-white flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-[#3b82f6]"></i> Yeni Senaryo Oluştur (<span class="current-project-label"></span>)
+                </h3>
+                <button id="close-scenario-modal" class="text-zinc-500 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <form id="scenario-form" class="space-y-5">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Senaryo Adı</label>
+                        <input type="text" id="new-scenario-name" required placeholder="Örn: obs1" 
+                               class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1.5">Hedef URL</label>
+                        <input type="url" id="new-scenario-url" required placeholder="https://obs.dpu.edu.tr/" 
+                               class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
+                    </div>
+
+                    <!-- Siber Güvenlik Beklenen Sonuç Seçimi -->
+                    <div id="expected-outcome-container" class="col-span-2 hidden bg-[#27272a]/30 p-3 rounded-lg border border-amber-500/20">
+                        <label class="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Siber Güvenlik Testi: Beklenen Sonuç Mantığı
+                        </label>
+                        <select id="new-scenario-expected-outcome" class="w-full p-2 bg-[#18181b] border border-[rgba(255,255,255,0.08)] text-xs text-white rounded-lg outline-none focus:border-amber-400 transition">
+                            <option value="SUCCESS_EXPECTED">Hatasız Geçiş Bekleniyor (Başarılı erişim/istek testi)</option>
+                            <option value="ERROR_EXPECTED">Engelleme / Hata Bekleniyor (Yetkisiz erişim, WAF engeli veya zafiyet koruması)</option>
+                        </select>
+                        <div id="expected-error-text-container" class="hidden mt-2">
+                            <label for="new-scenario-expected-error" class="block text-xs text-amber-400 mb-2">Hedefte görünmesi gereken engelleme mesajı</label>
+                            <input id="new-scenario-expected-error" type="text" minlength="3" maxlength="500" placeholder="Örn: Bu işlem için yetkiniz bulunmuyor" class="w-full p-2.5 bg-[#18181b] text-xs text-white rounded-lg border border-amber-500/20 outline-none">
+                            <p class="text-[10px] text-zinc-400 mt-2">Başarı için bu mesajın hedef sayfada doğrulanması gerekir. Bağlantı ve motor hataları başarı sayılmaz.</p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="space-y-3">
+                    <label class="block text-[10px] font-medium text-[#71717a] uppercase tracking-wider mb-1">Türkçe Test Adım Basamakları</label>
+                    <div id="steps-container" class="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                        <div class="flex items-center gap-3 bg-[#27272a]/40 p-2.5 rounded-lg border border-[rgba(255,255,255,0.04)] animate-slide-in">
+                            <span class="step-number text-[10px] font-mono text-zinc-500 w-5 text-center">01.</span>
+                            <input type="text" required placeholder="Örn: Akademisyen Girişi isimli butona tıkla" 
+                                   class="step-input flex-1 bg-transparent text-xs text-white outline-none">
+                            <button type="button" class="remove-step-btn text-zinc-600 hover:text-red-400 transition opacity-0 pointer-events-none"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                    <button type="button" id="add-step-field-btn" class="text-[11px] text-[#3b82f6] hover:text-blue-400 font-medium transition flex items-center gap-1 pt-1">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Yeni Adım Ekle
+                    </button>
+                        <button type="button" id="open-import-scenario-btn" class="text-[11px] text-[#3b82f6] hover:text-blue-400 font-medium transition flex items-center gap-1 pt-1" aria-haspopup="dialog">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i> İçe Aktar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 border-t border-[rgba(255,255,255,0.06)] pt-4">
+                    <button type="button" id="cancel-scenario-btn" class="px-4 py-2 bg-transparent hover:bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-zinc-400 hover:text-white rounded-lg text-xs font-medium transition">İptal</button>
+                    <button type="submit" id="save-scenario-submit-btn" class="px-4 py-2 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-medium border border-blue-600 transition shadow-sm flex items-center gap-1.5">
+                        <span id="save-scenario-submit-btn-label">Kaydet ve Çevir</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="import-scenario-modal" role="dialog" aria-modal="true" aria-labelledby="import-scenario-title" class="hidden fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div class="w-full max-w-md bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl shadow-2xl space-y-5">
+            <div class="flex items-center justify-between">
+                <h3 id="import-scenario-title" class="text-sm font-semibold text-white">Senaryo İçe Aktar</h3>
+                <button type="button" id="close-import-scenario-modal" class="text-zinc-400 hover:text-white" aria-label="Pencereyi kapat"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div>
+                <label for="import-scenario-dropdown" class="block text-xs text-zinc-400 mb-2">Senaryo seç</label>
+                <select id="import-scenario-dropdown" class="w-full bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-xs text-white p-2.5 rounded-lg outline-none focus:border-[#3b82f6]">
+                    <option value="" disabled selected>İçe aktarılacak senaryoyu seçin...</option>
+                </select>
+                <p id="import-scenario-status" class="text-xs text-zinc-400 mt-2" role="status"></p>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" id="cancel-import-scenario-btn" class="px-4 py-2 text-xs text-zinc-400 hover:text-white">İptal</button>
+                <button type="button" id="import-scenario-steps-btn" class="bg-[#3b82f6] hover:bg-blue-500 text-white text-xs px-4 py-2.5 rounded-lg font-medium">İçe Aktar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script dosyası -->
+    <script src="js/lib/utils.js"></script>
+    <script src="js/lib/notify.js"></script>
+    <script src="js/lib/api.js"></script>
+    <script src="js/app.js"></script>
+
+    <!-- Rapor Detay Pop-Up Modalı -->
+    <div id="report-detail-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto animate-fade-in">
+        <div class="w-full max-w-4xl bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl shadow-2xl space-y-6 my-8">
+            
+            <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-4">
+                <div class="flex items-center gap-3">
+                    <div id="modal-report-status-icon" class="w-9 h-9 rounded-xl flex items-center justify-center">
+                        <i data-lucide="file-text" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 id="modal-report-title" class="text-base font-bold text-white flex items-center gap-2">
+                            Rapor Detayı
+                        </h3>
+                        <p id="modal-report-date" class="text-xs text-zinc-400 font-mono mt-0.5">-</p>
+                    </div>
+                </div>
+                <button id="close-report-modal-btn" class="text-zinc-400 hover:text-white transition p-1.5 rounded-lg hover:bg-zinc-800">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div id="modal-report-error-card" class="hidden bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 text-rose-400">
+                <div class="flex items-center gap-2 mb-1.5">
+                    <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400 shrink-0"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider">Hata Detayı</span>
+                </div>
+                <pre id="modal-report-error-text" class="text-xs font-mono whitespace-pre-wrap leading-relaxed select-text font-semibold"></pre>
+            </div>
+
+            <div class="space-y-3">
+                <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-2">
+                    <span class="text-xs uppercase font-bold tracking-wider text-zinc-400 flex items-center gap-1.5">
+                        <i data-lucide="list-checks" class="w-4 h-4 text-[#3b82f6]"></i> Test Senaryo Adımları ve Log Karşılıkları
+                    </span>
+                    <span id="modal-report-step-count" class="text-[11px] font-mono text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded-md">0 Adım</span>
+                </div>
+                
+                <div id="modal-report-steps-container" class="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between border-t border-[rgba(255,255,255,0.06)] pt-4">
+                <button id="modal-copy-raw-log-btn" class="text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg transition flex items-center gap-1.5">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i> Tüm Ham Logu Kopyala
+                </button>
+                <button id="close-report-modal-footer-btn" class="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-medium transition">
+                    Kapat
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,49 @@
+{
+  "name": "test-tool",
+  "version": "1.0.0",
+  "description": "AI destekli Playwright test otomasyon platformu",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "build:css": "tailwindcss -i styles/tailwind.css -o public/css/app.css --minify",
+    "watch:css": "tailwindcss -i styles/tailwind.css -o public/css/app.css --watch",
+    "test": "node --test \"unit-tests/**/*.test.js\"",
+    "test:ai-local": "playwright test tests/ai-security.spec.ts",
+    "test:ui": "node --test security-tests/ui-actions.test.js",
+    "test:runner": "node --test security-tests/runner-flow.test.js",
+    "test:network": "node --test security-tests/browser-network.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "cross-env": "^10.1.0",
+    "lucide": "1.48.0",
+    "tailwindcss": "3.4.19"
+  },
+  "dependencies": {
+    "@browserbasehq/stagehand": "^3.6.0",
+    "@google/generative-ai": "^0.24.1",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "node-fetch": "^3.3.2",
+    "openai": "^6.47.0",
+    "playwright-core": "^1.61.1",
+    "zod": "^4.4.3",
+    "@playwright/test": "^1.61.1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "overrides": {
+    "undici": "6.28.1",
+    "@fastify/busboy": "3.2.2"
+  }
+}

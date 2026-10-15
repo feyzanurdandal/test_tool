@@ -1,3 +1,4 @@
+import { executeFormAction } from '../utils/formActions.js';
 // // tests/ai-security.spec.ts
 // import { test, expect } from '@playwright/test';
 // import { Stagehand } from '@browserbasehq/stagehand';
@@ -538,7 +539,9 @@ test('Yapay Zeka Test Otomasyonu', async () => {
             try {
                 // tests/ai-security.spec.ts - Dinamik ve Kırılmaz Act Bloğu
 
-if (step.type === 'act') {
+if (step.type === 'form') {
+    await executeFormAction(stagehand, pwPage, step.form);
+} else if (step.type === 'act') {
     let actSuccess = false;
 
     try {
