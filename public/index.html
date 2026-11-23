@@ -9,6 +9,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- İkonlar sabit sürümle yerelden sunulur (lucide 1.48.0) -->
     <script src="vendor/lucide.min.js"></script>
+    <link rel="stylesheet" href="css/browser-panel.css">
+    <link rel="stylesheet" href="css/jobs-panel.css">
 </head>
 <body class="bg-[#09090b] text-[#fafafa] min-h-screen flex flex-col antialiased select-none">
 
@@ -273,6 +275,7 @@
                                 <option value="ALL">Tüm Durumlar</option>
                                 <option value="SUCCESS">Sadece Başarılı</option>
                                 <option value="FAILED">Sadece Başarısız</option>
+                                <option value="UNKNOWN">Belirsiz / Değerlendiriliyor</option>
                             </select>
                         </div>
                         <div class="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
@@ -344,6 +347,32 @@
                         <div class="border-t border-[rgba(255,255,255,0.06)] pt-4 flex justify-end">
                             <button type="submit" id="save-settings-btn" class="px-5 py-2.5 bg-[#3b82f6] hover:bg-blue-500 text-white rounded-lg text-xs font-semibold border border-blue-600 transition shadow-sm flex items-center gap-1.5">
                                 <i data-lucide="save" class="w-4 h-4"></i> Ayarları Kaydet
+                            </button>
+                        </div>
+                    </form>
+
+                    <form id="allowed-hosts-form" class="space-y-4 w-full bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-xl shadow-2xl mt-6">
+                        <div class="space-y-1">
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider border-b border-[rgba(255,255,255,0.06)] pb-2 flex items-center gap-1.5 text-emerald-400">
+                                <i data-lucide="shield-check" class="w-4 h-4"></i> Test İzinli Adresler
+                            </h3>
+                            <p class="text-[11px] text-zinc-500 leading-relaxed">
+                                Testlerin ve senaryoların hedefleyebileceği adresler. <strong class="text-zinc-300">Bu listede olmayan adresler kabul edilmez</strong>
+                                (senaryo kaydı, test çalıştırma, tarayıcıdan kayıt ve sayfa yönlendirmeleri dahil). Liste boşsa hiçbir test çalıştırılamaz.
+                                Her satıra bir adres yazın: <code class="text-amber-400">ornek.dpu.edu.tr</code>, tüm alt alan adları için
+                                <code class="text-amber-400">*.dpu.edu.tr</code>, özel port için <code class="text-amber-400">test.dpu.edu.tr:8443</code>;
+                                iç ağ (özel IP) adresleri için satır sonuna <code class="text-amber-400">iç-ağ</code> ekleyin. Tam URL yapıştırırsanız yalnızca alan adı alınır.
+                                <span id="allowed-hosts-env-note"></span>
+                            </p>
+                        </div>
+                        <textarea id="allowed-hosts-input" rows="8" spellcheck="false" autocomplete="off"
+                                  class="w-full p-3 bg-[#27272a] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-lg outline-none focus:border-[#3b82f6] transition font-mono"
+                                  placeholder="*.dpu.edu.tr&#10;test.ornek.com&#10;intranet.dpu.edu.tr iç-ağ"></textarea>
+                        <div id="allowed-hosts-errors" class="text-[11px] text-rose-400 whitespace-pre-line"></div>
+                        <div class="flex items-center justify-between">
+                            <span id="allowed-hosts-count" class="text-[11px] text-zinc-500"></span>
+                            <button type="submit" id="save-allowed-hosts-btn" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold border border-emerald-700 transition shadow-sm flex items-center gap-1.5">
+                                <i data-lucide="save" class="w-4 h-4"></i> Adres Listesini Kaydet
                             </button>
                         </div>
                     </form>
@@ -544,14 +573,16 @@
     <script src="js/lib/utils.js"></script>
     <script src="js/lib/notify.js"></script>
     <script src="js/lib/api.js"></script>
+    <script src="js/lib/jobs-panel.js"></script>
+    <script src="js/browser-panel.js"></script>
     <script src="js/test-data-editor.js"></script>
     <script src="js/app.js"></script>
 
     <!-- Rapor Detay Pop-Up Modalı -->
-    <div id="report-detail-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto animate-fade-in">
-        <div class="w-full max-w-4xl bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl shadow-2xl space-y-6 my-8">
+    <div id="report-detail-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-hidden animate-fade-in">
+        <div class="w-full max-w-4xl max-h-full flex flex-col gap-4 bg-[#18181b] border border-[rgba(255,255,255,0.08)] p-6 rounded-2xl shadow-2xl">
             
-            <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-4">
+            <div class="shrink-0 flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-4">
                 <div class="flex items-center gap-3">
                     <div id="modal-report-status-icon" class="w-9 h-9 rounded-xl flex items-center justify-center">
                         <i data-lucide="file-text" class="w-5 h-5"></i>
@@ -561,6 +592,7 @@
                             Rapor Detayı
                         </h3>
                         <p id="modal-report-date" class="text-xs text-zinc-400 font-mono mt-0.5">-</p>
+                        <div id="modal-report-chips" class="flex flex-wrap gap-1.5 mt-1.5"></div>
                     </div>
                 </div>
                 <button id="close-report-modal-btn" class="text-zinc-400 hover:text-white transition p-1.5 rounded-lg hover:bg-zinc-800">
@@ -568,7 +600,24 @@
                 </button>
             </div>
 
-            <div id="modal-report-error-card" class="hidden bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 text-rose-400">
+            <div id="modal-report-ai-card" class="hidden shrink-0 max-h-60 overflow-y-auto bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 text-indigo-200">
+                <div class="flex items-center justify-between gap-2 mb-1.5">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-indigo-300 shrink-0"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider">Yapay Zeka Yorumu</span>
+                        <span class="text-[10px] text-zinc-400">(doğrulanmamış)</span>
+                    </div>
+                    <span id="modal-report-ai-chip" class="hidden text-[10px] px-2 py-0.5 rounded border font-bold uppercase"></span>
+                </div>
+                <p id="modal-report-ai-summary" class="text-xs leading-relaxed select-text"></p>
+                <p id="modal-report-ai-step" class="hidden text-xs leading-relaxed select-text mt-2"></p>
+                <pre id="modal-report-ai-msg" class="hidden text-[11px] font-mono whitespace-pre-wrap leading-relaxed select-text mt-2 p-2 rounded-lg bg-black/30 border border-indigo-500/20 text-indigo-100 max-h-24 overflow-y-auto"></pre>
+                <p id="modal-report-ai-cause" class="hidden text-xs leading-relaxed select-text mt-2 text-zinc-300"></p>
+                <ul id="modal-report-ai-tips" class="hidden list-disc pl-5 mt-2 text-xs leading-relaxed select-text text-zinc-300 space-y-0.5"></ul>
+                <p class="text-[10px] text-zinc-500 mt-2">Bu yorum otomatik üretilir. Adım durumunu değiştirmez; UI testlerinde senaryo sonucu bu değerlendirmeye göre belirlenir, güvenlik testlerinde yalnızca tavsiyedir.</p>
+            </div>
+
+            <div id="modal-report-error-card" class="hidden shrink-0 max-h-32 overflow-y-auto bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 text-rose-400">
                 <div class="flex items-center gap-2 mb-1.5">
                     <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400 shrink-0"></i>
                     <span class="text-xs font-bold uppercase tracking-wider">Hata Detayı</span>
@@ -576,19 +625,19 @@
                 <pre id="modal-report-error-text" class="text-xs font-mono whitespace-pre-wrap leading-relaxed select-text font-semibold"></pre>
             </div>
 
-            <div class="space-y-3">
-                <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-2">
+            <div class="flex flex-col gap-3 flex-1 min-h-0">
+                <div class="shrink-0 flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-2">
                     <span class="text-xs uppercase font-bold tracking-wider text-zinc-400 flex items-center gap-1.5">
                         <i data-lucide="list-checks" class="w-4 h-4 text-[#3b82f6]"></i> Test Senaryo Adımları ve Log Karşılıkları
                     </span>
                     <span id="modal-report-step-count" class="text-[11px] font-mono text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded-md">0 Adım</span>
                 </div>
                 
-                <div id="modal-report-steps-container" class="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                <div id="modal-report-steps-container" class="space-y-2.5 flex-1 min-h-0 overflow-y-auto pr-1">
                 </div>
             </div>
 
-            <div class="flex items-center justify-between border-t border-[rgba(255,255,255,0.06)] pt-4">
+            <div class="shrink-0 flex items-center justify-between border-t border-[rgba(255,255,255,0.06)] pt-4">
                 <button id="modal-copy-raw-log-btn" class="text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg transition flex items-center gap-1.5">
                     <i data-lucide="copy" class="w-3.5 h-3.5"></i> Tüm Ham Logu Kopyala
                 </button>

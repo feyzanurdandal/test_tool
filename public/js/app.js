@@ -107,7 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (batchQueue.length === 0) return;
 
             const totalTests = batchQueue.length;
-            const confirmBatch = confirm(`Seçtiğiniz ${totalTests} senaryo (${currentTestType}) sırasıyla canlı olarak çalıştırılacak.`);
+            const confirmBatch = confirm(`Seçtiğiniz ${totalTests} senaryo (${currentTestType}) kuyruğa alınıp arka planda çalıştırılacak. Sayfayı kapatsanız da testler sürer; ilerlemeyi sol alttaki "Testlerim" kutusundan izleyebilir, istersen sıradakileri oradan iptal edebilirsiniz.`);
             if (!confirmBatch) return;
 
             startBatchBtn.disabled = true;
@@ -460,7 +460,54 @@ document.addEventListener("DOMContentLoaded", () => {
     // ─── RAPOR YÖNETİMİ ───
     let cachedReportsData = [];
 
+    // Adım listesi: Stagehand'in iç "instruction:" satırlarından DEĞİL, test adımı başlıklarından ("Current test step: ...") ve
+    // araç satırlarından ([ÇÖZÜM] adım N) üretilir. Aynı adımın yeniden denemeleri tek adımda toplanır.
+    // Bu işaretler yoksa (eski raporlar) eski ayrıştırıcıya düşülür.
     function parseLogsToSteps(logContent) {
+        if (!logContent) return [];
+        if (!/Current test step:|\[ÇÖZÜM\] adım \d+/.test(logContent)) return parseLogsToStepsLegacy(logContent);
+
+        const steps = [];
+        const prelude = { title: 'Başlatma ve Hazırlık', status: 'PASSED', logs: [], info: true };
+        let cur = null;
+        const start = (title) => { cur = { title, status: 'PASSED', logs: [], resolved: false }; steps.push(cur); return cur; };
+
+        for (const line of logContent.split('\n')) {
+            const t = line.trim();
+            if (!t || t.startsWith('AI SDK Warning:')) continue;
+
+            const instr = /instruction:\s*"Current test step:\s*(.*?)(?:\\n|"$)/.exec(t);
+            if (instr) {
+                const title = instr[1].replace(/\\"/g, '"').trim();
+                if (!cur || cur.resolved || cur.title !== title) start(title);
+            }
+
+            const resolved = /^\[ÇÖZÜM\] adım (\d+):/.exec(t);
+            if (resolved) {
+                if (!cur || cur.resolved) start(`Adım ${resolved[1]}`);
+                cur.resolved = true;
+            }
+
+            const extracted = /\[BAŞARIYLA AYIKLANDI\]\s*(.*)$/.exec(t);
+            if (extracted) {
+                start(`Veri çekme: ${extracted[1].replace(/\s*->\s*/, ' → ')}`);
+                cur.resolved = true;
+            }
+
+            if (t.includes('CRITICAL_STEP_FAILED') || t.startsWith('🛑') || t.includes('CRITICAL_POPUP_ERROR') || t.includes('❌ [HATA TESPİT EDİLDİ]')) {
+                if (!cur) start('Test Başarısız Oldu');
+                // başarısız adımın başlığı günlüğe hiç düşmediyse (önceki adım çözülmüş görünüyorsa) başlığı hata satırından al
+                const m = /CRITICAL_STEP_FAILED:\s*(.*?)\s*->\s*Detay:/.exec(t);
+                if (m && cur.resolved && cur.title !== m[1]) start(m[1]);
+                cur.status = 'FAILED';
+            }
+
+            (cur || prelude).logs.push(t);
+        }
+        return [...(prelude.logs.length ? [prelude] : []), ...steps].map(({ title, status, logs, info }) => ({ title, status, logs, ...(info ? { info } : {}) }));
+    }
+
+    function parseLogsToStepsLegacy(logContent) {
         if (!logContent) return [];
 
         const lines = logContent.split('\n');
@@ -582,6 +629,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 cachedReportsData = result.reports;
                 updateReportStats(cachedReportsData);
                 applyReportFilters();
+                // Yapay zeka değerlendirmesi süren raporlar varsa liste birkaç saniyede bir yenilenir (en çok ~90 sn; liste görünürse)
+                clearTimeout(loadReports.pollTimer);
+                if (cachedReportsData.some(r => r.senaryo_sonucu === "degerlendiriliyor") && (loadReports.pollTries = (loadReports.pollTries || 0) + 1) <= 15 && accordionContainer.offsetParent !== null) {
+                    loadReports.pollTimer = setTimeout(loadReports, 6000);
+                } else if (!cachedReportsData.some(r => r.senaryo_sonucu === "degerlendiriliyor")) {
+                    loadReports.pollTries = 0;
+                }
             } else {
                 cachedReportsData = [];
                 updateReportStats([]);
@@ -595,6 +649,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // Rapor iki sonuç taşır: ADIM DURUMU (status: adımlar teknik olarak sorunsuz çalıştı mı) ve SENARYO SONUCU (amaca ulaşıldı mı:
+    // adım hatası → başarısız, güvenlik testi → beklenen sonuç mantığı, UI testi → yapay zeka değerlendirmesi). Yorum yoksa (eski rapor) adım durumu geçerlidir.
+    const SCENARIO_UI = {
+        basarili: { label: "Başarılı", icon: "check-circle", chip: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", box: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
+        basarisiz: { label: "Başarısız", icon: "alert-triangle", chip: "bg-rose-500/10 text-rose-400 border-rose-500/20", box: "bg-rose-500/10 text-rose-400 border-rose-500/20" },
+        belirsiz: { label: "Belirsiz", icon: "help-circle", chip: "bg-zinc-500/10 text-zinc-300 border-zinc-500/30", box: "bg-zinc-500/10 text-zinc-300 border-zinc-500/30" },
+        degerlendiriliyor: { label: "Değerlendiriliyor…", icon: "loader", chip: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20", box: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20" },
+    };
+    const isStepOk = (r) => ["SUCCESS", "PASSED"].includes(String(r.status || "").toUpperCase());
+    const effectiveResult = (r) => r.senaryo_sonucu || (isStepOk(r) ? "basarili" : "basarisiz");
+
     function updateReportStats(reports) {
         const totalEl = document.getElementById("stat-total-reports");
         const passedEl = document.getElementById("stat-passed-reports");
@@ -604,9 +669,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!totalEl || !passedEl || !failedEl || !rateEl) return;
 
         const total = reports.length;
-        const passed = reports.filter(r => String(r.status || '').toUpperCase() === 'SUCCESS' || String(r.status || '').toUpperCase() === 'PASSED').length;
-        const failed = total - passed;
-        const rate = total > 0 ? Math.round((passed / total) * 100) : 0;
+        const passed = reports.filter(r => effectiveResult(r) === 'basarili').length;
+        const failed = reports.filter(r => effectiveResult(r) === 'basarisiz').length;
+        const decided = passed + failed;   // belirsiz / değerlendiriliyor olanlar oranı bozmaz
+        const rate = decided > 0 ? Math.round((passed / decided) * 100) : 0;
 
         totalEl.textContent = total;
         passedEl.textContent = passed;
@@ -625,9 +691,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (statusFilter !== "ALL") {
             filtered = filtered.filter(r => {
-                const st = String(r.status || '').toUpperCase();
-                if (statusFilter === "SUCCESS") return st === "SUCCESS" || st === "PASSED";
-                if (statusFilter === "FAILED") return st !== "SUCCESS" && st !== "PASSED";
+                const res = effectiveResult(r);
+                if (statusFilter === "SUCCESS") return res === "basarili";
+                if (statusFilter === "FAILED") return res === "basarisiz";
+                if (statusFilter === "UNKNOWN") return res === "belirsiz" || res === "degerlendiriliyor";
                 return true;
             });
         }
@@ -658,10 +725,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         reports.forEach((report) => {
             try {
-                const reportStatus = String(report.status || '').toUpperCase();
-                const isSuccess = reportStatus === "SUCCESS" || reportStatus === "PASSED";
+                const isSuccess = isStepOk(report);                 // ADIM DURUMU
+                const result = effectiveResult(report);              // SENARYO SONUCU
+                const resUi = SCENARIO_UI[result] || SCENARIO_UI.belirsiz;
                 const scenarioName = report.scenario_name || "Bilinmeyen Senaryo";
-                const logContent = typeof report.log_content === 'string' ? report.log_content : "Log kaydı bulunmuyor.";
+                // Liste log içermez (büyük olabilir); log, rapor açılınca /reports/detail ile alınır.
+                const hasInlineLog = typeof report.log_content === 'string';
+                const logContent = hasInlineLog ? report.log_content : null;
 
                 let formattedDate = "Tarih Bilgisi Yok";
                 if (report.created_at) {
@@ -674,7 +744,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     } catch (e) { formattedDate = String(report.created_at); }
                 }
 
-                const parsedSteps = parseLogsToSteps(logContent);
+                const parsedSteps = hasInlineLog ? parseLogsToSteps(logContent) : [];
 
                 const card = document.createElement("div");
                 card.className = "bg-[#18181b] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)] rounded-xl overflow-hidden transition-all duration-200 cursor-pointer select-none group";
@@ -683,18 +753,21 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="flex items-center justify-between p-4">
                         <div class="flex items-center gap-3">
                             <input type="checkbox" value="${escapeHtml(report.id)}" aria-label="Raporu seç" class="js-stop-propagation report-checkbox w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0 cursor-pointer">
-                            <div class="w-9 h-9 rounded-lg flex items-center justify-center ${isSuccess ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
-                                <i data-lucide="${isSuccess ? 'check-circle' : 'alert-triangle'}" class="w-4 h-4"></i>
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center border ${resUi.box}">
+                                <i data-lucide="${resUi.icon}" class="w-4 h-4"></i>
                             </div>
                             <div>
                                 <h4 class="text-xs font-semibold text-white group-hover:text-[#3b82f6] transition-colors">${escapeHtml(scenarioName)}</h4>
-                                <span class="text-[10px] text-zinc-500">${escapeHtml(formattedDate)} · ${parsedSteps.length} Adım</span>
+                                <span class="text-[10px] text-zinc-500">${escapeHtml(formattedDate)}${hasInlineLog ? ` · ${parsedSteps.length} Adım` : ''}</span>
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
-                            <span class="text-[10px] px-2.5 py-1 font-semibold rounded uppercase tracking-wider ${isSuccess ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
-                                ${isSuccess ? 'Başarılı' : 'Hata'}
+                            <span title="Adım durumu: adımlar teknik olarak sorunsuz çalıştı mı" class="text-[10px] px-2.5 py-1 font-semibold rounded uppercase tracking-wider border ${isSuccess ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}">
+                                Adımlar: ${isSuccess ? 'Tamamlandı' : 'Hata'}
                             </span>
+                            ${report.senaryo_sonucu ? `<span title="Senaryo sonucu: ${report.senaryo_kaynagi === 'yapay_zeka' ? 'yapay zeka değerlendirmesi' : (report.senaryo_kaynagi === 'beklenen_sonuc' ? 'beklenen sonuca göre' : 'adım hatası nedeniyle')}" class="text-[10px] px-2.5 py-1 font-semibold rounded uppercase tracking-wider border ${resUi.chip}">
+                                Senaryo: ${resUi.label}
+                            </span>` : ''}
                             <button class="js-stop-propagation delete-report-btn text-zinc-500 hover:text-red-400 transition p-1.5 rounded-lg hover:bg-red-500/10" data-id="${escapeHtml(report.id)}" aria-label="Raporu sil">
                                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                             </button>
@@ -706,8 +779,32 @@ document.addEventListener("DOMContentLoaded", () => {
                 `;
 
                 bindStopPropagation(card);
-                card.addEventListener("click", () => {
-                    openReportModal(scenarioName, formattedDate, isSuccess, logContent, parsedSteps);
+                card.addEventListener("click", async () => {
+                    if (hasInlineLog) {
+                        openReportModal(scenarioName, formattedDate, isSuccess, logContent, parsedSteps, { scenario: { sonuc: report.senaryo_sonucu, kaynak: report.senaryo_kaynagi } });
+                        return;
+                    }
+                    // Log bir kez önbelleğe alınır; yapay zeka yorumu hazır olana kadar her açılışta yeniden sorulur.
+                    const fetchDetail = async () => {
+                        const detailRes = await fetch(`/api/scenarios/reports/detail?id=${encodeURIComponent(report.id)}`);
+                        const detail = await detailRes.json();
+                        if (!detailRes.ok || !detail.success) throw new Error(detail.error || "Hata oluştu");
+                        report.__log = detail.report.log_content || "";
+                        report.__analysis = detail.report.analysis || null;
+                        report.__scenario = { sonuc: detail.report.senaryo_sonucu || null, kaynak: detail.report.senaryo_kaynagi || null };
+                        return report.__analysis;
+                    };
+                    if (report.__log === undefined || report.__analysis?.durum === 'bekliyor') {
+                        try {
+                            await fetchDetail();
+                        } catch (err) {
+                            console.error("Rapor detayı alınamadı:", err);
+                            notify(`Rapor yüklenemedi: ${err.message || "sunucu bağlantı hatası."}`);
+                            return;
+                        }
+                    }
+                    const fullLog = report.__log || "Log kaydı bulunmuyor.";
+                    openReportModal(scenarioName, formattedDate, isSuccess, fullLog, parseLogsToSteps(fullLog), { analysis: report.__analysis, refresh: fetchDetail, scenario: report.__scenario || { sonuc: report.senaryo_sonucu, kaynak: report.senaryo_kaynagi }, getScenario: () => report.__scenario });
                 });
 
                 const deleteReportBtn = card.querySelector(".delete-report-btn");
@@ -993,6 +1090,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function showDashboard(user) {
+        window.dispatchEvent(new Event("jobs-changed"));
         if (loginView) loginView.classList.add("hidden");
         if (appView) appView.classList.remove("hidden");
         if (userBadge) userBadge.textContent = `${user.username.toUpperCase()} (${user.role})`;
@@ -1021,6 +1119,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function showLogin() {
+        if (window.JobsPanel) window.JobsPanel.stop();
         localStorage.removeItem("test_user");
         if (appView) appView.classList.add("hidden");
         if (loginView) loginView.classList.remove("hidden");
@@ -1541,7 +1640,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function getGroupSteps(groupEl) {
         return Array.from(groupEl.querySelectorAll(".step-input"))
-            .map(el => el.closest("[data-form-key]") ? `[[FORM:${el.closest("[data-form-key]").dataset.formKey}]]` : el.value.trim())
+            .map(el => el.closest('[data-record-key]') ? `[[REC:${el.closest('[data-record-key]').dataset.recordKey}]]` : el.closest("[data-form-key]") ? `[[FORM:${el.closest("[data-form-key]").dataset.formKey}]]` : el.value.trim())
             .filter(t => t !== "");
     }
 
@@ -1559,7 +1658,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 stepCount += steps.length;
             } else {
                 const input = child.querySelector(".step-input");
-                const val = child.dataset.formKey ? `[[FORM:${child.dataset.formKey}]]` : (input ? input.value.trim() : "");
+                const val = child.dataset.recordKey ? `[[REC:${child.dataset.recordKey}]]` : child.dataset.formKey ? `[[FORM:${child.dataset.formKey}]]` : (input ? input.value.trim() : "");
                 if (val) { lines.push(val); stepCount++; }
             }
         });
@@ -1596,8 +1695,25 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    const testDataEditor = scenarioForm && window.TestDataEditor ? new window.TestDataEditor({form:scenarioForm, steps:stepsContainer, addRow:createStepRow, reindex:reindexSteps, notify}) : null;
+    const testDataEditor = scenarioForm && window.TestDataEditor ? new window.TestDataEditor({form:scenarioForm, steps:stepsContainer, addRow:createStepRow, reindex:reindexSteps, notify, getProject:()=>projectDropdown?.value||currentProject}) : null;
 
+    // Canlı izleme isteğe bağlı; sadece tekil koşularda açılır.
+    // Canlı izleme: tema ile uyumlu açma/kapama düğmesi (gizli checkbox + peer stilleri; id api.js tarafından okunur).
+    const liveLabel=document.createElement('label');
+    liveLabel.className='group relative inline-flex items-center gap-2 cursor-pointer select-none text-xs font-medium px-3 py-2 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#09090b] text-zinc-400 hover:text-white hover:border-[rgba(255,255,255,0.16)] transition has-[:checked]:border-emerald-500/40 has-[:checked]:bg-emerald-500/10 has-[:checked]:text-emerald-300 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500/50';
+    liveLabel.title='Çalıştırdığınız testi canlı izlemek için açın (salt okunur)';
+    const liveCheckbox=document.createElement('input');liveCheckbox.type='checkbox';liveCheckbox.id='live-test-watch';liveCheckbox.className='peer sr-only';
+    const liveText=document.createElement('span');liveText.textContent='Testi canlı izle';
+    const liveHint=document.createElement('span');liveHint.className='text-[10px] font-mono text-zinc-500 group-has-[:checked]:text-emerald-400/70';liveHint.textContent='';
+    const liveSwitch=document.createElement('span');liveSwitch.className='relative w-7 h-4 shrink-0 rounded-full bg-zinc-700 transition-colors peer-checked:bg-emerald-500';
+    const liveKnob=document.createElement('span');liveKnob.className='absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform group-has-[:checked]:translate-x-3';
+    liveSwitch.append(liveKnob);
+    liveLabel.append(liveCheckbox,liveSwitch,liveText,liveHint);
+    const newScenarioBtn=document.getElementById('open-new-scenario-btn');
+    if(newScenarioBtn){
+        const group=document.createElement('div');group.className='flex items-center gap-2';
+        newScenarioBtn.replaceWith(group);group.append(liveLabel,newScenarioBtn);
+    }
     if (scenarioForm) {
         scenarioForm.addEventListener("invalid", e => {
             const group = e.target.closest(".step-group");
@@ -1605,6 +1721,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }, true);
         scenarioForm.addEventListener("submit", async (e) => {
             e.preventDefault();
+            if(window.BrowserPanel?.active?.mode==='record')return notify('Önce tarayıcı kaydını bitirin veya iptal edin.');
 
             const scenarioNameInput = document.getElementById("new-scenario-name");
             const targetUrlInput = document.getElementById("new-scenario-url");
@@ -1732,8 +1849,66 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // ─── TEST İZİNLİ ADRESLER (yalnızca ADMIN düzenler) ───
+    const allowedHostsForm = document.getElementById("allowed-hosts-form");
+    const allowedHostsInput = document.getElementById("allowed-hosts-input");
+    const allowedHostsErrors = document.getElementById("allowed-hosts-errors");
+
+    async function loadAllowedHosts() {
+        if (!allowedHostsForm || !allowedHostsInput) return;
+        try {
+            const res = await fetch("/api/scenarios/settings/allowed-hosts");
+            const data = await res.json();
+            if (res.ok && data.success) {
+                allowedHostsInput.value = data.hosts || "";
+                const countEl = document.getElementById("allowed-hosts-count");
+                if (countEl) countEl.textContent = `${data.count} adres tanımlı · varsayılan portlar: ${data.defaultPorts}`;
+                const envNote = document.getElementById("allowed-hosts-env-note");
+                if (envNote) envNote.textContent = data.envEntries > 0 ? ` (Sunucu ortam değişkeninden gelen ${data.envEntries} ek adres de geçerlidir.)` : "";
+                if (allowedHostsErrors) allowedHostsErrors.textContent = "";
+            }
+        } catch (err) {
+            console.error("İzinli adresler yüklenemedi:", err);
+        }
+    }
+
+    if (allowedHostsForm) {
+        allowedHostsForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById("save-allowed-hosts-btn");
+            const originalHtml = btn ? btn.innerHTML : "";
+            if (btn) { btn.disabled = true; btn.innerHTML = `<span>Kaydediliyor...</span>`; }
+            if (allowedHostsErrors) allowedHostsErrors.textContent = "";
+            try {
+                const res = await fetch("/api/scenarios/settings/allowed-hosts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ hosts: allowedHostsInput.value })
+                });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    notify(`Başarılı: ${result.message}`);
+                    await loadAllowedHosts();
+                } else {
+                    if (allowedHostsErrors && Array.isArray(result.details) && result.details.length) {
+                        allowedHostsErrors.textContent = result.details
+                            .map(d => (d.line ? `Satır ${d.line}: ` : "") + d.message + (d.text ? ` → ${d.text}` : ""))
+                            .join("\n");
+                    }
+                    notify(`Adres listesi kaydedilemedi: ${result.error || "Hata oluştu"}`);
+                }
+            } catch (err) {
+                console.error("İzinli adresler kaydedilirken hata:", err);
+                notify("Sunucu bağlantı hatası!");
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; lucide.createIcons(); }
+            }
+        });
+    }
+
     async function loadSystemSettings() {
         if (!settingsForm) return;
+        loadAllowedHosts();
 
 
         try {
@@ -2012,8 +2187,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const isChecked = selectedList.includes(proj) ? "checked" : "";
             userProjectsCheckboxes.innerHTML += `
                 <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer hover:text-white transition mb-1">
-                    <input type="checkbox" value="${proj}" ${isChecked} class="user-proj-cb w-3.5 h-3.5 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0">
-                    <span>${proj}</span>
+                    <input type="checkbox" value="${escapeHtml(proj)}" ${isChecked} class="user-proj-cb w-3.5 h-3.5 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0">
+                    <span>${escapeHtml(proj)}</span>
                 </label>
             `;
         });
@@ -2179,7 +2354,82 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ─── RAPOR DETAY MODALINI AÇAN VE DOLDURAN FONKSİYON ───
-    function openReportModal(scenarioName, formattedDate, isSuccess, rawLogContent, parsedSteps) {
+    let aiPollTimer = null;
+    const AI_CHIPS = {
+        // Bu etiket yorumun kanıtla uyumunu anlatır (senaryo sonucundan ayrıdır; "Tutarlı + Senaryo başarısız" çelişkili görünmesin)
+        tutarli: ["Kanıtla uyumlu", "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"],
+        supheli: ["Kanıt yetersiz", "bg-amber-500/10 text-amber-300 border-amber-500/30"],
+        sorunlu: ["Kanıtla çelişkili", "bg-rose-500/10 text-rose-300 border-rose-500/30"],
+    };
+    const CONFIDENCE_TR = { dusuk: "düşük", orta: "orta", yuksek: "yüksek" };
+
+    // Yapay zeka yorum kartı: analysis yoksa gizli; bekliyorsa "hazırlanıyor" + yoklama; metinler yalnızca textContent ile yazılır.
+    function renderAiCard(analysis, refresh, token) {
+        const card = document.getElementById("modal-report-ai-card");
+        const chip = document.getElementById("modal-report-ai-chip");
+        const summary = document.getElementById("modal-report-ai-summary");
+        const cause = document.getElementById("modal-report-ai-cause");
+        const stepEl = document.getElementById("modal-report-ai-step");
+        const msgEl = document.getElementById("modal-report-ai-msg");
+        const tips = document.getElementById("modal-report-ai-tips");
+        if (!card) return;
+        clearTimeout(aiPollTimer);
+        chip.classList.add("hidden"); cause.classList.add("hidden"); tips.classList.add("hidden"); stepEl.classList.add("hidden"); msgEl.classList.add("hidden");
+        if (!analysis) { card.classList.add("hidden"); return; }
+        card.classList.remove("hidden");
+        if (analysis.durum === 'bekliyor') {
+            summary.textContent = "Yorum hazırlanıyor…";
+            if (refresh && token.tries++ < 30) {
+                aiPollTimer = setTimeout(async () => {
+                    if (token.closed) return;
+                    try { const a = await refresh(); if (!token.closed) renderAiCard(a, refresh, token); }
+                    catch { if (!token.closed) renderAiCard(analysis, refresh, token); }
+                }, 4000);
+            }
+            return;
+        }
+        if (analysis.durum !== 'hazir') { summary.textContent = "Yorum üretilemedi."; return; }
+        summary.textContent = analysis.ozet || "";
+        const chipInfo = AI_CHIPS[analysis.degerlendirme];
+        if (chipInfo) {
+            chip.textContent = chipInfo[0] + (analysis.guven ? ` · güven ${CONFIDENCE_TR[analysis.guven] || analysis.guven}` : "");
+            chip.className = `text-[10px] px-2 py-0.5 rounded border font-bold uppercase ${chipInfo[1]}`;
+        }
+        if (analysis.hataliAdim) { stepEl.textContent = `Hatalı adım: ${analysis.hataliAdim}`; stepEl.classList.remove("hidden"); }
+        if (analysis.sayfaMesaji) { msgEl.textContent = analysis.sayfaMesaji; msgEl.classList.remove("hidden"); }
+        if (analysis.neden) { cause.textContent = `Muhtemel neden: ${analysis.neden}`; cause.classList.remove("hidden"); }
+        tips.innerHTML = "";
+        (analysis.oneriler || []).forEach(t => { const li = document.createElement("li"); li.textContent = t; tips.appendChild(li); });
+        if (tips.children.length) tips.classList.remove("hidden");
+    }
+
+    // Rapor penceresi başlığı: ikon = SENARYO SONUCU (yoksa adım durumu); iki etiket: Adımlar ve Senaryo.
+    function renderReportHeader(isSuccess, scenario) {
+        const iconEl = document.getElementById("modal-report-status-icon");
+        const chips = document.getElementById("modal-report-chips");
+        const result = scenario?.sonuc || (isSuccess ? "basarili" : "basarisiz");
+        const ui = SCENARIO_UI[result] || SCENARIO_UI.belirsiz;
+        if (iconEl) {
+            iconEl.className = `w-9 h-9 rounded-xl flex items-center justify-center border ${ui.box}`;
+            iconEl.innerHTML = `<i data-lucide="${ui.icon}" class="w-5 h-5"></i>`;
+        }
+        if (chips) {
+            chips.innerHTML = "";
+            const mk = (text, cls) => { const c = document.createElement("span"); c.className = `text-[10px] px-2 py-0.5 rounded border font-semibold uppercase tracking-wider ${cls}`; c.textContent = text; chips.appendChild(c); };
+            mk(`Adımlar: ${isSuccess ? "Tamamlandı" : "Hata"}`, isSuccess ? SCENARIO_UI.basarili.chip : SCENARIO_UI.basarisiz.chip);
+            if (scenario?.sonuc) mk(`Senaryo: ${ui.label}`, ui.chip);
+        }
+        if (window.lucide?.createIcons) window.lucide.createIcons();
+    }
+
+    function openReportModal(scenarioName, formattedDate, isSuccess, rawLogContent, parsedSteps, extra = {}) {
+        if (aiPollTimer) clearTimeout(aiPollTimer);
+        if (openReportModal.token) openReportModal.token.closed = true;
+        const aiToken = openReportModal.token = { tries: 0, closed: false };
+        // Yorum hazır olunca (yoklama) senaryo sonucu da güncellenir
+        const refreshWithHeader = extra.refresh && (async () => { const a = await extra.refresh(); renderReportHeader(isSuccess, extra.getScenario?.()); return a; });
+        document.querySelectorAll("#close-report-modal-btn, #close-report-modal-footer-btn").forEach(b => b.addEventListener("click", () => { aiToken.closed = true; clearTimeout(aiPollTimer); }, { once: true }));
+        renderAiCard(extra.analysis, refreshWithHeader, aiToken);
         const modal = document.getElementById("report-detail-modal");
         const titleEl = document.getElementById("modal-report-title");
         const dateEl = document.getElementById("modal-report-date");
@@ -2194,24 +2444,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
         titleEl.textContent = scenarioName;
         dateEl.textContent = formattedDate;
-        stepCountLabel.textContent = `${parsedSteps.length} Adım Yakalandı`;
+        stepCountLabel.textContent = `${parsedSteps.filter(st => !st.info).length} Adım Yakalandı`;
 
+        renderReportHeader(isSuccess, extra.scenario);
         if (isSuccess) {
-            iconEl.className = "w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-            iconEl.innerHTML = `<i data-lucide="check-circle-2" class="w-5 h-5"></i>`;
             errorCard.classList.add("hidden");
         } else {
-            iconEl.className = "w-9 h-9 rounded-xl flex items-center justify-center bg-rose-500/10 text-rose-400 border border-rose-500/20";
-            iconEl.innerHTML = `<i data-lucide="alert-triangle" class="w-5 h-5"></i>`;
             
             const lines = rawLogContent.split('\n');
-            const errLine = lines.find(l => l.includes('CRITICAL_POPUP_ERROR') || l.includes('HATA TESPİT EDİLDİ') || l.toLowerCase().includes('error:')) || "Test çalıştırma hatası oluştu.";
+            // Önce sistemin açıklama satırı (neden FAILED verildi), sonra eski kurallar
+            const errLine = lines.find(l => l.startsWith('[DEĞERLENDİRME]')) || lines.find(l => l.includes('CRITICAL_POPUP_ERROR') || l.includes('HATA TESPİT EDİLDİ') || l.toLowerCase().includes('error:')) || "Test çalıştırma hatası oluştu.";
             errorText.textContent = errLine.replace(/.*CRITICAL_POPUP_ERROR:\s*/i, '').trim();
             errorCard.classList.remove("hidden");
         }
 
         stepsContainer.innerHTML = "";
-        parsedSteps.forEach((st, idx) => {
+        let stepNo = 0;
+        parsedSteps.forEach((st) => {
+            const label = st.info ? "•" : String(++stepNo).padStart(2, '0') + ".";
             const isFailed = st.status === 'FAILED';
             const stepDiv = document.createElement("div");
             
@@ -2222,7 +2472,7 @@ document.addEventListener("DOMContentLoaded", () => {
             stepDiv.innerHTML = `
                 <div class="modal-step-header flex items-center justify-between p-3.5 cursor-pointer ${isFailed ? 'hover:bg-rose-500/10' : 'hover:bg-[#27272a]/40'} transition select-none">
                     <div class="flex items-center gap-3">
-                        <span class="font-mono text-xs ${isFailed ? 'text-rose-400 font-bold' : 'text-zinc-500'}">${String(idx + 1).padStart(2, '0')}.</span>
+                        <span class="font-mono text-xs ${isFailed ? 'text-rose-400 font-bold' : 'text-zinc-500'}">${label}</span>
                         <span class="text-xs ${isFailed ? 'text-rose-400 font-bold' : 'text-zinc-200 font-semibold'}">${escapeHtml(st.title)}</span>
                     </div>
                     <div class="flex items-center gap-2">
