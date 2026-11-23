@@ -67,6 +67,9 @@
             if (job.status === "failed") {
                 return { ok: false, status: "FAILED", message: job.error || "Test çalıştırılamadı." };
             }
+            if (job.status === "cancelled") {
+                return { ok: false, status: "CANCELLED", message: job.error || "Test iptal edildi." };
+            }
 
             await sleep(delay);
             delay = Math.min(delay + 500, 4000);
@@ -80,12 +83,14 @@
         const res = await fetch("/api/scenarios/run", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ scenarioName, projectName }),
+            body: JSON.stringify({ scenarioName, projectName, live: !!document.getElementById('live-test-watch')?.checked }),
         });
         const data = await readJson(res);
         if (!res.ok || !data.jobId) {
             return { ok: false, status: "FAILED", message: data.error || "Test kuyruğa eklenemedi." };
         }
+        window.dispatchEvent(new Event("jobs-changed"));
+        if(data.job?.liveId)window.BrowserPanel?.open({mode:'live',id:data.job.liveId,projectName});
         if (onProgress && data.job) onProgress(data.job);
         return waitForJob(data.jobId, onProgress);
     }
@@ -102,11 +107,15 @@
         });
         const data = await readJson(res);
         if (!res.ok) return { ok: false, message: data.error || "Toplu test başlatılamadı.", skipped: data.skipped || [] };
+        window.dispatchEvent(new Event("jobs-changed"));
         return { ok: true, jobs: data.jobs || [], skipped: data.skipped || [] };
     }
 
     function describeJob(job) {
-        if (job.status === "queued") return job.position > 1 ? `Sırada (${job.position}.)` : "Sırada...";
+        if (job.status === "queued") {
+            const eta = job.estimatedWaitSeconds ? ` · ~${Math.max(1, Math.round(job.estimatedWaitSeconds / 60))} dk` : "";
+            return job.position > 1 ? `Sırada (${job.position}.)${eta}` : `Sırada...${eta}`;
+        }
         if (job.status === "running") return "Çalışıyor...";
         return "";
     }
