@@ -22,3 +22,6 @@ certbot-www
 SECURITY_TEST_RESULTS.txt
 
 run-data/
+
+# Yanlışlıkla içe kopyalanan eski proje pakete alınmasın
+/test-tool/
