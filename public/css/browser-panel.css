@@ -1,0 +1,15 @@
+.browser-panel{background:#18181b;color:#e4e4e7;border:1px solid #3f3f46;border-radius:12px;padding:16px;font-size:12px;min-width:0;box-shadow:0 12px 50px #0006}
+.browser-panel h3{font-size:14px;font-weight:600;margin:0}.browser-panel p{color:#a1a1aa;line-height:1.6;margin:8px 0}
+.browser-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px}
+.browser-panel button,.browser-panel input,.browser-panel select{border:1px solid #3f3f46;border-radius:7px;background:#27272a;color:#e4e4e7;padding:7px 10px;font-size:12px}
+.browser-panel button{cursor:pointer}.browser-panel button:hover{border-color:#60a5fa}.browser-panel button:disabled{opacity:.5;cursor:wait}.browser-panel input{flex:1;min-width:100px}
+.browser-panel .browser-primary{background:#2563eb;border-color:#2563eb}.browser-panel .browser-error{color:#fca5a5;white-space:pre-wrap}
+.browser-screen{position:relative;width:100%;aspect-ratio:16/9;background:#09090b;border:1px solid #3f3f46;border-radius:6px;overflow:hidden;outline-offset:3px}
+.browser-screen img{width:100%;height:100%;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none}.browser-screen:focus{outline:2px solid #60a5fa}
+.browser-placeholder{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;color:#a1a1aa}.browser-screen.has-frame .browser-placeholder{display:none}
+.browser-events{max-height:145px;overflow:auto;list-style:decimal;padding-left:24px;color:#a1a1aa;line-height:1.8;margin-top:8px}
+.browser-live-overlay{position:fixed;inset:0;z-index:65;background:#000a;display:flex;align-items:center;justify-content:center;padding:16px}.browser-live-overlay .browser-panel{width:min(1100px,100%);max-height:95vh;overflow:auto}
+#scenario-modal.browser-recording{gap:16px;align-items:flex-start;padding-top:24px}
+#scenario-modal.browser-recording>div:first-child{width:40%;max-width:560px;margin-top:0;max-height:94vh;overflow-y:auto;flex-shrink:0}
+#scenario-modal.browser-recording>.browser-panel{width:60%;max-width:1100px;position:sticky;top:0}
+@media(max-width:1000px){#scenario-modal.browser-recording{flex-direction:column;align-items:center}#scenario-modal.browser-recording>div:first-child,#scenario-modal.browser-recording>.browser-panel{width:100%;max-width:900px;position:relative;max-height:none}}

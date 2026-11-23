@@ -1,3 +1,4 @@
+import { recordedLocator } from './recordedActions.js';
 import crypto from 'node:crypto';
 const normalize=s=>String(s).normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase('tr-TR');
 const optionSelector='[role="option"], option, .p-dropdown-item, .p-multiselect-item, .p-select-option, [data-pc-section="option"]';
@@ -61,11 +62,11 @@ export function formatCalendarDate(value,format) {
 export async function executeFormAction(stagehand,page,field) {
     const context=field.scope?` within the section or dialog named ${JSON.stringify(field.scope)}`:'';
     if(field.action==='fill' || field.action==='date') {
-        const action=await proposal(stagehand,page,`Fill the editable field labeled ${JSON.stringify(field.label)}${context} with ${JSON.stringify(field.value)}. Do not submit the form. ${field.action==='date'?'This is a date field. Use only the requested date.':''}`);
+        const action=field.target?{selector:field.target.selector,method:'fill'}:await proposal(stagehand,page,`Fill the editable field labeled ${JSON.stringify(field.label)}${context} with ${JSON.stringify(field.value)}. Do not submit the form. ${field.action==='date'?'This is a date field. Use only the requested date.':''}`);
         if(!['fill','type','press'].includes(action.method))throw new Error('FORM_FILL_TARGET_INVALID: '+field.label);
         // JSON değerinin model tarafından değiştirilmesini önle.
         if(action.method==='press')throw new Error('FORM_DATE_NOT_EDITABLE: Tarihi elle düzenlenebilir alan biçiminde belirtin veya takvim adımlarını kullanın.');
-        const target=page.locator(action.selector);
+        const target=field.target?await recordedLocator(page,field.target):page.locator(action.selector);
         const inputType = await target.getAttribute('type');
         const dateFormat = resolveDateFormat(inputType, await target.getAttribute('placeholder'), field.dateFormat);
         let value = field.value;
@@ -91,14 +92,14 @@ export async function executeFormAction(stagehand,page,field) {
     }
     if(field.action==='check') {
         if(!['true','false'].includes(field.value))throw new Error('FORM_CHECK_VALUE: true veya false kullanın.');
-        const action=await proposal(stagehand,page,`Identify the checkbox labeled ${JSON.stringify(field.label)}${context}.`);
-        const target=page.locator(action.selector);
+        const action=field.target?{selector:field.target.selector}:await proposal(stagehand,page,`Identify the checkbox labeled ${JSON.stringify(field.label)}${context}.`);
+        const target=field.target?await recordedLocator(page,field.target):page.locator(action.selector);
         // Native ve role=checkbox kontrollerinde Playwright durumu doğrular.
         await target.setChecked(field.value==='true',{timeout:10000});
         console.log('[JSON_ALANI]: '+JSON.stringify({field:field.label,action:'check'}));return;
     }
-    const action=await proposal(stagehand,page,`Open the dropdown labeled ${JSON.stringify(field.label)}${context}. Only identify its trigger; do not select any option.`);
-    const target=page.locator(action.selector);
+    const action=field.target?{selector:field.target.selector}:await proposal(stagehand,page,`Open the dropdown labeled ${JSON.stringify(field.label)}${context}. Only identify its trigger; do not select any option.`);
+    const target=field.target?await recordedLocator(page,field.target):page.locator(action.selector);
     const tag=await target.evaluate(el=>el.tagName);
     if(tag==='SELECT') {
         await target.evaluate(async select=>{

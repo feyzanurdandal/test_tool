@@ -1,4 +1,5 @@
 import express from 'express';
+import browserRouter from './browser.js';
 import projectsRouter from './projects.js';
 import scenariosRouter from './scenarios.js';
 import runsRouter from './runs.js';
@@ -11,6 +12,7 @@ import maintenanceRouter from './maintenance.js';
 // rotalar konularına göre ayrı dosyalara bölündü.
 const router = express.Router();
 
+router.use(browserRouter);
 router.use(projectsRouter);
 router.use(scenariosRouter);
 router.use(runsRouter);
