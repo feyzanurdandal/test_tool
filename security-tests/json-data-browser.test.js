@@ -1,3 +1,4 @@
+process.env.ALLOW_LOOPBACK_IN_TESTS='1'; // yerel fixture sunucuları için (yalnızca test)
 import {test,before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
@@ -34,7 +35,7 @@ test('JSON arayüzü: genel alanlar, teknik alanlar kapalı, önizleme ve yenide
  await page.evaluate(()=>{const steps=document.querySelector('#steps');const addRow=value=>{const row=document.createElement('div');const i=document.createElement('input');i.className='step-input';i.value=value;row.append(i);window.editor.decorate(row,value);return row;};window.editor=new window.TestDataEditor({form:document.querySelector('form'),steps,addRow,reindex:()=>{},notify:()=>{}});});
  await page.click('#json-form-open');await page.fill('#json-form-source',JSON.stringify({productName:'Kalem',quantity:'00012',id:'technical',settings:{enabled:true}}));await page.click('#json-preview');
  assert.equal(await page.locator('#json-preview-table tbody tr').count(),4);assert.equal(await page.locator('#json-preview-table tbody tr').nth(2).locator('input[type=checkbox]').isChecked(),false);
- await page.locator('#json-preview-table tbody tr').nth(1).locator('select').nth(2).selectOption('increment');await page.click('#json-apply');
+ await page.locator('#json-preview-table tbody tr').nth(1).locator('select').nth(4).selectOption('increment');await page.click('#json-apply');
  const data=await page.evaluate(()=>window.editor.get());assert.equal(data.fields.length,3);assert.equal(data.enabled,true);assert.equal(data.fields[1].rule,'increment');assert.equal(await page.locator('#steps [data-form-key]').count(),3);
  await page.evaluate(data=>window.editor.load(data),data);await page.click('#json-form-open');assert.equal(await page.locator('#json-preview-table tbody tr').count(),3);await page.getByRole('button',{name:'İptal',exact:true}).click();
  await page.click('#json-form-open');await page.fill('#json-form-source','{"__proto__":{"x":1}}');await page.click('#json-preview');assert.match(await page.locator('[role=alert]').textContent(),/Desteklenmeyen/);

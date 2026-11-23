@@ -37,6 +37,7 @@ export function applyScenarioData(runtime,sequence='0') {
 export async function compileScenarioData(input,data,translate,targetUrl) {
     data=testDataSchema.parse(data||{});
     const fields=new Map(data.fields.map(f=>[f.key,f]));
+    const recordings=new Map(data.recordings.map(r=>[r.key,r]));
     const steps=[];let batch=[];
     const flush=async()=>{
         if(!batch.length)return;
@@ -46,6 +47,8 @@ export async function compileScenarioData(input,data,translate,targetUrl) {
     };
     const lines=Array.isArray(input)?input:String(input).split('\n');
     for(const line of lines) {
+        const recorded=line.trim().match(/^\[\[REC:([A-Za-z][A-Za-z0-9_]*)\]\]$/);
+        if(recorded){await flush();const action=recordings.get(recorded[1]);if(!action)throw new Error('Kayıtlı adım bulunamadı.');steps.push({type:'recorded',instruction:action.target?.label||action.target?.name||action.action,recorded:action});continue;}
         const match=line.trim().match(/^\[\[FORM:([A-Za-z][A-Za-z0-9_]*)\]\]$/);
         if(!match){if(line.trim())batch.push(line);continue;}
         await flush();const form=fields.get(match[1]);

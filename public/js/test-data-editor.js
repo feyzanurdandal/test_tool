@@ -8,8 +8,8 @@ const rules=[['fixed','Sabit'],['increment','Sayıyı artır'],['suffix','Metin 
 const dateFormats=[['auto','Otomatik'],['MM/DD/YYYY','MM/DD/YYYY · 10/14/2026'],['DD/MM/YYYY','DD/MM/YYYY · 14/10/2026'],['DD.MM.YYYY','DD.MM.YYYY · 14.10.2026'],['DD-MM-YYYY','DD-MM-YYYY · 14-10-2026'],['YYYY-MM-DD','YYYY-MM-DD · 2026-10-14']];
 const modes=[['text','Görünen metin'],['value','Seçenek değeri / ID'],['index','Sıra (0’dan başlar)'],['random','Rastgele geçerli seçenek']];
 class Editor {
- constructor({form,steps,addRow,reindex,notify}) {
-  Object.assign(this,{form,steps,addRow,reindex,notify});this.data={enabled:false,fields:[],variables:[]};
+ constructor({form,steps,addRow,reindex,notify,getProject}) {
+  Object.assign(this,{form,steps,addRow,reindex,notify,getProject});this.data={enabled:false,fields:[],variables:[],recordings:[]};
   const toolbar = document.getElementById('add-step-field-btn').parentElement;
   toolbar.className = '';
   Object.assign(toolbar.style, {
@@ -89,29 +89,55 @@ class Editor {
     'Değişecek değerleri ve doldurma yöntemini seçin.'
   );
 
-  second.append(json, change);
+  const record=el('button','Tarayıcıdan Kaydet');record.type='button';record.id='browser-record-open';
+  styleButton(record,'Tarayıcıdan Kaydet','Tıklama ve doldurma işlemlerinden senaryo oluşturun.');
+  record.onclick=()=>{
+   const targetUrl=document.getElementById('new-scenario-url').value.trim();const projectName=this.getProject?.();
+   if(!targetUrl||!projectName)return this.notify('Önce proje ve hedef URL seçin.');
+   window.BrowserPanel.open({targetUrl,projectName,notify:this.notify,onSave:steps=>this.addRecording(steps)});
+  };
+  second.append(json, change, record);
   toolbar.append(first, second);
   this.info=el('p',undefined,'text-xs text-zinc-400 pt-2');toolbar.parentElement.append(this.info);this.summary();
   form.addEventListener('reset',()=>this.load());
  }
- load(data={}) {this.data=JSON.parse(JSON.stringify({enabled:false,fields:[],variables:[],...data}));this.summary();}
+ load(data={}) {this.data=JSON.parse(JSON.stringify({enabled:false,fields:[],variables:[],recordings:[],...data}));this.summary();}
  summary(){this.info.textContent=`${this.data.fields.length} JSON alanı · ${[...this.data.fields,...this.data.variables].filter(f=>this.data.enabled && f.rule!=='fixed').length} değişen değer. Her alan kendi kuralına göre çalışır; Sabit seçilenler değişmez.`;}
  get(){
   const keys=new Set([...this.steps.querySelectorAll('[data-form-key]')].map(r=>r.dataset.formKey));
   const text=[...this.steps.querySelectorAll('.step-input')].map(i=>i.value).join('\n');
-  return {...this.data,fields:this.data.fields.filter(f=>keys.has(f.key)),variables:this.data.variables.filter(v=>text.includes('{{data.'+v.key+'}}'))};
+  return {...this.data,recordings:this.data.recordings.filter(r=>[...this.steps.querySelectorAll('[data-record-key]')].some(row=>row.dataset.recordKey===r.key)),fields:this.data.fields.filter(f=>keys.has(f.key)),variables:this.data.variables.filter(v=>text.includes('{{data.'+v.key+'}}'))};
  }
  importSteps(steps,data={}) {
   const mapping=new Map();const prefix='i_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7)+'_';
   for(const f of data.fields||[]){const key=prefix+mapping.size;mapping.set(f.key,key);this.data.fields.push({...f,key,rule:data.enabled?f.rule:'fixed'});}
   for(const v of data.variables||[]){const key=prefix+mapping.size;mapping.set(v.key,key);this.data.variables.push({...v,key,rule:data.enabled?v.rule:'fixed'});}
+  for(const r of data.recordings||[]){const key=prefix+mapping.size;mapping.set(r.key,key);this.data.recordings.push({...r,key});}
   if(data.enabled){this.data.enabled=true;}
   this.summary();
-  return steps.map(t=>String(t).replace(/\[\[FORM:([A-Za-z][A-Za-z0-9_]*)\]\]/g,(m,k)=>mapping.has(k)?'[[FORM:'+mapping.get(k)+']]':m).replace(/\{\{data\.([A-Za-z][A-Za-z0-9_]*)\}\}/g,(m,k)=>mapping.has(k)?'{{data.'+mapping.get(k)+'}}':m));
+  return steps.map(t=>String(t).replace(/\[\[REC:([A-Za-z][A-Za-z0-9_]*)\]\]/g,(m,k)=>mapping.has(k)?'[[REC:'+mapping.get(k)+']]':m).replace(/\[\[FORM:([A-Za-z][A-Za-z0-9_]*)\]\]/g,(m,k)=>mapping.has(k)?'[[FORM:'+mapping.get(k)+']]':m).replace(/\{\{data\.([A-Za-z][A-Za-z0-9_]*)\}\}/g,(m,k)=>mapping.has(k)?'{{data.'+mapping.get(k)+'}}':m));
+ }
+ addRecording(actions) {
+  const existing=this.steps.querySelectorAll('.step-input').length;
+  if(existing+actions.length>100 && !(existing===1&&!this.steps.querySelector('.step-input').value.trim()))return this.notify('Senaryo en fazla 100 adım içerebilir. Önce gereksiz adımları silin.');
+  const empty=this.steps.children.length===1?this.steps.querySelector('.step-input'):null;if(empty&&!empty.value.trim())this.steps.innerHTML='';
+  for(const action of actions){
+   let marker;
+   if(['fill','select','check'].includes(action.action)){
+    const type=action.target?.inputType;
+    this.data.fields.push({key:action.key,label:action.target.label||action.target.name||'Form alanı',scope:'',value:action.action==='check'?String(action.checked):action.value,action:action.action==='fill'&&(type==='date'||/tarih|doğum|birth|date/i.test(action.target.label))?'date':action.action,selectionMode:'value',dateFormat:'auto',typingMode:action.action==='fill'?'keyboard':'auto',rule:'fixed',target:action.target});
+    marker='[[FORM:'+action.key+']]';
+   }else{this.data.recordings.push(action);marker='[[REC:'+action.key+']]';}
+   this.steps.append(this.addRow(marker));
+  }
+  this.reindex();this.summary();this.notify(actions.length+' kayıtlı adım eklendi. Veri Ayarları üzerinden değerleri düzenleyebilirsiniz.');
  }
  decorate(row,text) {
+  const recorded=text.match(/^\[\[REC:([A-Za-z][A-Za-z0-9_]*)\]\]$/);
+  if(recorded){row.dataset.recordKey=recorded[1];const r=this.data.recordings.find(r=>r.key===recorded[1]);const i=row.querySelector('.step-input');i.value=r?'Tarayıcı · '+window.BrowserPanel.describe(r):'Kayıtlı adım eksik';i.readOnly=true;return;}
+
   const m=text.match(/^\[\[FORM:([A-Za-z][A-Za-z0-9_]*)\]\]$/);if(!m)return;
-  const field=this.data.fields.find(f=>f.key===m[1]);row.dataset.formKey=m[1];const i=row.querySelector('.step-input');i.value=field?`JSON · ${field.label}: ${field.selectionMode==='random'?'Rastgele seçenek':field.value}`:`JSON alanı eksik: ${m[1]}`;i.readOnly=true;
+  const field=this.data.fields.find(f=>f.key===m[1]);row.dataset.formKey=m[1];const i=row.querySelector('.step-input');i.value=field?`JSON · ${field.label}: ${field.selectionMode==='random'?'Rastgele seçenek':(field.target?.inputType==='password'?'••••••':field.value)}`:`JSON alanı eksik: ${m[1]}`;i.readOnly=true;
   const b=el('button','Ayarlar','text-xs text-blue-400');b.type='button';b.onclick=()=>this.open();row.append(b);
  }
  refresh(){for(const r of this.steps.querySelectorAll('[data-form-key]')){const f=this.data.fields.find(f=>f.key===r.dataset.formKey);if(f)r.querySelector('.step-input').value=`JSON · ${f.label}: ${f.selectionMode==='random'?'Rastgele seçenek':f.value}`;}this.summary();}
@@ -132,7 +158,8 @@ class Editor {
   function fieldRow(f,sourceName,used=true){
    const tr=el('tr');const use=el('input');use.type='checkbox';use.checked=used;
    const label=input(f.label),value=input(f.value),action=select([['fill','Metin yaz'],['select','Açılır kutu'],['date','Tarih gir'],['check','İşaretleme kutusu']],f.action),mode=select(modes,f.selectionMode),dateFormat=select(dateFormats,f.dateFormat||'auto'),typing=select([['auto','Otomatik'],['fill','Doğrudan doldur'],['keyboard','Klavyeden yaz']],f.typingMode||'auto'),rule=select(rules,f.rule),scope=input(f.scope||'');
-   const update=()=>{mode.disabled=action.value!=='select';dateFormat.disabled=action.value!=='date';typing.disabled=!['fill','date'].includes(action.value);rule.disabled=action.value!=='fill'||/password|şifre/i.test(sourceName+' '+label.value);if(rule.disabled)rule.value='fixed';};action.onchange=update;label.oninput=update;update();
+   if(f.target?.inputType==='password')value.type='password';
+   const update=()=>{mode.disabled=action.value!=='select';dateFormat.disabled=action.value!=='date';typing.disabled=!['fill','date'].includes(action.value);rule.disabled=action.value!=='fill'||f.target?.inputType==='password'||/password|şifre/i.test(sourceName+' '+label.value);if(rule.disabled)rule.value='fixed';};action.onchange=update;label.oninput=update;update();
    for(const item of [use,el('span',sourceName),label,value,action,mode,typing,dateFormat,rule,scope]){const td=el('td',undefined,'p-1 align-top');td.append(item);tr.append(td);}tbody.append(tr);
    fieldRows.push({f,use,label,value,action,mode,typing,dateFormat,rule,scope});
   }
@@ -159,7 +186,7 @@ class Editor {
   };
   this.data.variables.forEach(v=>makeVariable({...v}));
   const chooser=select([['','Adımdan veri seç…']], '');chooser.id='data-value-choice';
-  for(const row of this.steps.querySelectorAll('.step-input')){if(row.closest('[data-form-key]'))continue;const quoted=[...row.value.matchAll(/"([^"\n]+)"/g)];const typed=row.value.match(/(?:type|fill|enter)\s+"([^"]+)"/i);const value=typed?.[1] || (/(?:yaz|gir|doldur)/i.test(row.value)?quoted.at(-1)?.[1]:null);if(value && !value.startsWith('{{data.')){const o=el('option',value+' — '+row.value.slice(0,100));o.value=value;chooser.append(o);}}
+  for(const row of this.steps.querySelectorAll('.step-input')){if(row.closest('[data-form-key],[data-record-key]'))continue;const quoted=[...row.value.matchAll(/"([^"\n]+)"/g)];const typed=row.value.match(/(?:type|fill|enter)\s+"([^"]+)"/i);const value=typed?.[1] || (/(?:yaz|gir|doldur)/i.test(row.value)?quoted.at(-1)?.[1]:null);if(value && !value.startsWith('{{data.')){const o=el('option',value+' — '+row.value.slice(0,100));o.value=value;chooser.append(o);}}
   const add=el('button','Seçilen değeri ekle','text-xs text-blue-400');add.type='button';add.onclick=()=>{if(chooser.value && !variableRows.some(r=>!r.removed&&r.value.value===chooser.value)){makeVariable({key:'v_'+Date.now().toString(36)+'_'+variableRows.length,value:chooser.value,rule:'suffix'});}};panel.append(chooser,add,error);
   const footer=el('div',undefined,'flex gap-3 justify-end');const cancel=el('button','İptal','text-xs border rounded px-3 py-2');cancel.type='button';cancel.onclick=()=>overlay.remove();
   const save=el('button',variablesOnly?'Ayarları Uygula':'Seçili Alanları Uygula','text-xs bg-blue-600 rounded px-3 py-2');save.type='button';save.id='json-apply';save.onclick=()=>{try{
@@ -182,6 +209,6 @@ class Editor {
   }catch(e){error.textContent=e.message;}};footer.append(cancel,save);panel.append(footer);document.body.append(overlay);cancel.focus();overlay.addEventListener('keydown',e=>{if(e.key==='Escape')overlay.remove();});
  }
 }
-window.readableDataSteps=(text,data={})=>String(text).replace(/\[\[FORM:([A-Za-z][A-Za-z0-9_]*)\]\]/g,(m,k)=>{const f=(data.fields||[]).find(f=>f.key===k);return f?`JSON · ${f.label}: ${f.selectionMode==='random'?'Rastgele seçenek':f.value}`:'JSON alanı';}).replace(/\{\{data\.([A-Za-z][A-Za-z0-9_]*)\}\}/g,(m,k)=>[...(data.fields||[]),...(data.variables||[])].find(f=>f.key===k)?.value||m);
+window.readableDataSteps=(text,data={})=>String(text).replace(/\[\[REC:([A-Za-z][A-Za-z0-9_]*)\]\]/g,(m,k)=>{const r=(data.recordings||[]).find(r=>r.key===k);return r?'Tarayıcı · '+window.BrowserPanel.describe(r):'Kayıtlı adım';}).replace(/\[\[FORM:([A-Za-z][A-Za-z0-9_]*)\]\]/g,(m,k)=>{const f=(data.fields||[]).find(f=>f.key===k);return f?`JSON · ${f.label}: ${f.selectionMode==='random'?'Rastgele seçenek':(f.target?.inputType==='password'?'••••••':f.value)}`:'JSON alanı';}).replace(/\{\{data\.([A-Za-z][A-Za-z0-9_]*)\}\}/g,(m,k)=>[...(data.fields||[]),...(data.variables||[])].find(f=>f.key===k)?.value||m);
 window.TestDataEditor=Editor;
 })();
