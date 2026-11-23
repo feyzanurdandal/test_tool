@@ -9,7 +9,7 @@ import {
 
 const router = express.Router();
 const DEFAULT_PROJECT = 'Varsayılan Proje';
-const sanitizeProjectName = (name) => String(name || '').replace(/[^a-zA-Z0-9\s_-]/g, '').trim();
+const sanitizeProjectName = (name) => String(name || '').replace(/[^\p{L}\p{N}\s_-]/gu, '').trim();
 
 // ─── PROJELERİ LİSTELEME ───
 router.get('/projects/list', requireAuth, async (req, res, next) => {

@@ -21,6 +21,14 @@ class DpuService {
             return this.token;
         }
 
+        // Eşzamanlı isteklerin her biri ayrı token almasın: devam eden istek paylaşılır.
+        if (!this.tokenPromise) {
+            this.tokenPromise = this.fetchNewToken().finally(() => { this.tokenPromise = null; });
+        }
+        return this.tokenPromise;
+    }
+
+    async fetchNewToken() {
         console.log(" DPU Base: Yeni JWT Token alınıyor...");
         try {
             const result = await this.fetchWithTimeoutAndRetry(`${this.baseUrl}/api/v1/auth/token`, {
@@ -63,7 +71,7 @@ class DpuService {
                 const response = await fetch(url, {
                     ...config,
                     signal: controller.signal,
-                    size: 2 * 1024 * 1024,
+                    size: Number(process.env.DPU_MAX_RESPONSE_BYTES) || 16 * 1024 * 1024,
                 });
 
                 // Eğer HTTP statüsü 5xx ise ve retry hakkımız varsa yeniden denemek üzere catch'e düşür
@@ -101,7 +109,7 @@ class DpuService {
     }
 
     // Genel İstek Atma
-    async request(endpoint, method = "GET", body = null) {
+    async request(endpoint, method = "GET", body = null, isRetry = false) {
         const token = await this.getValidToken();
         const headers = {
             "Authorization": `Bearer ${token}`,
@@ -120,8 +128,16 @@ class DpuService {
         }
 
         // Doğrudan fetch yerine Timeout + Retry mekanizmasını çağırıyoruz
-        return await this.fetchWithTimeoutAndRetry(`${this.baseUrl}/api/v1/${endpoint}`, config,
+        const result = await this.fetchWithTimeoutAndRetry(`${this.baseUrl}/api/v1/${endpoint}`, config,
             {timeoutMs:8000,retries:['GET','HEAD'].includes(method) ? 2 : 0});
+
+        // Token sunucuda iptal edildiyse bir kez yeni token alıp isteği tekrarla
+        if (!isRetry && result && result.success === false && /unauthor|invalid.*token|expired.*token|token.*(expired|invalid)|401/i.test(String(result.message || result.error || ''))) {
+            this.token = null;
+            this.tokenExpiresAt = null;
+            return this.request(endpoint, method, body, true);
+        }
+        return result;
     }
 
     // 1. LIST / SEARCH

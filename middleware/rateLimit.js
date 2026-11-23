@@ -1,13 +1,29 @@
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
-// Login: Brute-force koruması
-export const loginLimiter = rateLimit({
+// Login: Brute-force koruması.
+// Üniversite/eduroam NAT'ı arkasında yüzlerce kullanıcı tek IP görünebilir; bu yüzden
+//  1) asıl kota KULLANICI ADI başına (yalnızca BAŞARISIZ denemeler sayılır),
+//  2) IP başına çok geniş bir tavan (toplu saldırı koruması) uygulanır.
+const norm = (v) => String(v || '').trim().toLowerCase().slice(0, 60);
+export const loginUserLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: Number(process.env.LOGIN_MAX_FAILS_PER_USER) || 8,
+    skipSuccessfulRequests: true,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: "Çok fazla giriş denemesi yapıldı. Lütfen 15 dakika sonra tekrar deneyin." },
+    keyGenerator: (req) => `u:${norm(req.body?.username) || ipKeyGenerator(req.ip)}`,
+    message: { error: "Bu hesap için çok fazla hatalı giriş denemesi yapıldı. Lütfen 15 dakika sonra tekrar deneyin." },
 });
+export const loginIpLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: Number(process.env.LOGIN_MAX_PER_IP) || 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => ipKeyGenerator(req.ip),
+    message: { error: "Bu ağdan çok fazla giriş isteği geldi. Lütfen biraz sonra tekrar deneyin." },
+});
+// Geriye dönük uyumluluk için birleşik middleware
+export const loginLimiter = [loginIpLimiter, loginUserLimiter];
 
 // AI çağıran endpoint'ler
 export const aiCallLimiter = rateLimit({

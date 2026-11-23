@@ -6,3 +6,5 @@ process.env.DPU_API_KEY ||= 'x';
 process.env.DPU_PROJECT_CODE ||= 'x';
 process.env.DPU_USER_EMAIL ||= 'x@x';
 process.env.DPU_USER_PASSWORD ||= 'x';
+// İzinli test adresi listesi artık boşsa hiçbir hedef kabul edilmez; testlerde genel bir IP izinlidir.
+process.env.ALLOWED_TEST_HOSTS ||= '1.1.1.1';

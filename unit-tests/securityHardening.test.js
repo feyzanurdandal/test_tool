@@ -63,7 +63,7 @@ test('cevap başlığı gelse bile DPU gövdesi timeout sınırını aşamaz',as
 
 test('AI eşzamanlılık slotu işlem bitene kadar tutulur',async()=>{
     let release;const blocked=new Promise(resolve=>{release=resolve});
-    const handler=withAiCapacity(async()=>blocked);
+    const handler=withAiCapacity(async()=>blocked,{concurrency:2,maxWaitMs:0});
     const res={status(code){this.code=code;return this},json(body){this.body=body;return this}};
     const one=handler({}, {}, ()=>{}),two=handler({}, {}, ()=>{});
     await handler({},res,()=>{});assert.equal(res.code,429);

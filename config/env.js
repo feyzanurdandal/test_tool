@@ -52,8 +52,13 @@ export const env = {
     PORT: Number(process.env.PORT) || 3000,
     JWT_SECRET: process.env.JWT_SECRET,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
-    RUN_CONCURRENCY: Math.max(1, Number(process.env.RUN_CONCURRENCY) || 1),
-    MAX_QUEUED_RUNS: Math.max(1, Number(process.env.MAX_QUEUED_RUNS) || 50),
+    // Aynı anda koşan test sayısı. Her test ≈ 0,7-1 GB RAM ve ≈ 0,5-1 çekirdek kullanır;
+    // varsayılan 2 küçük sunucular için bilinçli olarak düşük tutulmuştur (fazlası sırada bekler).
+    RUN_CONCURRENCY: Math.max(1, Number(process.env.RUN_CONCURRENCY) || 2),
+    MAX_QUEUED_RUNS: Math.max(1, Number(process.env.MAX_QUEUED_RUNS) || 200),
+    // Toplu çalıştırma tek istekte en fazla 50 senaryo alır; kullanıcı başına sınır buna uygun olmalıdır.
+    MAX_QUEUED_PER_USER: Math.max(1, Number(process.env.MAX_QUEUED_PER_USER) || 50),
+    RECORD_MAX: Math.max(1, Number(process.env.RECORD_MAX) || 2),
     COOKIE_SECURE: process.env.COOKIE_SECURE === 'true',
 };
 

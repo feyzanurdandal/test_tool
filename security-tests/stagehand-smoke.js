@@ -1,3 +1,4 @@
+process.env.ALLOW_LOOPBACK_IN_TESTS='1'; // yerel fixture sunucuları için (yalnızca test)
 import '../unit-tests/setup-env.js';
 import assert from 'node:assert/strict';
 import http from 'node:http';

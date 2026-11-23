@@ -1,13 +1,15 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 import { loginLimiter } from '../middleware/rateLimit.js';
 import { requireAuth, signSession, sessionCookieOptions, SESSION_COOKIE, parseCookies, revokeSessionToken } from '../middleware/auth.js';
 import { findUserByName } from '../services/userService.js';
 
 const router = express.Router();
 
-// Kullanıcı bulunamadığında da bcrypt karşılaştırması yapılır (zamanlama saldırısı koruması)
-const DUMMY_HASH = '$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUUWXYZ123456';
+// Kullanıcı bulunamadığında da GERÇEK bir bcrypt karşılaştırması yapılır (zamanlama saldırısı koruması).
+// Not: Geçersiz biçimli bir hash'te bcrypt anında false döner ve kullanıcı adı sızdırırdı.
+const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 10);
 
 router.post('/login', loginLimiter, async (req, res, next) => {
     const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';

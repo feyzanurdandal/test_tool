@@ -5,6 +5,9 @@ import { TtlCache } from './ttlCache.js';
 // Böylece silinen kullanıcı veya değişen rol, token süresinin bitmesini
 // beklemeden en geç TTL kadar sürede etkili olur.
 const userCache = new TtlCache(30_000);
+// Her kimlik doğrulamalı istekte DPU'ya gidilmesin diye kısa süreli (15 sn) kimlik önbelleği.
+// Kullanıcı değiştiğinde/silindiğinde invalidateUser ile anında temizlenir.
+const idCache = new TtlCache(15_000);
 const key = (v) => String(v || '').trim().toLowerCase();
 
 export async function findUserByName(username, { fresh = false } = {}) {
@@ -26,11 +29,12 @@ export async function findUserByName(username, { fresh = false } = {}) {
 }
 
 export function invalidateUser(username) {
+    idCache.invalidate();
     if (username === undefined) userCache.invalidate();
     else userCache.invalidate(key(username));
 }
 
 // Oturum kimliği kullanıcı adı tekrar kullanımından bağımsızdır.
 export async function findUserById(id) {
-    return dpu.findOne('kullanicilar', { id: { eq: String(id) } });
+    return idCache.getOrLoad(String(id), () => dpu.findOne('kullanicilar', { id: { eq: String(id) } }));
 }

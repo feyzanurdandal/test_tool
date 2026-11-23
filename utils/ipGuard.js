@@ -1,5 +1,6 @@
 import net from 'net';
 import dns from 'dns/promises';
+import { findEntry, hostMatches, getEffectiveEntries } from './hostPolicy.js';
 
 // ─── İÇ AĞ / ÖZEL ADRES LİSTESİ ───
 // Test tarayıcısının ve sunucunun erişmemesi gereken tüm aralıklar.
@@ -36,6 +37,14 @@ const blockList = new net.BlockList();
     ['fec0::', 10],        // site-local (eski)
     ['ff00::', 8],         // multicast
 ].forEach(([addr, prefix]) => blockList.addSubnet(addr, prefix, 'ipv6'));
+
+// Yönetici "iç-ağ" izni verse bile ASLA açılmayan aralıklar: loopback, link-local
+// (bulut metadata 169.254.169.254 dahil), belirtilmemiş, multicast ve rezerve.
+const neverBlock = new net.BlockList();
+[['0.0.0.0', 8], ['127.0.0.0', 8], ['169.254.0.0', 16], ['224.0.0.0', 4], ['240.0.0.0', 4]]
+    .forEach(([addr, prefix]) => neverBlock.addSubnet(addr, prefix, 'ipv4'));
+[['::', 128], ['::1', 128], ['fe80::', 10], ['ff00::', 8]]
+    .forEach(([addr, prefix]) => neverBlock.addSubnet(addr, prefix, 'ipv6'));
 
 // IPv6 adresini 8 adet 16-bit gruba açar (IPv4 gömülü yazımı da destekler)
 function expandIpv6(ip) {
@@ -95,27 +104,39 @@ export function isPrivateIp(ip) {
     return true;
 }
 
-// Yönetici tarafından bilinçli olarak izin verilen iç ağ host'ları
-// (örn: ALLOWED_PRIVATE_HOSTS=test.intranet.local,staging.local)
-function allowedPrivateHosts() {
-    return (process.env.ALLOWED_PRIVATE_HOSTS || '')
-        .split(',')
-        .map(h => h.trim().toLowerCase())
-        .filter(Boolean);
+/** 'public' | 'private' (RFC1918/CGNAT/ULA vb., yetkiyle açılabilir) | 'never' (hiçbir koşulda açılmaz) */
+export function classifyIp(ip) {
+    const clean = String(ip || '').replace(/^\[|\]$/g, '');
+    let v4 = null;
+    if (net.isIPv4(clean)) v4 = clean;
+    else if (net.isIPv6(clean)) {
+        const groups = expandIpv6(clean);
+        if (!groups) return 'never';
+        v4 = embeddedIpv4(groups);
+        if (!v4) {
+            const v6 = clean.split('%')[0];
+            if (neverBlock.check(v6, 'ipv6')) return 'never';
+            return blockList.check(v6, 'ipv6') ? 'private' : 'public';
+        }
+    } else return 'never';
+    if (neverBlock.check(v4, 'ipv4')) return 'never';
+    return blockList.check(v4, 'ipv4') ? 'private' : 'public';
 }
 
 /**
- * Host adının (domain veya IP) güvenli bir dış adrese çözümlenip
- * çözümlenmediğini denetler.
+ * Host adının (domain veya IP) güvenli bir adrese çözümlenip çözümlenmediğini denetler.
+ * - Loopback, link-local/metadata, multicast ve rezerve adresler HER ZAMAN engellenir.
+ * - Özel (RFC1918/CGNAT/ULA) adreslere yalnızca yöneticinin "iç-ağ" işaretlediği host'lar çözümlenebilir.
+ * Not: Hangi host'ların test edilebileceği (izin listesi) isSafeUrl / isNavigationAllowed ile denetlenir;
+ * burası yalnızca SSRF korumasıdır ve sayfanın alt kaynakları için de kullanılır.
  * @returns {Promise<{ safe: boolean, reason?: string }>}
  */
 export async function resolveSafeHost(hostname, lookup = dns.lookup) {
     const host = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
     if (!host) return { safe: false, reason: 'Host adı boş!' };
-    const hosts = (process.env.ALLOWED_TEST_HOSTS || '').split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
-    if (hosts.length && !hosts.includes(host)) return { safe: false, reason: 'Host test izin listesinde yok.' };
-    const privateAllowed = allowedPrivateHosts().includes(host);
     try {
+        const entries = await getEffectiveEntries();
+        const privateAllowed = entries.some(e => e.internal && hostMatches(e, host));
         let timer;
         const addresses = net.isIP(host) ? [{ address: host, family: net.isIP(host) }]
             : await Promise.race([
@@ -125,7 +146,11 @@ export async function resolveSafeHost(hostname, lookup = dns.lookup) {
         if (!Array.isArray(addresses) || !addresses.length || addresses.some(a => !net.isIP(a.address))) {
             return {safe:false,reason:'DNS çözümlemesi geçersiz.'};
         }
-        if (!privateAllowed && addresses.some(a => isPrivateIp(a.address))) {
+        // Yalnızca geliştirme/test: izinli host'un loopback'e çözülmesine (yerel test sunucuları) izin veren
+        // açık anahtar. Production'da ve docker-compose'da ASLA etkin olmaz (NODE_ENV=production iken yok sayılır).
+        const loopbackOk = privateAllowed && process.env.ALLOW_LOOPBACK_IN_TESTS === '1' && process.env.NODE_ENV !== 'production';
+        const classes = addresses.map(a => (loopbackOk && /^(127\.|::1$)/.test(a.address)) ? 'private' : classifyIp(a.address));
+        if (classes.includes('never') || (!privateAllowed && classes.includes('private'))) {
             return {safe:false, reason:'Yerel/özel veya rezerve IP adresine erişim engellendi.'};
         }
         // Proxy yalnızca burada kontrol edilen IP'ye bağlanır; tekrar DNS çözmez.
@@ -145,30 +170,61 @@ export function isAllowedTestPort(port) {
     return (process.env.ALLOWED_TEST_PORTS || '80,443').split(',').map(p => Number(p.trim())).includes(Number(port));
 }
 
+/** Port varsayılan listede ya da yöneticinin bu host için açıkça yazdığı port mu? */
+export async function isPortPermitted(host, port) {
+    if (isAllowedTestPort(port)) return true;
+    const entries = await getEffectiveEntries();
+    return entries.some(e => e.port !== undefined && hostMatches(e, host, port));
+}
+
+function parseHttpUrl(urlString) {
+    if (!urlString || typeof urlString !== 'string') return { error: 'URL boş veya geçersiz formatta!' };
+    let parsed;
+    try { parsed = new URL(urlString); } catch { return { error: 'Geçersiz URL yapısı!' }; }
+    const protocol = parsed.protocol.toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return { error: `İzin verilmeyen protokol: ${protocol}` };
+    if (parsed.username || parsed.password) return { error: 'URL içinde kullanıcı adı/şifre kullanılamaz.' };
+    const port = Number(parsed.port || (protocol === 'https:' ? 443 : 80));
+    return { parsed, port };
+}
+
 /**
- * URL'in güvenli olup olmadığını denetler (protokol + SSRF).
- * Hem kayıt anında hem de test çalıştırılmadan hemen önce çağrılır.
+ * Ağ düzeyinde güvenlik (protokol + port + SSRF). İzin listesi aranmaz;
+ * WebSocket ve benzeri alt kaynak bağlantıları için kullanılır.
+ */
+export async function checkNetworkUrl(urlString) {
+    const { parsed, port, error } = parseHttpUrl(urlString);
+    if (error) return { safe: false, reason: error };
+    if (!(await isPortPermitted(parsed.hostname, port))) return { safe: false, reason: 'Hedef port test izin listesinde yok.' };
+    return checkHost(parsed.hostname);
+}
+
+/** Ana çerçeve (sayfa) gezintisi yönetici izin listesinde mi? */
+export async function isNavigationAllowed(urlString) {
+    const { parsed, port, error } = parseHttpUrl(urlString);
+    if (error) return false;
+    const entries = await getEffectiveEntries();
+    return !!findEntry(entries, parsed.hostname, port);
+}
+
+/**
+ * Test hedefi URL'inin güvenli ve YÖNETİCİ İZİN LİSTESİNDE olup olmadığını denetler
+ * (protokol + izin listesi + port + SSRF). Kayıt anında ve her çalıştırmadan önce çağrılır.
+ * İzin listesi boşsa hiçbir adres kabul edilmez.
  * @returns {Promise<{ safe: boolean, reason?: string }>}
  */
 export async function isSafeUrl(urlString) {
-    if (!urlString || typeof urlString !== 'string') {
-        return { safe: false, reason: 'URL boş veya geçersiz formatta!' };
+    const { parsed, port, error } = parseHttpUrl(urlString);
+    if (error) return { safe: false, reason: error };
+    const entries = await getEffectiveEntries();
+    if (!entries.length) {
+        return { safe: false, reason: 'Test için izin verilen adres listesi boş. Yönetici Ayarlar > "Test İzinli Adresler" bölümüne adres eklemelidir.' };
     }
-
-    let parsedUrl;
-    try {
-        parsedUrl = new URL(urlString);
-    } catch {
-        return { safe: false, reason: 'Geçersiz URL yapısı!' };
+    if (!findEntry(entries, parsed.hostname, port)) {
+        const defaultPort = isAllowedTestPort(port);
+        return { safe: false, reason: defaultPort
+            ? `"${parsed.hostname}" yönetici tarafından izin verilen test adresleri arasında değil.`
+            : 'Hedef port test izin listesinde yok.' };
     }
-
-    const protocol = parsedUrl.protocol.toLowerCase();
-    if (protocol !== 'http:' && protocol !== 'https:') {
-        return { safe: false, reason: `İzin verilmeyen protokol: ${protocol}` };
-    }
-
-    if (parsedUrl.username || parsedUrl.password) return {safe:false,reason:'URL içinde kullanıcı adı/şifre kullanılamaz.'};
-    const port = Number(parsedUrl.port || (protocol === 'https:' ? 443 : 80));
-    if (!isAllowedTestPort(port)) return {safe:false,reason:'Hedef port test izin listesinde yok.'};
-    return checkHost(parsedUrl.hostname);
+    return checkNetworkUrl(urlString);
 }

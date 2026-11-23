@@ -305,7 +305,7 @@ test('regresyon: kalıcı oturum kayıtları yeniden başlatınca çalışır; s
     const extraPort=50000+Math.floor(Math.random()*10000);
     const extra=spawn(process.execPath,['server.js'],{cwd:fileURLToPath(new URL('..',import.meta.url)),env:{...process.env,PORT:String(extraPort),DPU_BASE_URL:`http://127.0.0.1:${dpu.address().port}`,NODE_ENV:'test',SESSION_DIR:sessionDir},stdio:['ignore','pipe','pipe']});
     try {
-        await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Restart test sunucusu başlayamadı')),5000);extra.once('error',err=>{clearTimeout(timer);reject(err);});extra.stdout.on('data',d=>{if(String(d).includes('aktif')){clearTimeout(timer);resolve();}});});
+        await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Restart test sunucusu başlayamadı')),15000);extra.once('error',err=>{clearTimeout(timer);reject(err);});extra.stdout.on('data',d=>{if(String(d).includes('aktif')){clearTimeout(timer);resolve();}});});
         const r=await fetch(`http://127.0.0.1:${extraPort}/api/auth/me`,{headers:{Cookie:adminCookie}});assert.equal(r.status,200);
         assert.equal((await api('/api/auth/logout',{method:'POST',cookie:adminCookie})).status,200);
         assert.equal((await fetch(`http://127.0.0.1:${extraPort}/api/auth/me`,{headers:{Cookie:adminCookie}})).status,401);

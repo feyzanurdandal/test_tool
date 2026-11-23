@@ -2,7 +2,9 @@ import express from 'express';
 import dpu from '../config/dpuService.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
-import { saveSettingsSchema } from '../schemas/scenarioSchemas.js';
+import { saveSettingsSchema, saveAllowedHostsSchema } from '../schemas/scenarioSchemas.js';
+import { ALLOWED_HOSTS_KEY } from '../services/hostPolicyService.js';
+import { parseHostEntries, formatHostEntries, getEffectiveEntries } from '../utils/hostPolicy.js';
 import { encrypt, decrypt } from '../utils/cryptoHelper.js';
 import {
     getSettingsRows, invalidateSettings, SYSTEM_KEYS, maskKey, isMaskedValue
@@ -20,6 +22,7 @@ router.get('/settings/get', requireAuth, requireAdmin, async (req, res, next) =>
         rows.forEach(row => {
             if (row.ayar_anahtar === 'test_runner_api') settings.testRunnerApi = row.ayar_deger;
             else if (row.ayar_anahtar === 'translator_api') settings.translatorApi = row.ayar_deger;
+            else if (row.ayar_anahtar === ALLOWED_HOSTS_KEY) return;
             else {
                 let plain = '';
                 try {
@@ -97,6 +100,50 @@ router.post('/settings/save', requireAuth, requireAdmin, validate(saveSettingsSc
 
         invalidateSettings();
         return res.json({ success: true, message: 'Ayarlar başarıyla kaydedildi.' });
+    } catch (err) {
+        invalidateSettings();
+        next(err);
+    }
+});
+
+// ─── TEST İZİNLİ ADRESLER ───
+// Test senaryolarının hedefleyebileceği adresler. Herkes görebilir (senaryo yazarken
+// hangi adreslerin geçerli olduğunu bilmek için), yalnızca ADMIN değiştirebilir.
+router.get('/settings/allowed-hosts', requireAuth, async (req, res, next) => {
+    try {
+        const rows = await getSettingsRows();
+        const row = rows.find(r => r.ayar_anahtar === ALLOWED_HOSTS_KEY);
+        const { entries } = parseHostEntries(row?.ayar_deger || '');
+        const envOnly = (await getEffectiveEntries()).length - entries.length;
+        return res.json({
+            success: true,
+            hosts: formatHostEntries(entries),
+            count: entries.length,
+            envEntries: Math.max(0, envOnly),
+            defaultPorts: String(process.env.ALLOWED_TEST_PORTS || '80,443'),
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.post('/settings/allowed-hosts', requireAuth, requireAdmin, validate(saveAllowedHostsSchema), async (req, res, next) => {
+    try {
+        const { entries, errors } = parseHostEntries(req.body.hosts);
+        if (errors.length) {
+            return res.status(400).json({ error: 'Adres listesinde hatalı satırlar var.', details: errors });
+        }
+        const text = formatHostEntries(entries);
+        const rows = await getSettingsRows();
+        const existing = rows.find(r => r.ayar_anahtar === ALLOWED_HOSTS_KEY);
+        const nowIso = new Date().toISOString();
+        const payload = { ayar_anahtar: ALLOWED_HOSTS_KEY, ayar_deger: text, ayar_model: null, updated_at: nowIso };
+        const result = existing
+            ? await dpu.update('ayarlar', existing.id, payload)
+            : await dpu.insert('ayarlar', { ...payload, created_at: nowIso });
+        invalidateSettings();
+        if (!result?.success) return res.status(500).json({ error: 'İzinli adres listesi kaydedilemedi.' });
+        return res.json({ success: true, hosts: text, count: entries.length, message: `${entries.length} adres kaydedildi.` });
     } catch (err) {
         invalidateSettings();
         next(err);

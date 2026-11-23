@@ -3,7 +3,7 @@ import { TtlCache } from './ttlCache.js';
 
 const settingsCache = new TtlCache(30_000);
 
-export const SYSTEM_KEYS = ['test_runner_api', 'translator_api'];
+export const SYSTEM_KEYS = ['test_runner_api', 'translator_api', 'allowed_test_hosts'];
 
 // Arayüze gerçek API anahtarı yerine gönderilen maske. Kullanıcı alanı
 // değiştirmezse bu değer geri gelir ve mevcut şifreli anahtar korunur.

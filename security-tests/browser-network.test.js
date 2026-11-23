@@ -1,3 +1,4 @@
+process.env.ALLOW_LOOPBACK_IN_TESTS='1'; // yerel fixture sunucuları için (yalnızca test)
 import {test,before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -23,13 +24,13 @@ after(()=>{
     if(originalHosts===undefined) delete process.env.ALLOWED_PRIVATE_HOSTS;else process.env.ALLOWED_PRIVATE_HOSTS=originalHosts;
     wss.close();target.close();
 });
-async function runBrowser(task) {
+async function runBrowser(task, guardOptions = { enforceNavigation: false }) {
     const proxy=await startNetworkProxy();
     let browser;
     try {
     browser=await chromium.launch({executablePath:process.env.AUDIT_CHROMIUM_PATH || process.env.CHROME_PATH || chromium.executablePath(),headless:true,
         args:['--no-sandbox','--disable-dev-shm-usage','--no-zygote','--disable-gpu',...browserNetworkArgs(proxy.url)]});
-    const ctx=await browser.newContext();await installBrowserNetworkGuard(ctx);await task(await ctx.newPage());
+    const ctx=await browser.newContext();await installBrowserNetworkGuard(ctx,guardOptions);await task(await ctx.newPage());
     } finally {await browser?.close();await proxy.close();}
 }
 
@@ -51,13 +52,14 @@ test('tarayıcı loopback HTTP ve WebSocket hedeflerine ulaşamaz',async()=>{
 test('public DNS kararı sonraki private bağlantıya izin vermez',async()=>{
     let lookupCalls=0;const count=requests;
     dns.lookup=async(host,...args)=>host==='localhost'?[{address:++lookupCalls===1?'1.1.1.1':'127.0.0.1',family:4}]:originalLookup.call(dns,host,...args);
+    process.env.ALLOWED_TEST_HOSTS='localhost';   // izin listesinde; asıl denetlenen DNS rebinding korumasıdır
     try {
         assert.equal((await isSafeUrl(`http://localhost:${port}/rebind`)).safe,true);
         await runBrowser(async page=>{
             const response=await page.goto(`http://localhost:${port}/rebind`);
             assert.equal(response.status(),403);assert.equal(requests,count);assert.ok(lookupCalls>=2);
         });
-    } finally {dns.lookup=originalLookup;}
+    } finally {dns.lookup=originalLookup;delete process.env.ALLOWED_TEST_HOSTS;}
 });
 
 test('yönetici tarafından açıkça izinli host ve port normal HTTP/WS akışını korur',async()=>{
@@ -71,5 +73,20 @@ test('yönetici tarafından açıkça izinli host ve port normal HTTP/WS akış�
             }),port);
             assert.equal(answer,'PERMITTED SOCKET');
         });
+    } finally {delete process.env.ALLOWED_PRIVATE_HOSTS;}
+});
+
+test('ana çerçeve gezintisi yalnızca yönetici izin listesindeki adreslere gidebilir',async()=>{
+    process.env.ALLOWED_PRIVATE_HOSTS='localhost';   // izin listesi + iç-ağ (loopback yalnızca bu testte açık)
+    const before=requests;
+    try {
+        await runBrowser(async page=>{
+            await page.goto(`http://localhost:${port}/allowed`);
+            assert.match(await page.textContent('body'),/PRIVATE TARGET/);
+            // listede olmayan adrese (127.0.0.1) yönlendirme engellenmeli (Chromium hata sayfası gösterir)
+            const blocked=await page.evaluate(port=>{location.href=`http://127.0.0.1:${port}/baska`;return true;},port).then(()=>page.waitForTimeout(800)).then(()=>page.url());
+            assert.doesNotMatch(blocked,/baska/);
+        },{enforceNavigation:true});
+        assert.equal(requests,before+1,'yalnızca izinli sayfa isteği hedefe ulaşmalı');
     } finally {delete process.env.ALLOWED_PRIVATE_HOSTS;}
 });

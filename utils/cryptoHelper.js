@@ -2,7 +2,6 @@ import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 // .env dosyasından 32 byte'lık (64 karakter hex) Master Key alıyoruz.
-// Yoksa fallback olarak sistemin çökmemesi için deterministik bir key türetiyoruz.
 const ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
 
 /**
@@ -35,7 +34,7 @@ export function decrypt(encryptedText) {
 
     try {
         const parts = encryptedText.split(':');
-        if (parts.length !== 4) return encryptedText;
+        if (parts.length !== 4) throw new Error('Geçersiz şifreli değer biçimi.');
 
         const iv = Buffer.from(parts[1], 'hex');
         const authTag = Buffer.from(parts[2], 'hex');
@@ -49,7 +48,8 @@ export function decrypt(encryptedText) {
 
         return decrypted;
     } catch (error) {
+        // Şifreli metin asla "anahtar" olarak geri döndürülmez; çağıran açık hata görür.
         console.error(" Şifre çözme (Decryption) hatası:", error.message);
-        return encryptedText; 
+        throw new Error('Şifrelenmiş değer çözülemedi (ENCRYPTION_KEY değişmiş veya veri bozuk).');
     }
 }

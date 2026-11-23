@@ -25,7 +25,7 @@ export const createProjectSchema = z.object({
     projectName: z.string({ required_error: "Proje adı boş olamaz!" })
       .trim()
       .min(1, "Proje adı boş olamaz!")
-      .transform(val => val.replace(/[^a-zA-Z0-9\s_-]/g, '').trim())
+      .transform(val => val.replace(/[^\p{L}\p{N}\s_-]/gu, '').trim())
       .refine(val => val.length > 0, "Geçersiz proje adı!"),
     customErrorKeywords: z.string().optional().default('')
   })
@@ -82,18 +82,18 @@ export const updateScenarioSchema = z.object({
     turkishInstructions: z.union([z.string().min(1).max(50000), z.array(z.string().min(1).max(4000)).min(1).max(100)]),
     targetUrl: z.string().url("Geçerli bir URL giriniz!"),
     projectName: z.string().optional().default('Varsayılan Proje'),
-    testType: testTypeSchema.optional().default("UI"),
-    expectedOutcome: expectedOutcomeSchema.optional().default("SUCCESS_EXPECTED"),
+    testType: z.enum(["UI", "SECURITY"]).optional(),
+    expectedOutcome: z.enum(["SUCCESS_EXPECTED", "ERROR_EXPECTED"]).optional(),
     testData: testDataSchema.optional(),
     expectedErrorText: z.string().trim().max(500).optional().default('')
-  }).refine(value => value.expectedOutcome !== 'ERROR_EXPECTED' || value.expectedErrorText.length >= 3,
-    { message: 'Beklenen engelleme mesajını en az 3 karakterle belirtin.', path: ['expectedErrorText'] })
+  })
 });
 
 // Hedef URL artık istekten alınmaz; her zaman senaryonun kayıtlı hedef_url'si kullanılır.
 export const runScenarioSchema = z.object({
   body: z.object({
     scenarioName: scenarioNameSchema,
+    live: z.boolean().optional().default(false),
     projectName: z.string().trim().min(1, "Proje adı zorunlu!")
   })
 });
@@ -101,6 +101,7 @@ export const runScenarioSchema = z.object({
 export const deleteScenarioSchema = z.object({
   body: z.object({
     scenarioName: scenarioNameSchema,
+    live: z.boolean().optional().default(false),
     projectName: z.string().trim().min(1, "Proje adı zorunlu!")
   })
 });
@@ -109,6 +110,10 @@ const recordIdSchema = z.union([z.string().trim().min(1).max(64).regex(/^[A-Za-z
 
 export const deleteReportSchema = z.object({
   body: z.object({ id: recordIdSchema })
+});
+
+export const reportDetailSchema = z.object({
+  query: z.object({ id: recordIdSchema })
 });
 
 export const deleteReportsBatchSchema = z.object({
@@ -127,7 +132,7 @@ const providerNameSchema = z.string().trim().toLowerCase()
   .min(1, "Sağlayıcı adı boş olamaz!")
   .max(40)
   .regex(/^[a-z0-9_-]+$/, "Sağlayıcı adı yalnızca harf, rakam, - ve _ içerebilir!")
-  .refine(v => v !== 'test_runner_api' && v !== 'translator_api', "Bu sağlayıcı adı sistem tarafından ayrılmıştır!");
+  .refine(v => !['test_runner_api', 'translator_api', 'allowed_test_hosts'].includes(v), "Bu sağlayıcı adı sistem tarafından ayrılmıştır!");
 
 export const saveSettingsSchema = z.object({
   body: z.object({
@@ -137,6 +142,12 @@ export const saveSettingsSchema = z.object({
       key: z.string().max(4096).optional().default(''),
       model: z.string().trim().max(200).optional().default('')
     })).optional().default({})
+  })
+});
+
+export const saveAllowedHostsSchema = z.object({
+  body: z.object({
+    hosts: z.string().max(50000, "Liste çok uzun!")
   })
 });
 

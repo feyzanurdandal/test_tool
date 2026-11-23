@@ -1,6 +1,6 @@
 import http from 'node:http';
 import net from 'node:net';
-import { resolveSafeHost, isAllowedTestPort, isSafeUrl } from './ipGuard.js';
+import { resolveSafeHost, isPortPermitted, checkNetworkUrl, isNavigationAllowed } from './ipGuard.js';
 
 // Her testin kendi loopback proxy'si vardır. HTTP ve HTTPS/WSS CONNECT bağlantısı
 // kontrol edilen numeric IP'ye gider: tarayıcı/işletim sistemi yeniden DNS çözmez.
@@ -8,7 +8,7 @@ export async function startNetworkProxy({ resolveHost = resolveSafeHost, connect
     const sockets = new Set();
     const deny = res => { if (!res.headersSent) res.writeHead(403); res.end('Test network policy denied this request.'); };
     async function destination(host, port) {
-        if (!Number.isInteger(port) || !isAllowedTestPort(port)) throw new Error('Port denied');
+        if (!Number.isInteger(port) || !(await isPortPermitted(host, port))) throw new Error('Port denied');
         const verdict = await resolveHost(host);
         if (!verdict.safe || !net.isIP(verdict.address)) throw new Error('Host denied');
         return verdict;
@@ -114,16 +114,26 @@ export function browserNetworkArgs(proxyUrl) {
         '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1'];
 }
 
-export async function installBrowserNetworkGuard(context) {
-    await context.route('**/*', route => {
-        const protocol = new URL(route.request().url()).protocol;
-        return ['http:','https:'].includes(protocol) ? route.continue() : route.abort('blockedbyclient');
+export async function installBrowserNetworkGuard(context, { enforceNavigation = process.env.ENFORCE_NAV_ALLOWLIST !== 'false' } = {}) {
+    await context.route('**/*', async route => {
+        const request = route.request();
+        const protocol = new URL(request.url()).protocol;
+        if (!['http:','https:'].includes(protocol)) return route.abort('blockedbyclient');
+        // Sayfanın ana çerçevesi yalnızca yöneticinin izin verdiği adreslere gidebilir
+        // (link tıklama / yönlendirme ile başka siteye geçiş engellenir). Alt kaynaklar
+        // (CDN, font, iframe vb.) serbesttir ancak SSRF proxy'sinden geçer.
+        if (enforceNavigation && request.isNavigationRequest() && !request.frame().parentFrame()) {
+            let allowed = false;
+            try { allowed = await isNavigationAllowed(request.url()); } catch {}
+            if (!allowed) return route.abort('blockedbyclient');
+        }
+        return route.continue();
     });
     await context.routeWebSocket('**/*', async socket => {
         const target = new URL(socket.url());
         if (!['ws:','wss:'].includes(target.protocol)) return socket.close({code:1008,reason:'Protocol denied'});
         target.protocol = target.protocol === 'wss:' ? 'https:' : 'http:';
-        const checked = await isSafeUrl(target.href);
+        const checked = await checkNetworkUrl(target.href);
         if (!checked.safe) return socket.close({code:1008,reason:'Network policy denied'});
         socket.connectToServer();
     });
