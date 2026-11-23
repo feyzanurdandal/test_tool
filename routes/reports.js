@@ -3,8 +3,10 @@ import dpu from '../config/dpuService.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { requireProjectAccess } from '../utils/projectGuard.js';
-import { listScenariosSchema, deleteReportSchema, deleteReportsBatchSchema } from '../schemas/scenarioSchemas.js';
+import { listScenariosSchema, deleteReportSchema, deleteReportsBatchSchema, reportDetailSchema } from '../schemas/scenarioSchemas.js';
 import { getProjectByName, userHasProjectAccess } from '../services/projectService.js';
+import { listProjectReports, invalidateReports } from '../services/reportService.js';
+import { extractAnalysis, resolveScenarioResult } from '../services/reportAnalysis.js';
 
 const router = express.Router();
 
@@ -18,14 +20,10 @@ router.get('/reports/list', requireAuth, validate(listScenariosSchema), requireP
         const project = await getProjectByName(selectedProj);
         if (!project) return res.json({ reports: [] });
 
-        const reportsRes = await dpu.selectWhere('raporlar', { project_id: { eq: project.id } });
-        if (!reportsRes.success || !reportsRes.data) return res.json({ reports: [] });
-
-        const reports = reportsRes.data
-            .filter(r => (r.test_tipi || 'UI').toUpperCase() === testType)
-            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-        return res.json({ success: true, reports });
+        const { reports: all, total } = await listProjectReports(project.id);
+        const reports = all.filter(r => (r.test_tipi || 'UI').toUpperCase() === testType);
+        // Log içeriği listede yoktur; rapor açılınca /reports/detail ile alınır.
+        return res.json({ success: true, reports, total });
     } catch (error) {
         next(error);
     }
@@ -46,6 +44,25 @@ async function loadProjectsById() {
     return new Map(res.data.map(p => [String(p.id), p]));
 }
 
+// ─── RAPOR DETAYI (log içeriği) ───
+router.get('/reports/detail', requireAuth, validate(reportDetailSchema), async (req, res, next) => {
+    try {
+        const report = await dpu.findOne('raporlar', { id: { eq: req.query.id } });
+        if (!report) return res.status(404).json({ error: 'Rapor bulunamadı.' });
+
+        const projectsById = req.user.role === 'ADMIN' ? new Map() : await loadProjectsById();
+        if (!(await canManageReport(req.user, report, projectsById))) {
+            return res.status(403).json({ error: 'Erişim Engellendi: Bu raporun projesine erişim yetkiniz yok!' });
+        }
+        // Yapay zeka yorum bloğu günlükten ayrılır; istemci günlüğü ve yorumu ayrı alır.
+        const { log, analysis } = extractAnalysis(report.log_content);
+        const scenario = resolveScenarioResult({ status: report.status, testType: report.test_tipi, analysis });
+        return res.json({ success: true, report: { id: report.id, log_content: log, analysis, senaryo_sonucu: scenario?.sonuc ?? null, senaryo_kaynagi: scenario?.kaynak ?? null } });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // ─── TEKİL RAPOR SİLME ───
 router.post('/reports/delete', requireAuth, validate(deleteReportSchema), async (req, res, next) => {
     const { id } = req.body;
@@ -60,6 +77,7 @@ router.post('/reports/delete', requireAuth, validate(deleteReportSchema), async 
         }
 
         const deleteResult = await dpu.delete('raporlar', report.id);
+        invalidateReports();
         if (deleteResult.success) return res.json({ success: true, message: 'Test raporu başarıyla silindi!' });
         return res.status(500).json({ error: 'Silme işlemi veritabanında başarısız oldu.' });
     } catch (error) {
@@ -90,6 +108,7 @@ router.post('/reports/delete-batch', requireAuth, validate(deleteReportsBatchSch
             if (deleteResult.success) deletedCount++;
         }
 
+        invalidateReports();
         return res.json({
             success: true,
             message: `${deletedCount} adet rapor başarıyla silindi.` + (deniedCount ? ` ${deniedCount} rapor için yetkiniz yoktu.` : '')

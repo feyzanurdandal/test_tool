@@ -6,7 +6,7 @@ import { aiCallLimiter } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import { requireProjectAccess } from '../utils/projectGuard.js';
 import { isSafeUrl } from '../utils/ipGuard.js';
-import { translateToStagehandJson } from '../utils/translator.js';
+import { translateToStagehandJsonStrict } from '../utils/translator.js';
 import { compileScenarioData } from '../utils/scenarioData.js';
 import { runtimeStepsSchema } from '../schemas/runtimeSteps.js';
 import { stripImportMarkers } from '../utils/stepGroups.js';
@@ -14,6 +14,20 @@ import {
     listScenariosSchema, getScenarioContentSchema, createScenarioSchema, updateScenarioSchema, deleteScenarioSchema
 } from '../schemas/scenarioSchemas.js';
 import { getProjectByName, getScenario } from '../services/projectService.js';
+import { z } from 'zod';
+import { invalidateReports } from '../services/reportService.js';
+
+// Kullanıcının düzeltebileceği çeviri/veri hataları (eksik [[FORM:..]] anahtarı, geçersiz test verisi vb.)
+// 500 yerine anlaşılır 400 olarak döner; böylece kayıt yarım kalmaz.
+async function translateOrFail(res, ...args) {
+    try {
+        return { ok: true, value: await translateScenario(...args) };
+    } catch (err) {
+        const message = err instanceof z.ZodError ? 'Test verisi veya adımlar geçersiz. Alanları kontrol edin.' : (err?.message || 'Senaryo çevirisi tamamlanamadı.');
+        res.status(400).json({ error: message });
+        return { ok: false };
+    }
+}
 
 const router = express.Router();
 
@@ -27,7 +41,7 @@ const toInstructionText = (turkishInstructions) =>
 // girdiği ve doğrulanan değerdir, modelin ürettiği değer kullanılmaz.
 async function translateScenario(turkishInstructions, targetUrl, expectedErrorText = '', testData = {}) {
     const input = typeof turkishInstructions === 'string' ? stripImportMarkers(turkishInstructions) : turkishInstructions;
-    const stagehandJson = await compileScenarioData(input, testData, translateToStagehandJson, targetUrl);
+    const stagehandJson = await compileScenarioData(input, testData, translateToStagehandJsonStrict, targetUrl);
     if (!stagehandJson || typeof stagehandJson !== 'object') return null;
     const checked = runtimeStepsSchema.safeParse({ ...stagehandJson, targetUrl, expectedErrorText });
     return checked.success ? checked.data : null;
@@ -107,13 +121,18 @@ router.post('/create-and-save', requireAuth, aiCallLimiter, validate(createScena
             return res.status(400).json({ error: 'Bu proje altında bu senaryo adı zaten mevcut!' });
         }
 
+        // Önce çevir, sonra tek seferde kaydet: çeviri hata verirse veritabanında yarım kayıt kalmaz.
+        const translated = await translateOrFail(res, turkishInstructions, targetUrl, expectedErrorText, testData);
+        if (!translated.ok) return;
+        const stagehandJson = translated.value;
+
         const nowIso = new Date().toISOString();
         const insertResult = await dpu.insert('senaryolar', {
             project_id: project.id,
             senaryo_adi: scenarioName,
             hedef_url: targetUrl,
             adimlar_tr: toInstructionText(turkishInstructions),
-            adimlar: '',
+            adimlar: stagehandJson ? JSON.stringify(stagehandJson) : '',
             test_tipi: (testType || 'UI').toUpperCase(),
             beklenen_sonuc: (expectedOutcome || 'SUCCESS_EXPECTED').toUpperCase(),
             created_at: nowIso,
@@ -123,15 +142,7 @@ router.post('/create-and-save', requireAuth, aiCallLimiter, validate(createScena
             return res.status(500).json({ error: 'Senaryo veritabanına eklenemedi.' });
         }
 
-        const createdId = insertResult.data?.id || insertResult.data?.insertId
-            || (await getScenario(project.id, scenarioName))?.id;
-
-        const stagehandJson = await translateScenario(turkishInstructions, targetUrl, expectedErrorText, testData);
-        if (stagehandJson && createdId) {
-            await dpu.update('senaryolar', createdId, {
-                adimlar: JSON.stringify(stagehandJson),
-                updated_at: new Date().toISOString()
-            });
+        if (stagehandJson) {
             return res.json({ success: true, status: 'SUCCESS', message: 'Senaryo başarıyla oluşturuldu ve yapay zeka çevirisi tamamlandı.' });
         }
 
@@ -159,6 +170,12 @@ router.post('/update', requireAuth, aiCallLimiter, validate(updateScenarioSchema
         const existing = await getScenario(project.id, originalScenarioName);
         if (!existing) return res.status(404).json({ error: 'Düzenlenecek senaryo bulunamadı.' });
 
+        // testType/expectedOutcome gönderilmediyse kayıtlı değer korunur (varsayılan üzerine yazılmaz).
+        const effectiveOutcome = (expectedOutcome || existing.beklenen_sonuc || 'SUCCESS_EXPECTED').toUpperCase();
+        if (effectiveOutcome === 'ERROR_EXPECTED' && String(expectedErrorText || '').trim().length < 3) {
+            return res.status(400).json({ error: 'Beklenen engelleme mesajını en az 3 karakterle belirtin.' });
+        }
+
         const isRename = scenarioName !== originalScenarioName;
         if (isRename) {
             const conflict = await getScenario(project.id, scenarioName);
@@ -167,13 +184,18 @@ router.post('/update', requireAuth, aiCallLimiter, validate(updateScenarioSchema
             }
         }
 
+        // Önce çevir; çeviri başarısızsa eski adımlar yeni hedefte çalıştırılmasın diye adimlar boşaltılır.
+        const translated = await translateOrFail(res, turkishInstructions, targetUrl, expectedErrorText, testData);
+        if (!translated.ok) return;
+        const stagehandJson = translated.value;
+
         const updateRes = await dpu.update('senaryolar', existing.id, {
             senaryo_adi: scenarioName,
             hedef_url: targetUrl,
             adimlar_tr: toInstructionText(turkishInstructions),
-            adimlar: '', // Yeni çeviri başarısızsa eski adımlar yeni hedefte çalıştırılmaz.
+            adimlar: stagehandJson ? JSON.stringify(stagehandJson) : '',
             test_tipi: testType ? testType.toUpperCase() : (existing.test_tipi || 'UI'),
-            beklenen_sonuc: expectedOutcome ? expectedOutcome.toUpperCase() : (existing.beklenen_sonuc || 'SUCCESS_EXPECTED'),
+            beklenen_sonuc: effectiveOutcome,
             updated_at: new Date().toISOString()
         });
         if (!updateRes.success) {
@@ -191,14 +213,10 @@ router.post('/update', requireAuth, aiCallLimiter, validate(updateScenarioSchema
                     await dpu.update('raporlar', report.id, { scenario_name: scenarioName });
                 }
             }
+            invalidateReports(project.id);
         }
 
-        const stagehandJson = await translateScenario(turkishInstructions, targetUrl, expectedErrorText, testData);
         if (stagehandJson) {
-            await dpu.update('senaryolar', existing.id, {
-                adimlar: JSON.stringify(stagehandJson),
-                updated_at: new Date().toISOString()
-            });
             return res.json({ success: true, status: 'SUCCESS', message: 'Senaryo ve çevirisi başarıyla güncellendi.' });
         }
 
