@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { runQueue } from '../services/jobQueue.js';
+import { emptyDirectory } from '../utils/emptyDirectory.js';
 
 const router = express.Router();
 const CACHE_DIR = path.join(process.cwd(), 'cache');
@@ -16,10 +17,15 @@ router.post('/cache/clear', requireAuth, requireAdmin, async (req, res, next) =>
     }
 
     try {
-        await fs.promises.rm(CACHE_DIR, { recursive: true, force: true });
+        // Klasörün kendisi silinmez (Docker'da volume bağlama noktası + salt-okunur kök: rmdir EROFS/EBUSY verir); yalnızca içi boşaltılır.
+        await emptyDirectory(CACHE_DIR);
         await fs.promises.mkdir(path.join(CACHE_DIR, 'ai-security'), { recursive: true });
         return res.json({ success: true, message: 'Geçici önbellek dosyaları başarıyla temizlendi!' });
     } catch (error) {
+        if (['EROFS', 'EACCES', 'EPERM', 'EBUSY'].includes(error?.code)) {
+            console.error('Önbellek temizlenemedi:', error.code, error.message);
+            return res.status(500).json({ error: `Önbellek temizlenemedi (${error.code}): klasör yazılabilir değil veya kullanımda. Sunucu günlüğüne bakın.` });
+        }
         next(error);
     }
 });
