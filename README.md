@@ -32,15 +32,16 @@ cp .env.example .env
 
 ```dotenv
 PORT=3000
-DPU_BASE_URL=https://dpubase.dpu.edu.tr
-DPU_PROJECT_CODE=test_otomasyonu
-DPU_USER_EMAIL=user+test_otomasyonu@base.dpu.edu.tr
+DPU_BASE_URL=https://
+DPU_PROJECT_CODE=
+DPU_USER_EMAIL=
 DPU_API_KEY=KENDI_DPU_API_ANAHTARINIZ
 DPU_USER_PASSWORD=KENDI_DPU_PAROLANIZ
 JWT_SECRET=AYRI_RASTGELE_GIZLI_DEGER
 ENCRYPTION_KEY=64_HEX_KARAKTERLIK_ANAHTAR
-RUN_CONCURRENCY=1
-MAX_QUEUED_RUNS=50
+RUN_CONCURRENCY=2
+MAX_QUEUED_RUNS=200
+MAX_QUEUED_PER_USER=50
 ALLOWED_PRIVATE_HOSTS=
 ALLOWED_TEST_HOSTS=
 ALLOWED_TEST_PORTS=80,443
@@ -222,7 +223,7 @@ npm audit
 
 1. POST /api/scenarios/run işi kuyruğa ekler ve 202 + iş kimliği döner.
 2. Arayüz GET /api/scenarios/jobs/:id ile sonucu izler.
-3. RUN_CONCURRENCY kadar iş çalışır; varsayılan 1'dir. Kaynak kullanımını ölçmeden artırmayın.
+3. RUN_CONCURRENCY kadar iş aynı anda çalışır; varsayılan 2'dir. Sıra kullanıcılar arasında adil dağıtılır (aşağıdaki "Kapasite" bölümüne bakın).
 4. Rapor DPU Base'e yazılır; geçici çalışma dosyaları temizlenir.
 
 ## Güvenlik ve geçiş notları
@@ -231,8 +232,9 @@ npm audit
 - Değişiklik yapan API çağrıları X-Requested-With: fetch başlığı gerektirir.
 - Yeni/değiştirilen parolalar en az 12 karakter, en fazla 72 UTF-8 bayttır. Eski kısa parolalar giriş uyumluluğu için kabul edilir; canlı öncesinde güncelleyin.
 - ERROR_EXPECTED senaryolarında ayırt edici beklenen engelleme metni (en az 3 karakter) zorunludur. Altyapı/AI hatası beklenen engelleme başarısı sayılmaz. Eski güvenlik senaryolarını bu alanla yeniden kaydedin.
-- Hedef URL ve HTTP/HTTPS/WebSocket bağlantıları denetlenir; bağlantı kontrol edilmiş numeric IP'ye yapılır. ALLOWED_TEST_HOSTS isteğe bağlı tam host izin listesidir. ALLOWED_TEST_PORTS varsayılan 80,443'tür. ALLOWED_PRIVATE_HOSTS yalnızca açıkça yetkili iç ağ hedefleri için kullanılmalıdır.
-- Docker backend salt okunur kök, yazılabilir geçici alanlar, kaynak sınırları ve kalıcı cache/session volume'leri kullanır. Eski host cache klasörü named volume'e otomatik taşınmaz.
+- Hedef URL ve HTTP/HTTPS/WebSocket bağlantıları denetlenir; bağlantı kontrol edilmiş numeric IP'ye yapılır. **Test hedefleri yalnızca yöneticinin Ayarlar > "Test İzinli Adresler" listesine eklediği adresler olabilir** (liste boşsa hiçbir hedef kabul edilmez). ALLOWED_TEST_HOSTS/ALLOWED_PRIVATE_HOSTS ortam değişkenleri bu listeye EK olarak eklenir. ALLOWED_TEST_PORTS varsayılan 80,443'tür. İç ağ (özel IP) adreslerine yalnızca listede "iç-ağ" işaretli host'lar çözülebilir; loopback ve bulut metadata (169.254.x.x) adresleri hiçbir koşulda açılmaz.
+- Test süreci ve Chromium'a JWT_SECRET, ENCRYPTION_KEY, DPU ve AI anahtarları geçirilmez; AI ayarları ana süreçte çözülüp yalnızca o koşunun geçici dosyasıyla (0600) verilir. Rapor loglarındaki şifre benzeri değerler kaydedilmeden maskelenir.
+- Docker backend salt okunur kök, yazılabilir geçici alanlar, kaynak sınırları, healthcheck, log rotasyonu ve kalıcı cache/session volume'leri kullanır. Eski host cache klasörü named volume'e otomatik taşınmaz.
 - Oturum deposu tek sunucu içindir. Ayrı sunuculara ölçekleme ortak oturum deposu gerektirir.
 - Chromium Docker'da no-sandbox ve backend ile aynı konteynerde çalışır. Ağ proxy'si tarayıcı/işletim sistemi izolasyonunun yerini tutmaz; üretim altyapısında ayrı test işçisi ve egress firewall değerlendirilmelidir.
 - Yetkili hedefler dışında test çalıştırmayın. Canlı öncesinde staging, gerçek servis entegrasyonu, yük, TLS ve dış erişim kontrollerini tamamlayın.
@@ -252,3 +254,225 @@ Bazı ilişkiler kimlik yerine isim kullanır (ör. kullanici_projeleri.proje_ad
 ## JSON form adımları ve değişken test verisi
 
 Senaryo ekranındaki **JSON’dan Adım Oluştur** ve **Değişecek Değerleri Seç** düğmeleri ile bu özellikleri kullanabilirsiniz. Ayrıntılı kullanım, sayaç yedekleme, seçim yöntemleri ve sınırlar için [JSON_VERI_DEGISIKLIKLERI.md](JSON_VERI_DEGISIKLIKLERI.md) dosyasını okuyun.
+
+
+## Tarayıcıdan senaryo kaydı ve canlı izleme
+
+Bu sürümde görüntü, mevcut panel bağlantısından yaklaşık saniyede bir alınır.
+noVNC, VNC portu, sanal masaüstü veya WebSocket reverse proxy ayarı gerekmez.
+Docker'da tarayıcı headless çalışır; gerçek sayfa görüntüsü panelde gösterilir ve
+paneldeki tıklama/klavye komutları Playwright üzerinden bu tarayıcıya iletilir.
+Bu, akıcı masaüstü videosu değildir. Yeni npm bağımlılığı eklenmedi.
+
+### Local kullanım
+
+1. Proje kökünde `.env` dosyanızı koruyun. Bu pakete gerçek ayarlar dahil edilmez.
+2. İlk kurulumda `npm ci`, ardından `npx playwright install chromium` çalıştırın.
+3. `npm start` ile başlatın. Tarayıcıda Ctrl+F5 yapın.
+4. Proje seçip Yeni Senaryo ekranında hedef URL girin ve **Tarayıcıdan Kaydet** seçin.
+5. Açılan sağ panelde görüntüye tıklayıp klavyenizle yazın. Yapılan işlemler sağ panelin
+   altındaki kayıt listesinde görünür. Türkçe karakterler veya çok uzun metin için
+   seçili alan aracını kullanabilirsiniz. Tarih/maskeli alanlarda klavye yöntemi korunur.
+6. Native HTML select için önce görüntüde kutuya tıklayın; sonra panelde görünen
+   seçenek listesinden seçim yapın. Özel web listelerinde görüntüdeki seçeneğe tıklayın.
+7. Görünmesi gereken sonuç mesajını yazıp **Metni Doğrula ve Ekle** kullanabilirsiniz.
+   Kayıt sırasında bu metnin gerçekten görünmesi kontrol edilir; sonraki koşuda da
+   görünmesi zorunludur. Değişken isim içeren mesajlarda sabit mesaj bölümünü kullanın.
+8. **Kaydı Bitir ve Adımları Ekle**: tarayıcı kapanır, kaydedilmiş adımlar senaryoya
+   eklenir. **Kaydı İptal Et**: kayıt senaryoya eklenmeden oturum kapatılır.
+9. **Veri Ayarları** ile form değerlerini, yazma yöntemini ve değişim kurallarını
+   düzenleyin; ardından senaryoyu kaydedin. Şifreler önizlemede maskelenir ve sabittir.
+
+Kaydedilmiş adımlar marker+metadata olarak mevcut `adimlar_tr` ve `adimlar` alanlarına
+yazılır; DPU Base tablo değişikliği gerekmez. Saf kayıt senaryosu AI çevirisine girmez.
+Doğal dil adımlarıyla karışık senaryolarda yalnızca doğal dil kısımları çevrilir.
+Mevcut koşucu başlangıcında AI sağlayıcı ayarlarını yine okur; kayıt özelliği kendi
+başına AI çağrısı yapmaz. Hedef bozulursa rastgele tıklama/AI tekrar denemesi yapılmaz.
+
+### Çalışan testi izleme
+
+Senaryo listesinin üstünde **Testi canlı izle (tekil koşu)** seçimini açıp normal
+Çalıştır düğmesini kullanın. Kuyruktayken bekleme mesajı, çalışırken tarayıcı görüntüsü
+görünür. Görüntü salt okunurdur. Görüntüyü kapatmak testi durdurmaz. Toplu koşular
+bu ilk sürümde canlı ekran açmaz. Son görüntü test sonuna kadar gösterilir ve geçici
+dosyalar tamamlandıktan yaklaşık iki dakika sonra temizlenir.
+
+### Docker
+
+Mevcut Dockerfile/Compose kurulumu kullanılır. Chromium yolu zaten imajdaki sürümle
+eşleştirilmiştir. Güncel kodla `docker compose up --build -d` gerekir. Yerel
+sertifikasız Docker denemesinde README'deki dev override komutunu kullanın.
+
+Ek dış port açmayın. Görüntü ve kontrol API'leri mevcut oturum çerezi ve proje
+yetkisiyle korunur; başka kullanıcının görüntüsü ADMIN hesabına da açılmaz.
+URL ve ağ istekleri mevcut SSRF proxy politikasından geçer. Local hedef gerekli ise
+yalnızca ilgili host/portu mevcut izin ayarlarıyla tanımlayın. Docker'da localhost
+konteynerin kendisidir; Windows'taki uygulama için uygun host adresi gerekir.
+
+Kayıt oturumu kullanıcı başına 1, toplamda RECORD_MAX (varsayılan 2) tane açılabilir;
+limit dolunca diğer kullanıcıya beklemesi söylenir. Kayıt 2 dakika bağlantısızlıkta veya 15 dakika toplam sürede
+kapanır; en fazla 100 adım kaydedilir. Kayıt sırasında gerçek Kaydet/Sil işlemleri
+hedef sistemde uygulanır. Kayıtlar kullanıcı kaydedene kadar yalnızca bellektedir.
+
+Tek Node replikasıyla kullanın; çoklu replica için oturum yönlendirme ve paylaşılan
+oturum yönetimi ayrıca gerekir. RUN_CONCURRENCY=1 başlangıç için önerilir.
+
+### Destek sınırları ve doğrulama
+
+- Tek sekmeli HTTP/HTTPS akışları, metin/tarih, checkbox/radio, native select,
+  normal DOM ve iframe hedefleri desteklenir. Özel listeler tıklama olarak kaydolur.
+- Yeni sekme ilk sürümde kapatılır ve uyarı gösterilir. Dosya yükleme, sürükle-bırak,
+  canvas ve kapalı shadow DOM hedefleri bu sürümün kapsamı dışındadır.
+- Tarayıcının alert/confirm/prompt penceresi kapatılır ve panelde uyarı gösterilir;
+  bu tür akışlar kayıt üzerinden güvenilir tekrar oynatma kapsamında değildir.
+- Kaydedilen hedef tek olarak belirlenemezse adım hata verir. Site DOM'u değişirse
+  hedef güncellemesi veya yeniden kayıt gerekebilir. Kaydedilmiş adımın açıklaması
+  salt okunurdur; form değerleri Veri Ayarları'ndan değiştirilir.
+- Sonuç doğrulaması eklenmemiş senaryolarda mevcut başarı değerlendirme sınırı
+  devam eder: adımların tamamlanması iş kuralının başarıyla gerçekleştiğini kanıtlamaz.
+- Kontrollü test: `npm test`, `npm run test:recorder`. Sistem Chromium yolu kullanılıyorsa
+  test komutuna `AUDIT_CHROMIUM_PATH` ortam değişkeni verilebilir.
+- Bu teslimde gerçek DPÜ sitesi veya Docker daemon üzerinde uçtan uca test yapılmadı.
+
+## Klasör temizliği
+
+Eski ZIP'teki `test-tool/test-tool` ikinci proje kopyası kaldırılmıştır. Güncel dış
+sürüm temel alınmıştır. Eski iç kopyadaki `.env` dosyanızı kendi bilgisayarınızda
+koruyup yeni projenin köküne koyun. `node_modules`, geçici koşu dosyaları ve oturum
+verileri teslim paketinde yoktur. Mevcut `run-data` veya Docker `test-run-data`
+volume'ünü silmeyin; artan veri sayacınız oradadır.
+
+
+## Kapasite, eşzamanlılık ve izinli adresler
+
+### Eşzamanlı kullanıcı davranışı
+
+| İşlem | Davranış |
+|---|---|
+| Gezinme, senaryo/rapor/ayar işlemleri | Eşzamanlı kullanıcı sayısıyla doğrusal ölçeklenir; yavaşlığı esas olarak DPU Base'in hızı belirler. Kimlik doğrulama için kullanıcı bilgisi 15 sn önbelleğe alınır. |
+| Test çalıştırma | En fazla `RUN_CONCURRENCY` test aynı anda koşar, kalanı **adil** sırada bekler: boş slot açılınca o an en az testi koşan kullanıcının işi alınır. Kullanıcı başına en fazla `MAX_QUEUED_PER_USER` (varsayılan 50; sırada + çalışan) iş. Tek (etkileşimli) çalıştırmalar toplu işlerden önce slot alır; birden fazla kullanıcının toplu işi dönüşümlü ilerler, biri diğerini bekletmez. "Testlerim" kutusundaki "Sıradakileri iptal et" toplu işi yarıda bırakır. Sıra no ve tahmini bekleme arayüzde (sol alttaki "Testlerim" kutusu) görünür; kuyruktaki veya çalışan test iptal edilebilir. |
+| Canlı izleme | Kullanıcı "Testi canlı izle" kutusunu işaretlerse kendi testinin görüntüsünü izler, işaretlemezse test arka planda çalışır. Sekme kapatılırsa test devam eder. Çok sayıda izleyici varsa kare sıklığı otomatik düşürülür. |
+| Tarayıcıdan kayıt | Kullanıcı başına 1, toplamda `RECORD_MAX` oturum. |
+| Senaryo kaydetme (AI çeviri) | `AI_CONCURRENCY` çeviri aynı anda çalışır, fazlası 40 sn'ye kadar **sırada bekler** (anında hata vermez). Kullanıcı başına aynı anda 1 çeviri. Dakikalık istek sayısı `AI_TRANSLATE_RPM` ile sağlayıcı kotasına göre sınırlanır; 429/503 yanıtında bir kez yeniden denenir. |
+
+### Sunucu boyutlandırma
+
+Her eşzamanlı test ≈ 0,7-1 GB RAM ve ≈ 0,5-1 çekirdek kullanır (Chromium + Stagehand + Playwright). Varsayılan ayar (`RUN_CONCURRENCY=2`, `APP_MEM_LIMIT=3g`, `APP_CPUS=2.0`) 2 çekirdek / 4 GB'lık küçük bir sunucuya uygundur. Büyütmek için `.env` içinde üç değeri birlikte artırın (kural: `APP_MEM_LIMIT ≈ 1 GB + RUN_CONCURRENCY × 1 GB`, `APP_CPUS ≈ RUN_CONCURRENCY`). Örnek:
+
+| Sunucu | RUN_CONCURRENCY | APP_MEM_LIMIT | APP_CPUS |
+|---|---|---|---|
+| 2 çekirdek / 4 GB | 2 | 3g | 2.0 |
+| 4 çekirdek / 8 GB | 4 | 6g | 4.0 |
+| 8 çekirdek / 16 GB | 8 | 10g | 8.0 |
+
+Çok sayıda kullanıcı aynı anda test başlatsa bile sistem çökmez; kapasiteyi aşan işler sırada bekler. Bekleme süresi ≈ (sıra no ÷ RUN_CONCURRENCY) × ortalama test süresidir. Tek sunucu yetmezse sonraki adım ayrı "test işçisi" konteynerleri ve paylaşımlı kuyruktur (şu an tek sunucu içindir).
+
+### Yapay zeka sağlayıcı kotası
+
+Sağlayıcı kotaları hesaba/katmana göre değişir; yaklaşık değerler: Gemini ücretsiz katman ≈ 10 istek/dk (günlük sınırlı), ücretli Tier 1 ≈ 1000 istek/dk; OpenAI Tier 1 ≈ 500 istek/dk (gpt-4o-mini). Kesin değerleri sağlayıcı panelinizden kontrol edin. Ücretsiz katmanda `AI_TRANSLATE_RPM=8` ve `RUN_CONCURRENCY=1-2` kullanın; her test adım başına AI çağrısı yaptığı için eşzamanlı testler dakikalık kotayı hızla doldurabilir.
+
+### Test izinli adresler (yönetici)
+
+Yönetici **Ayarlar > Test İzinli Adresler** bölümüne satır satır adres ekler:
+
+```
+ornek.dpu.edu.tr            # yalnızca bu host
+*.dpu.edu.tr                # tüm alt alan adları (dpu.edu.tr'nin kendisi hariç)
+test.dpu.edu.tr:8443        # varsayılan dışı port
+intranet.dpu.edu.tr iç-ağ   # özel (RFC1918) IP'ye çözümlenmesine izin verilir
+```
+
+Bu liste dışındaki adresler senaryo kaydında, test çalıştırmada, tarayıcıdan kayıtta ve test sırasındaki sayfa yönlendirmelerinde (ana çerçeve gezintisi) reddedilir. Sayfanın alt kaynakları (CDN, font, iframe) serbesttir ama SSRF proxy'sinden geçer. **Liste boşsa hiçbir test çalışmaz**; canlıya alırken ilk işiniz hedef adresleri eklemek olmalıdır. Sayfa yönlendirme kısıtını kapatmak için `ENFORCE_NAV_ALLOWLIST=false` kullanılabilir (önerilmez).
+
+### Güvenli kapatma ve yeniden dağıtım
+
+`docker compose up --build -d` konteyneri `SIGTERM` ile kapatır: yeni iş alınmaz, çalışan testler en fazla `SHUTDOWN_GRACE_SECONDS` (varsayılan 90 sn) beklenir. Sırada bekleyen işler bellektedir ve yeniden başlatmada kaybolur; kullanıcı arayüzde "sunucu yeniden başlatılmış olabilir, testi tekrar başlatın" mesajını görür. Mümkünse düşük yoğunluklu saatte dağıtın.
+
+### Sağlık uç noktaları
+
+`/api/live` yalnızca süreç ayakta mı kontrol eder (Docker healthcheck bunu kullanır). `/api/health` DPU bağlantısını da denetler; sonuç 5 sn önbelleklenir.
+
+
+### Yapay zeka adımlarının çözümü (çerçeveden bağımsız)
+
+Doğal dille yazılan her adım (`act`) şu sırayla çözülür; hiçbir arayüz kütüphanesine (PrimeNG, MUI, Ant...) özel kural kullanılmaz, yalnızca web standartlarına (ARIA rolleri, etiketler, görünürlük) dayanılır:
+
+1. **Seçici önbelleği:** önceki başarılı koşuda bulunan eleman aynı sayfada hâlâ varsa ve parmak izi (etiket, tür, ad, metin) uyuyorsa yapay zekaya hiç gidilmez (hızlı ve kota harcamaz). Sayfa değişmişse önbellek geçersiz sayılır ve yenilenir. Yalnızca seçici ve parmak izi saklanır, **yazılan değerler saklanmaz**. Dosyalar `cache/selectors/` altındadır; adımlar düzenlenince yeni anahtar kullanılır; 30 günden eski dosyalar silinir; `SELECTOR_CACHE=off` ile kapatılır, "Önbelleği Temizle" düğmesi de siler.
+2. **Yapay zeka + geri bildirimli yeniden deneme:** seçilen eleman sayfada çözümlenemezse veya eylemin hiçbir etkisi olmadıysa (alan boş kaldı, onay kutusu değişmedi) model nedenini söyleyen bir düzeltmeyle en çok 3 kez yeniden sorulur.
+3. **Anlamsal yedek (yapay zekasız):** yapay zeka sonuç vermezse (veya kota/ağ hatası olursa) talimattaki tırnak içi metin, rol/etiket/yer tutucu/satır metniyle Playwright'ın standart yöntemleriyle çözülür. Tam olarak **1 görünür eşleşme** yoksa tahmin edilmez, adım hata verir.
+
+Önbelleğe yalnızca **testin tamamı başarılı bitince** yazılır; başarısız bir koşunun (ör. giriş olmadığı için yanlış sayfada yapılan) tıklamaları kalıcı olmaz.
+
+Güvenlik önlemleri: (a) tıklama/seçme adımında modelin seçtiği elemanın görünen adı adımdaki etiketle hiç örtüşmüyorsa (ör. "devam et" için "Giriş Yap" düğmesi) **tıklanmaz**; alan, açılır liste ve onay kutusu adımlarında denetim uygulanmaz (etiketleri elemanın kendi metni değildir). (b) Model "eleman yok" derse (sayfa beklenen durumda olmayabilir) zorlanmaz; iki kez üst üste boş cevap gelirse üçüncü çağrı harcanmadan anlamsal yedeğe geçilir. (c) Tıklama sonrası ekranda görünen uyarı/durum metinleri loga `[BİLGİ] adım N sonrası ekranda görünen uyarı/durum: "..."` olarak yazılır (ör. "hesap bilgileri yanlış"). Bu metinler proje "hata anahtar kelimeleri" taramasına girer. (d) Adım başarısız olunca `[TEŞHİS]` satırları sayfa adresini (sorgusuz), başlığı, ekrandaki uyarıları ve geçersiz/zorunlu alanları yazar.
+
+**Önemli:** sonucu doğrulayan bir adım (ör. "Tarayıcıdan Kaydet" ile eklenen "Metni Doğrula" veya giriş sonrası görünen bir metnin kontrolü) olmayan senaryo, adımların hepsi tamamlanınca başarılı sayılır; giriş başarısız olsa bile. Senaryolarınızın sonuna mutlaka bir doğrulama adımı ekleyin.
+
+**Süre ve gecikme yönetimi:** bir testin süre sınırı adım sayısına göre otomatik ayarlanır: `max(5 dk, 90 sn + 30 sn × adım)`, en çok 30 dk (`RUN_TIMEOUT_SECONDS` ile sabitlenebilir). Tek bir yapay zeka çağrısı `AI_CALL_TIMEOUT_SECONDS` (varsayılan 25 sn) içinde yanıt vermezse aynı soru yeniden sorulur (deneme hakkından yemez, en çok 2 ek hak). Her adımın logunda toplam süre ve yapay zekayı bekleme süresi, test sonunda `[SÜRE]` özeti yazılır. Ekran uyarıları yalnızca gerçek uyarı rollerinden (`role=alert`, `alertdialog`) alınır ve aynı uyarı tekrarlanmaz.
+
+**Adım türü denetimi:** "yaz" adımına model "tıkla" önerirse (veya tersi) eylem uygulanmaz, düzeltmeyle yeniden sorulur; iki kez ısrar ederse yapay zekasız yedeğe geçilir. Yazılacak değer her zaman adım metnindeki tırnak içi değerdir (model uydurma/değiştirilmiş değer döndürse bile). Stagehand'in kendi "onarma" denemesi (self-heal) kapalıdır, böylece başarısız eylemde modelin uydurduğu bir değer (örn. `your_password`) yazılamaz.
+
+**Yer/kapsam ifadeleri:** çeviri talimatı, Türkçe satırdaki konum ifadelerini ("sayfanın en üstündeki", "tablodaki satırdaki", "sol paneldeki", "X bölümündeki") İngilizce adımda KORUMAYA zorlar; aynı etiketli birden çok eleman olan sayfalarda doğru olanı seçmek için gerekir. Kural yalnızca senaryo **kaydedilirken/yeniden kaydedilirken** çeviriye uygulanır; mevcut senaryoların adımlarını yenilemek için senaryoyu düzenleyip tekrar kaydedin. Hata anında `[TEŞHİS]` satırları ekranda görünen düğme/bağlantı adlarını da yazar. Testin başında `[SÜRE] başlatma: tarayıcı açılışı X sn | ilk sayfa yüklemesi Y sn` yazılır.
+
+Her eylemden sonra sonuç doğrulanır. Loglarda hangi yolun kullanıldığı `[ÇÖZÜM] adım N: ...` satırıyla görünür. Farklı arayüz yapılarına karşı sınama: `npm run test:resolution` (düz HTML, gizli input'lu özel onay kutusu, ARIA, belirsiz eşleşme, özel açılır liste, shadow DOM).
+
+
+## Rapor durum kararı ve yapay zeka yorumu
+
+**Durum kararı:** Başarı/başarısızlık anahtar kelime taramasında Stagehand'in kendi iç kayıt blokları (`[tarih] INFO: ...` ve altındaki girintili satırlar) ve `AI SDK Warning:` satırları **taranmaz**; çünkü kurtarılmış iç hatalar (ör. bayat eleman yolu, ikinci denemede çözülen adım) testi yanlışlıkla FAILED yapıyordu. Tam günlük yine kaydedilir. Çıkış kodu 0 olduğu halde FAILED verilirse günlüğün sonuna `[DEĞERLENDİRME]: ...` satırı eklenir (hangi anahtar kelime, temel kural mı proje anahtar kelimesi mi, hangi satır); rapor detayındaki "Hata Detayı" kartı bu satırı gösterir.
+
+**Yapay zeka yorumu:** Her rapor kaydedildikten sonra (başarılı/başarısız) arka planda çeviri sağlayıcısına kısa bir yorum isteği gider ve yalnızca **rapor detay penceresinde**, "Hata Detayı" kartının üstünde "Yapay Zeka Yorumu" bloğu olarak görünür (Türkçe; özet, tutarlı/şüpheli/sorunlu etiketi, muhtemel neden, en çok 3 öneri). Yorum **yalnızca tavsiyedir, test durumunu değiştirmez**. Modele yalnızca araç satırları ve test hata satırları gider (yazılan değerler maskelenir, Stagehand blokları ve ham sayfa verisi gitmez, ~7000 karakter sınırı). Yorum, raporun günlük alanının sonuna işaretli bir blok olarak saklanır (ek sütun gerekmez); API ve arayüz günlüğü bundan ayırır. Üretilemezse "Yorum üretilemedi" görünür. Yönetici ayarı yoktur; acil kapatma: `AI_REPORT_ANALYSIS=off`. Tek işçili sınırlı kuyruk (en çok 100 bekleyen) kullanır; test koşusunu geciktirmez.
+
+### Eylem sonrası ağ beklemesi ve rapor adım listesi
+
+- **Eylem sonrası bekleme:** tıklama/seçme gibi eylemler (yazma adımları hariç) bir ağ isteği (xhr/fetch/sayfa) başlatırsa, o istekler bitene kadar (en çok `AI_POST_ACTION_WAIT_SECONDS`, varsayılan 8 sn; `0` kapatır) beklenir; istek başlamazsa en çok ~0,5 sn eklenir. Yavaş sitelerde "Giriş Yap"tan sonraki adımın panel gelmeden başlayıp "eleman bulunamadı" demesini önler.
+- **Rapor penceresi adım listesi:** adımlar Stagehand'in iç satırlarından değil `Current test step` başlıklarından ve `[ÇÖZÜM] adım N` satırlarından üretilir; yeniden denemeler tek adımda toplanır, başlatma günlükleri "Başlatma ve Hazırlık" altında numarasız görünür. İşaret içermeyen eski raporlar eski ayrıştırıcıyla gösterilir.
+- `[KOŞUCU_HATASI]: ... güvenlik engeli sayılmaz` notu yalnızca "hata/engel beklenen" senaryolarda yazılır.
+
+### "Bul" adımları eylemsizdir
+
+"... bul" adımları (çeviride `Find/Locate/Look for ...`) yalnızca elemanın sayfada **var ve görünür** olduğunu doğrular; tıklama/yazma gibi hiçbir eylem uygulamaz. Önce yapay zekasız etiket/metin denetimi yapılır (en çok `AI_FIND_WAIT_SECONDS`, varsayılan 5 sn yoklanır), bulunamazsa yalnızca gözlem yapan yapay zeka (en çok 2 deneme) kullanılır; eleman yoksa adım `ACTION_FAILED` ile düşer. Cümlede eylem fiili varsa ("Find X **and click** it") eskisi gibi eylem sayılır. Önceden "giriş yap düğmesini bul" adımı düğmeye tıklayıp girişi yapıyor, sonraki "tıkla" adımı da düğmeyi bulamıyordu.
+
+### Sağlayıcı adları ve çeviri hata mesajları
+
+- Ayarlar panelinde sağlayıcıya serbest ad verebilirsiniz (ör. `openai_api_key2`, `openai_yedek`). Hem test koşucusu hem çeviri (ve yapay zeka yorumcusu) adı **aynı kuralla** tanır: adda `openai` geçiyorsa OpenAI, `gemini` geçiyorsa Gemini, `qwen`/`local`/`dpu` geçiyorsa DPU AI. Hiçbirine uymayan ad reddedilir (anahtar yanlış servise gönderilmez). Önceden çeviri yalnızca tam `openai`/`openai_api_key` adlarını kabul ediyordu.
+- Senaryo kaydederken çeviri başarısız olursa arayüz artık gerçek nedeni gösterir (anahtar reddedildi, model bulunamadı, kota/bakiye, zaman aşımı, desteklenmeyen sağlayıcı adı, 400'de sağlayıcının parametre mesajı). Mesajlar anahtar değeri içermez; tam ayrıntı sunucu günlüğündedir (`[Translator Gateway Error]`).
+
+### Adım türü: act / extract
+
+- Çeviri talimatına **adım türü kuralı** eklendi: `extract` yalnızca bir değeri/mesajı OKUMA/döndürme içindir ve hiçbir şeye tıklamaz/yazmaz; tıklama, kapatma, açma, yazma, seçme, "bul", "varsa kapat" gibi her etkileşim `act`'tir. Kural yalnızca senaryo **kaydedilirken/yeniden kaydedilirken** çeviriye uygulanır.
+- **Çalışma anı güvenlik ağı** (`utils/stepKind.js`): kayıtlı senaryoda bir `extract` adımının talimatı eylem fiili içeriyor (close/click/open/type/select...) ve okuma fiili içermiyorsa (return/read/get/verify...) adım `act` olarak çalıştırılır; günlüğe `[BİLGİ] adım N: "extract" olarak çevrilmiş ama eylem içeriyor...` yazılır. Okuma adımları (hata/engel mesajı döndürme dahil) değişmez. Mevcut senaryoları yeniden çevirmeye gerek yoktur.
+- Not: pop up "her zaman çıkmayabilir" durumları için isteğe bağlı adım ("varsa" → yoksa atla) henüz yoktur; pop up yoksa tıklama/kapatma adımı hata verir.
+
+### Yazma ve seçim adımlarında ek korumalar
+
+- **Hedef yazı kutusu değilse yazılmaz:** "yaz" adımında model bir kap (div/bileşen sarmalayıcı) önerirse, kabın içinde **tek görünür ve yazılabilir** kutu varsa doğrudan ona yazılır; yoksa eylem uygulanmaz, düzeltmeyle yeniden sorulur, ısrar edilirse yapay zekasız yedeğe geçilir. Gizli erişilebilirlik girdileri (`p-hidden-accessible`), salt-okunur/devre dışı kutular sayılmaz. Önceki hata: model kabı seçip `type` önerince Stagehand yazıyı odaktaki ALAN'a (e-posta kutusuna) yazıyor ve adım başarılı görünüyordu.
+- **"type" her zaman "fill" olarak uygulanır** (yazma adımlarında); `fill` uygun olmayan hedefte hata verir, körlemesine yazmaz. Yazdıktan sonra hedef yazılabilir bir kutu değilse (değer okunamıyorsa) sonuç doğrulaması başarısız sayılır.
+- **`selectOptionFromDropdown`:** hedef gerçek bir `<select>`/`<option>` değilse (örn. PrimeNG liste öğesi `<li>`) sıradan tıklamaya çevrilir; gerçek `<select>` kutularında yöntem korunur.
+
+### Yapay zeka yorumu: hatalı adım, sayfa mesajı ve neden
+
+Başarısız raporlarda yorum artık genel bir cümle yerine şunları verir: **hatalı adım**, sayfadan gelen **hata/uyarı mesajı (aynen alıntı)**, **muhtemel neden** (örn. uygulama "zorunludur" diyorsa büyük olasılıkla eksik test verisi/senaryo adımı; eleman yoksa sayfa beklenen durumda değil) ve nedene bağlı **somut öneriler**. Hata süre kaynaklı değilse performans önerisi verilmez. Uygulamanın doğrulama mesajı testin işini doğru yaptığını gösterir; bu durumda değerlendirme "Tutarlı" olur ama neden test verisi olarak yazılır.
+
+- Modele giden kanıt: çok satırlı sayfa mesajları (pop up metni) devam satırlarıyla alınır, aynı mesajın tekrarları tek sefer yazılır (~600 karakter sınırı), `[HATA TESPİT EDİLDİ]` satırları tanınır, "Hata veren adım: N. adım — ..." satırı eklenir.
+- Maskeleme: yalnızca "Type ... into" ile yazılan değerler `•••` olur (kanıtın her yerinde). Düğme adları, sayfa başlığı ve etiketler okunur kalır.
+- Modelin alıntıladığı sayfa mesajı kanıtta geçmiyorsa (uydurma) kartta gösterilmez. Kart "Hatalı adım" ve sayfa mesajı satırlarını ayrı gösterir. Yorum yine yalnızca tavsiyedir, durumu değiştirmez.
+
+### "Önbelleği Temizle" (Docker)
+
+Düğme artık `cache/` klasörünün **kendisini silmez**, yalnızca içindekileri (seçici önbelleği, `ai-security` vb.) boşaltır. Docker'da `/app/cache` bir volume bağlama noktası ve kök dosya sistemi salt-okunur olduğundan eski yöntem (klasörü sil + yeniden oluştur) `EROFS: rmdir '/app/cache'` ile düşüyordu. Silme yine başarısız olursa arayüze anlaşılır bir hata (kod ile) döner. Çalışan/sıradaki test varsa yine 409 ile reddedilir.
+
+### Rapor sonuçları: "Adım durumu" ve "Senaryo sonucu"
+
+Her rapor iki ayrı sonuç gösterir:
+
+| Alan | Anlamı | Kim belirler |
+|---|---|---|
+| **Adımlar** (Tamamlandı / Hata) | Adımlar teknik olarak sorunsuz çalıştı mı (`status` alanı, önceki mantık aynen) | Koşucu + sert kurallar |
+| **Senaryo** (Başarılı / Başarısız / Belirsiz / Değerlendiriliyor) | Senaryo amacına ulaştı mı | Aşağıdaki kurallar |
+
+Senaryo sonucu kuralları:
+1. Adım durumu **Hata** ise senaryo **Başarısız**; yapay zeka bunu başarılıya çeviremez (yalnızca aşağı yönlü etki; sayfadaki metinle sonuç iyileştirilemez).
+2. **Güvenlik (SECURITY) testleri:** sonuç yapay zekaya bırakılmaz; "beklenen sonuç" (başarı/hata beklenir) mantığıyla sistemin verdiği durumdur. Yapay zeka yalnızca yorum yapar.
+3. **UI/fonksiyonel testler**, adımlar sorunsuz tamamlandıysa: yapay zeka yorumundaki `senaryoSonucu` (uygulama "zorunludur/geçersiz/hata" gibi bir mesaj gösterdiyse, işlem reddedildiyse veya giriş/kayıt tamamlanmadıysa Başarısız). Yorum hazırlanırken "Değerlendiriliyor…", üretilemediyse "Belirsiz" (nötr gri) görünür. Yorum hiç yoksa (eski rapor / `AI_REPORT_ANALYSIS=off`) yalnızca adım durumu gösterilir.
+
+Rapor listesinde iki etiket, istatistik kartları ve filtre (Başarılı / Başarısız / Belirsiz-Değerlendiriliyor) senaryo sonucuna göre çalışır; "Değerlendiriliyor…" olan raporlar varken liste birkaç saniyede bir yenilenir. Sonuç, yorum bloğunun içinde saklanır (DPU tablosuna yeni sütun gerekmez); liste servisi bloğu okuyup `senaryo_sonucu` / `senaryo_kaynagi` alanlarını satıra ekler. Yapay zeka kartındaki etiket (Kanıtla uyumlu / Kanıt yetersiz / Kanıtla çelişkili) yorumun kanıtla uyumunu anlatır, senaryo sonucundan ayrıdır.
