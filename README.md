@@ -32,9 +32,9 @@ cp .env.example .env
 
 ```dotenv
 PORT=3000
-DPU_BASE_URL=https://
-DPU_PROJECT_CODE=
-DPU_USER_EMAIL=
+DPU_BASE_URL=https://dpubase.dpu.edu.tr
+DPU_PROJECT_CODE=test_otomasyonu
+DPU_USER_EMAIL=user+test_otomasyonu@base.dpu.edu.tr
 DPU_API_KEY=KENDI_DPU_API_ANAHTARINIZ
 DPU_USER_PASSWORD=KENDI_DPU_PAROLANIZ
 JWT_SECRET=AYRI_RASTGELE_GIZLI_DEGER
@@ -476,3 +476,37 @@ Senaryo sonucu kuralları:
 3. **UI/fonksiyonel testler**, adımlar sorunsuz tamamlandıysa: yapay zeka yorumundaki `senaryoSonucu` (uygulama "zorunludur/geçersiz/hata" gibi bir mesaj gösterdiyse, işlem reddedildiyse veya giriş/kayıt tamamlanmadıysa Başarısız). Yorum hazırlanırken "Değerlendiriliyor…", üretilemediyse "Belirsiz" (nötr gri) görünür. Yorum hiç yoksa (eski rapor / `AI_REPORT_ANALYSIS=off`) yalnızca adım durumu gösterilir.
 
 Rapor listesinde iki etiket, istatistik kartları ve filtre (Başarılı / Başarısız / Belirsiz-Değerlendiriliyor) senaryo sonucuna göre çalışır; "Değerlendiriliyor…" olan raporlar varken liste birkaç saniyede bir yenilenir. Sonuç, yorum bloğunun içinde saklanır (DPU tablosuna yeni sütun gerekmez); liste servisi bloğu okuyup `senaryo_sonucu` / `senaryo_kaynagi` alanlarını satıra ekler. Yapay zeka kartındaki etiket (Kanıtla uyumlu / Kanıt yetersiz / Kanıtla çelişkili) yorumun kanıtla uyumunu anlatır, senaryo sonucundan ayrıdır.
+
+## Senaryo grupları
+
+Senaryoları gruplayıp listeyi filtreleyebilir ve toplu testte bir grubu tek tıkla seçebilirsiniz.
+
+- **Grup:** proje + test türü (UI / Güvenlik) bazında adlandırılmış, **sıralı** senaryo listesi. Bir senaryo birden fazla gruba girebilir. Aynı projede/türde aynı ad (büyük/küçük harf ve Türkçe i/İ duyarsız) iki kez kullanılamaz; en çok 50 grup, grup başına en çok 200 senaryo.
+- **Yetki:** projeye erişimi olan herkes grup oluşturabilir, düzenleyebilir, senaryo atayabilir. Grup silmek onay sorar ve **senaryoları silmez**.
+- **Senaryo listesi:** "Grup" filtresi (tümü / bir grup / grupsuz), satırlarda grup etiketleri (etikete tıklayınca grubun içeriği açılır), satırları seçip "Gruba ekle" / "Bu gruptan çıkar" (veya yeni grup oluşturma). Filtreden **bir grup seçilince** "Grupları Yönet"in yanında o gruba özel bölüm belirir: **Senaryo ekle ▾ + Ekle** ve **Grup içeriği (n)**. Bir grup seçiliyken liste grup sırasıyla gelir. Senaryo oluştururken/düzenlerken formda "Gruplar" alanı vardır (satır içinde yeni grup da açılabilir).
+- **Grupları Yönet** penceresi yalnızca grup işleri içindir: oluştur, **adı değiştir**, **sil** (onaylı). Bir grubun adına tıklayınca içeriği açılır.
+- **Grup içeriği** penceresi: grubun senaryoları çalışma sırasıyla; ↑ ↓ ile sıra değiştirilir, ✕ ile gruptan çıkarılır.
+- **Toplu test:** grup seçici; "Görünenleri seç (grup sırasıyla)" seçimi grubun sırasıyla yapar (tek seferde en çok 50). Grup seçiliyken her satırda ↑ ↓ ile grup sırası değiştirilir ve seçili testler yeni sırayla numaralanır; "Grup sırasını düzenle" grup içeriği penceresini açar.
+- **Senaryo silinince** tüm gruplardan çıkarılır; senaryoyu yeniden adlandırmak grup üyeliğini etkilemez (üyelik kimlikle tutulur). Proje silinince grupları da silinir.
+
+**DPU Base tablosu `senaryo_gruplari`** (uygulamanın DPU kullanıcısının bu tabloda okuma/ekleme/güncelleme/silme yetkisi olmalıdır):
+
+| Kolon | Tip | Anlamı |
+|---|---|---|
+| `id` | Plain text (sistem) | Grup kimliği |
+| `project_id` | Plain text | Projenin kimliği (metin olarak) |
+| `test_tipi` | Plain text | `UI` veya `SECURITY` |
+| `grup_adi` | Plain text | Grup adı |
+| `senaryo_idleri` | JSON | Sıralı senaryo kimlikleri, örn. `["12","7","31"]` |
+
+Tablo yoksa veya yetki eksikse senaryo listesi ve toplu test normal çalışır; yalnızca grup alanlarında "Gruplar kullanılamıyor: ..." uyarısı görünür. API: `GET /api/scenarios/groups`, `POST /api/scenarios/groups/{create,rename,delete,members,reorder,assign}`; `GET /api/scenarios/list` yanıtına ad listesinin yanında `items: [{id, name}]` eklenmiştir (eski alan aynen durur). Grup işlemleri tek sunucu sürecinde grup başına sıralı yürütülür (eşzamanlı eklemeler birbirini ezmez); birden fazla sunucu örneği çalıştırılırsa DPU tarafında kilit yoktur.
+
+### Yapay zeka yorumunu yeniden yorumlatma
+
+Yorum üretilemezse ("Yorum üretilemedi"), yorum hiç yoksa (eski rapor) veya senaryo sonucu **Belirsiz** kaldıysa rapor penceresindeki yapay zeka kartında **"Yeniden yorumlat"** düğmesi çıkar. Tıklayınca yorum yeniden kuyruğa alınır ("Yorum hazırlanıyor…" görünür, sonuç gelince hem pencere hem rapor listesi güncellenir). Kesin sonuçlar (Başarılı/Başarısız) ve güvenlik testleri için düğme çıkmaz; sunucu da reddeder (409). Aynı rapor için 15 sn içinde ikinci istek 429 alır; yorum kapalıysa (`AI_REPORT_ANALYSIS=off`) 409. Yeniden yorum, senaryonun **güncel** adımlarını ve beklenen sonucunu kullanır (senaryo silinmişse yalnızca günlük kanıtı).
+
+- **Neden üretilemedi?** Kart artık nedeni yazar (anahtar reddedildi, model bulunamadı, kota/bakiye, zaman aşımı, biçim hatası...) ve sunucu günlüğüne `[Rapor yorumu] rapor N için yorum üretilemedi: ...` satırı düşer (gizli anahtar değerleri maskelenir). Önceden neden hiç görünmüyordu.
+- **Otomatik yeniden deneme:** geçici hatalarda (kota 429, 5xx, ağ/zaman aşımı) en çok 3 deneme, artan bekleme (`AI_ANALYSIS_RETRY_DELAY_MS`, varsayılan 3000); kalıcı hatalarda (anahtar/model/ayar) yeniden denenmez; biçim hatasında hemen yeniden denenir.
+- **Toplu koşular:** yorumlar tek işçili kuyrukta ve çeviri sağlayıcısının dakikalık sınırıyla (`AI_TRANSLATE_RPM`, varsayılan 20) üretilir; çok sayıda rapor birikirse kota beklemesi uzar. "Hazırlanıyor" durumu artık 10 dk sonra (eskiden 4 dk) "üretilemedi" sayılır. Toplu testlerde sık "üretilemedi" görüyorsanız `AI_TRANSLATE_RPM` değerini sağlayıcı kotanıza göre yükseltin.
+
+**Yorumun cevap biçimi:** yapay zekanın cevabı şemaya sokulmadan önce toleranslı hâle getirilir: Türkçe karakterli/büyük harfli değerler ("şüpheli", "Başarılı", "yüksek"), İngilizce eş anlamlılar, 3'ten fazla öneri (ilk 3 alınır), çok uzun metinler (kısaltılır), tek metin olarak gelen öneri ve tek seviye sarmalayıcı nesne kabul edilir; tanınmayan etiketler güvenli varsayılana düşer (şüpheli / belirsiz / orta). Yalnızca `özet` zorunludur. Yine de kullanılamayan cevapta kart "Yapay zekanın cevabı beklenen biçimde değildi (alan: sorun)" ve sunucu günlüğü hangi alanın tutmadığını yazar. Önceden bu farklılıkların hepsi yorumu "üretilemedi" yapıyordu.
