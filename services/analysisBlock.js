@@ -3,7 +3,7 @@
 const OPEN = '[[YZ_YORUMU:v1]]';
 const CLOSE = '[[/YZ_YORUMU]]';
 const BLOCK_RE = /\n?\[\[YZ_YORUMU:v1\]\]([\s\S]*?)\[\[\/YZ_YORUMU\]\]\s*$/;
-const PENDING_STALE_MS = 4 * 60 * 1000;
+const PENDING_STALE_MS = 10 * 60 * 1000;   // toplu koşularda yorum kuyruğu birikebilir; 10 dk sonra hâlâ bekliyorsa üretilemedi sayılır
 
 /** Günlük metninden yorum bloğunu ayırır: {log, analysis|null}. Bozuk blok → analysis null. */
 export function extractAnalysis(logContent) {

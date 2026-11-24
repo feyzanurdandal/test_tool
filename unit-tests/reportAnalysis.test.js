@@ -53,7 +53,7 @@ test('blok ekle/ayır; bozuk blok yok sayılır; eski bekleme üretilemedi olur'
     assert.deepEqual(analysis, block);
     assert.equal(A.extractAnalysis('düz log').analysis, null);
     assert.equal(A.extractAnalysis('log\n[[YZ_YORUMU:v1]]{bozuk[[/YZ_YORUMU]]').analysis, null);
-    const old = A.withAnalysisBlock('log', { durum: 'bekliyor', baslangic: new Date(Date.now() - 10 * 60e3).toISOString() });
+    const old = A.withAnalysisBlock('log', { durum: 'bekliyor', baslangic: new Date(Date.now() - 20 * 60e3).toISOString() });
     assert.equal(A.extractAnalysis(old).analysis.durum, 'uretilemedi');
     assert.equal(A.extractAnalysis(A.withAnalysisBlock('log', A.pendingBlock())).analysis.durum, 'bekliyor');
 });
@@ -116,6 +116,9 @@ test('istem: hatalı adım, aynen sayfa mesajı, neden ve performans önerisi ya
     assert.ok(A._systemPrompt.includes('hataliAdim') && A._systemPrompt.includes('sayfaMesaji'));
     assert.match(A._systemPrompt, /AYNEN alıntıla/);
     assert.ok(A._systemPrompt.includes('senaryoSonucu') && A._systemPrompt.includes('SECURITY'));
+    assert.match(A._systemPrompt, /VARSAYILAN KARAR/);
+    assert.match(A._systemPrompt, /BAŞARI mesajı kanıtta varsa .* KESİNLİKLE "basarili"/);
+    assert.match(A._systemPrompt, /"belirsiz" \(NADİR\)/);
     assert.match(A._systemPrompt, /EKSİK\/HATALI TEST VERİSİ/);
     assert.match(A._systemPrompt, /performans veya yapay zeka süresi önerisi VERME/);
 });
@@ -140,7 +143,7 @@ test('uçtan uca: rapor "bekliyor" ile eklenir, yorum aynı satıra yazılır, d
 });
 
 test('geçersiz/şemaya uymayan model cevabı → "uretilemedi" (durum yine değişmez)', async () => {
-    llmAnswer = JSON.stringify({ ozet: 'x', degerlendirme: 'harika' });
+    llmAnswer = JSON.stringify({ degerlendirme: 'harika' });      // özet yok: kullanılamaz (tanınmayan değerler artık toleranslı, özet zorunlu)
     db.raporlar.push({ id: 8, project_id: 1, status: 'SUCCESS', log_content: 'log' });
     A.scheduleAnalysis({ reportId: 8, projectId: 1, baseLog: 'log', ctx: ctx() });
     await A._idle();
@@ -164,4 +167,37 @@ test('kanıtta gerçekten bulunan sayfa mesajı korunur', async () => {
     const { analysis } = A.extractAnalysis(db.raporlar.find(r => r.id === 11).log_content);
     assert.match(analysis.sayfaMesaji, /Sözleşme bitiş tarihi zorunludur/);
     assert.equal(analysis.neden, 'Tarih alanları boş.');
+});
+
+test('normalizeAnalysis: Türkçe karakterli/büyük harfli değerler, İngilizce eş anlamlılar, fazla öneri, uzun metin, sarmalayıcı nesne', () => {
+    const n = A.normalizeAnalysis({ ozet: 'Doğrulama adımı yok.', degerlendirme: 'Şüpheli', senaryoSonucu: 'Başarılı', guven: 'Yüksek', oneriler: ['a', 'b', 'c', 'd', 'e'], neden: 'x'.repeat(5000) });
+    assert.equal(n.degerlendirme, 'supheli'); assert.equal(n.senaryoSonucu, 'basarili'); assert.equal(n.guven, 'yuksek');
+    assert.deepEqual(n.oneriler, ['a', 'b', 'c']); assert.equal(n.neden.length, 800);
+    const en = A.normalizeAnalysis({ ozet: 'x', degerlendirme: 'consistent', senaryoSonucu: 'FAILED', guven: 'high' });
+    assert.deepEqual([en.degerlendirme, en.senaryoSonucu, en.guven], ['tutarli', 'basarisiz', 'yuksek']);
+    const wrapped = A.normalizeAnalysis({ yorum: { özet: 'sarmalı', değerlendirme: 'Tutarlı', öneriler: 'tek metin' } });
+    assert.equal(wrapped.ozet, 'sarmalı'); assert.deepEqual(wrapped.oneriler, ['tek metin']);
+    const unknown = A.normalizeAnalysis({ ozet: 'x', degerlendirme: 'bilinmeyen', senaryoSonucu: '???', guven: null });
+    assert.deepEqual([unknown.degerlendirme, unknown.senaryoSonucu, unknown.guven], ['supheli', 'belirsiz', 'orta'], 'tanınmayan değer güvenli varsayılana düşer');
+    assert.equal(A.normalizeAnalysis(null).ozet, '');
+});
+
+test('uçtan uca: model Türkçe karakterli değerlerle ve 5 öneriyle cevap verirse yorum yine üretilir', async () => {
+    llmAnswer = JSON.stringify({ ozet: 'Sonucu doğrulayan adım yok.', degerlendirme: 'şüpheli', senaryoSonucu: 'belirsiz', guven: 'yüksek', hataliAdim: '', sayfaMesaji: '', neden: 'Doğrulama yok.', oneriler: ['1', '2', '3', '4', '5'] });
+    db.raporlar.push({ id: 12, project_id: 1, status: 'SUCCESS', log_content: 'x' });
+    A.scheduleAnalysis({ reportId: 12, projectId: 1, baseLog: 'x', ctx: ctx() });
+    await A._idle();
+    const { analysis } = A.extractAnalysis(db.raporlar.find(r => r.id === 12).log_content);
+    assert.equal(analysis.durum, 'hazir');
+    assert.equal(analysis.degerlendirme, 'supheli'); assert.equal(analysis.guven, 'yuksek'); assert.equal(analysis.oneriler.length, 3);
+});
+
+test('cevapta zorunlu özet yoksa: üretilemedi ve nedende hangi alanın tutmadığı yazar', async () => {
+    llmAnswer = JSON.stringify({ degerlendirme: 'tutarli' });
+    db.raporlar.push({ id: 13, project_id: 1, status: 'SUCCESS', log_content: 'x' });
+    A.scheduleAnalysis({ reportId: 13, projectId: 1, baseLog: 'x', ctx: ctx() });
+    await A._idle();
+    const { analysis } = A.extractAnalysis(db.raporlar.find(r => r.id === 13).log_content);
+    assert.equal(analysis.durum, 'uretilemedi');
+    assert.match(analysis.neden, /beklenen biçimde değildi \(ozet/);
 });

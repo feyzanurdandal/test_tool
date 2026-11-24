@@ -30,7 +30,7 @@ export function describeTranslatorError(error, model = '') {
         return 'Yapay zeka sağlayıcısı API anahtarını reddetti. Ayarlar\'dan anahtarı kontrol edin.';
     }
     if (status === 404 || /model_not_found|does not exist|not found/i.test(raw)) {
-        return `Model bulunamadı veya erişiminiz yok: "${model}". Ayarlar'dan model adını kontrol edin.`;
+        return `Model bulunamadı veya erişiminiz yok${model ? `: "${model}"` : ''}. Ayarlar'dan model adını kontrol edin.`;
     }
     if (status === 429 || /insufficient_quota|rate limit|quota|RESOURCE_EXHAUSTED/i.test(raw)) {
         return 'Yapay zeka sağlayıcısının kotası/limiti doldu (veya bakiye yetersiz). Sağlayıcı panelinden kontrol edin.';

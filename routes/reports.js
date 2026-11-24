@@ -3,10 +3,10 @@ import dpu from '../config/dpuService.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { requireProjectAccess } from '../utils/projectGuard.js';
-import { listScenariosSchema, deleteReportSchema, deleteReportsBatchSchema, reportDetailSchema } from '../schemas/scenarioSchemas.js';
+import { listScenariosSchema, deleteReportSchema, deleteReportsBatchSchema, reportDetailSchema, reanalyzeReportSchema } from '../schemas/scenarioSchemas.js';
 import { getProjectByName, userHasProjectAccess } from '../services/projectService.js';
 import { listProjectReports, invalidateReports } from '../services/reportService.js';
-import { extractAnalysis, resolveScenarioResult } from '../services/reportAnalysis.js';
+import { extractAnalysis, resolveScenarioResult, reanalyzeReport, ReanalysisError } from '../services/reportAnalysis.js';
 
 const router = express.Router();
 
@@ -59,6 +59,26 @@ router.get('/reports/detail', requireAuth, validate(reportDetailSchema), async (
         const scenario = resolveScenarioResult({ status: report.status, testType: report.test_tipi, analysis });
         return res.json({ success: true, report: { id: report.id, log_content: log, analysis, senaryo_sonucu: scenario?.sonuc ?? null, senaryo_kaynagi: scenario?.kaynak ?? null } });
     } catch (error) {
+        next(error);
+    }
+});
+
+// ─── YAPAY ZEKA YORUMUNU YENİDEN ÜRET (belirsiz / üretilemeyen yorumlar için) ───
+router.post('/reports/reanalyze', requireAuth, validate(reanalyzeReportSchema), async (req, res, next) => {
+    try {
+        const report = await dpu.findOne('raporlar', { id: { eq: req.body.id } });
+        if (!report) return res.status(404).json({ error: 'Rapor bulunamadı.' });
+
+        const projectsById = req.user.role === 'ADMIN' ? new Map() : await loadProjectsById();
+        if (!(await canManageReport(req.user, report, projectsById))) {
+            return res.status(403).json({ error: 'Erişim Engellendi: Bu raporun projesine erişim yetkiniz yok!' });
+        }
+        // Güncel senaryo kaydı (adımlar ve beklenen sonuç için); senaryo silinmiş olabilir
+        const scenario = await dpu.findOne('senaryolar', { project_id: { eq: report.project_id }, senaryo_adi: { eq: report.scenario_name } }).catch(() => null);
+        const pending = await reanalyzeReport(report, scenario);
+        return res.json({ success: true, analysis: pending });
+    } catch (error) {
+        if (error instanceof ReanalysisError) return res.status(error.statusCode).json({ error: error.message });
         next(error);
     }
 });

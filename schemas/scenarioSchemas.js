@@ -112,6 +112,10 @@ export const deleteReportSchema = z.object({
   body: z.object({ id: recordIdSchema })
 });
 
+export const reanalyzeReportSchema = z.object({
+  body: z.object({ id: recordIdSchema })
+});
+
 export const reportDetailSchema = z.object({
   query: z.object({ id: recordIdSchema })
 });
