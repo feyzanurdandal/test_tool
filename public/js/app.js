@@ -198,13 +198,20 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(currentProject)}&testType=${encodeURIComponent(currentTestType)}`);
             const result = await res.json();
 
-            if (result.scenarios && result.scenarios.length > 0) {
+            // Gruplar: araç çubuğu + filtre (grup seçiliyse liste grup sırasıyla gelir)
+            await window.ScenarioGroups?.refresh();
+            window.ScenarioGroups?.renderScenarioToolbar();
+            const groupsApi = window.ScenarioGroups;
+            const allNames = result.scenarios || [];
+            const visibleNames = groupsApi ? groupsApi.filterNames(allNames, groupsApi.filterId) : allNames;
+
+            if (allNames.length > 0 && visibleNames.length > 0) {
                 scenariosEmpty.classList.add("hidden");
                 scenariosTable.classList.remove("hidden");
                 scenariosList.innerHTML = "";
-                if (scenarioCountLabel) scenarioCountLabel.textContent = result.scenarios.length;
+                if (scenarioCountLabel) scenarioCountLabel.textContent = visibleNames.length === allNames.length ? allNames.length : `${visibleNames.length}/${allNames.length}`;
 
-                result.scenarios.forEach((scenarioName, index) => {
+                visibleNames.forEach((scenarioName, index) => {
                     const contentId = `scenario-content-${index}`;
 
                     const row = document.createElement("tr");
@@ -212,10 +219,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     row.setAttribute("data-target", contentId);
                     
                     row.innerHTML = `
+                        <td class="js-stop-propagation py-3 px-3 w-10"><input type="checkbox" class="sg-row-check w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-[#3b82f6] focus:ring-0 cursor-pointer" value="${escapeHtml(scenarioName)}" aria-label="Senaryoyu seç"></td>
                         <td class="py-3 px-4 font-mono text-zinc-500">${String(index + 1).padStart(2, '0')}</td>
-                        <td class="py-3 px-4 font-medium text-white flex items-center gap-2">
+                        <td class="py-3 px-4 font-medium text-white flex items-center gap-2 flex-wrap">
                             <i data-lucide="chevron-right" class="chevron-icon-scen w-4 h-4 text-zinc-500 transition-transform duration-200"></i>
                             <span>${escapeHtml(scenarioName)}</span>
+                            <span class="sg-chips"></span>
                         </td>
                         <td class="py-3 px-4 target-url-cell text-zinc-400 font-mono text-[11px]">-</td>
                         <td class="js-stop-propagation py-3 px-4 text-right">
@@ -226,12 +235,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     `;
                     bindStopPropagation(row);
                     scenariosList.appendChild(row);
+                    groupsApi?.fillChips(row.querySelector(".sg-chips"), scenarioName);
 
                     const contentRow = document.createElement("tr");
                     contentRow.id = contentId;
                     contentRow.className = "hidden bg-[#09090b]/50";
                     contentRow.innerHTML = `
-                        <td colspan="4" class="p-4 border-b border-[rgba(255,255,255,0.04)]">
+                        <td colspan="5" class="p-4 border-b border-[rgba(255,255,255,0.04)]">
                             <div class="space-y-3 bg-[#18181b]/40 p-4 rounded-xl border border-[rgba(255,255,255,0.06)]">
                                 <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] pb-2">
                                     <span class="text-[10px] uppercase font-bold tracking-wider text-zinc-500 flex items-center gap-1">
@@ -365,6 +375,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 reindexSteps();
                             }
 
+                            await window.ScenarioGroups?.mountFormField(document.getElementById("scenario-groups-field"), scenarioName);
                             lucide.createIcons();
                             if (scenarioModal) scenarioModal.classList.remove("hidden");
                         } catch (err) {
@@ -448,7 +459,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 lucide.createIcons();
             } else {
-                if (scenarioCountLabel) scenarioCountLabel.textContent = "0";
+                if (scenarioCountLabel) scenarioCountLabel.textContent = allNames.length > 0 ? `0/${allNames.length}` : "0";
+                scenariosEmpty.textContent = allNames.length > 0 ? "Seçili grupta/filtrede senaryo yok." : "Bu projeye ait henüz senaryo bulunamadı.";
                 scenariosTable.classList.add("hidden");
                 scenariosEmpty.classList.remove("hidden");
             }
@@ -803,8 +815,15 @@ document.addEventListener("DOMContentLoaded", () => {
                             return;
                         }
                     }
+                    const reanalyze = async () => {
+                        const rr = await fetch("/api/scenarios/reports/reanalyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: report.id }) });
+                        const jj = await rr.json().catch(() => ({}));
+                        if (!rr.ok || !jj.success) throw new Error(jj.error || "Yeniden yorumlatma başarısız.");
+                        report.__analysis = jj.analysis;
+                        return jj.analysis;
+                    };
                     const fullLog = report.__log || "Log kaydı bulunmuyor.";
-                    openReportModal(scenarioName, formattedDate, isSuccess, fullLog, parseLogsToSteps(fullLog), { analysis: report.__analysis, refresh: fetchDetail, scenario: report.__scenario || { sonuc: report.senaryo_sonucu, kaynak: report.senaryo_kaynagi }, getScenario: () => report.__scenario });
+                    openReportModal(scenarioName, formattedDate, isSuccess, fullLog, parseLogsToSteps(fullLog), { analysis: report.__analysis, refresh: fetchDetail, scenario: report.__scenario || { sonuc: report.senaryo_sonucu, kaynak: report.senaryo_kaynagi }, getScenario: () => report.__scenario, reanalyze });
                 });
 
                 const deleteReportBtn = card.querySelector(".delete-report-btn");
@@ -856,7 +875,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (refreshBtn) refreshBtn.addEventListener("click", loadReports);
     
     // Toplu Testleri Yöneten Fonksiyon
-    async function loadBatchScenarios() {
+    async function loadBatchScenarios(keepSelection = false) {
         const batchEmpty = document.getElementById("batch-empty");
         const batchTable = document.getElementById("batch-table");
         const batchList = document.getElementById("batch-list");
@@ -876,15 +895,21 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch(`/api/scenarios/list?project=${encodeURIComponent(activeProjectName)}&testType=${encodeURIComponent(currentTestType)}`);
             const result = await res.json();
 
+            // Gruplar: grup seçiciyi çiz; grup seçiliyse liste grup sırasıyla gelir (toplu çalıştırma sırası)
+            await window.ScenarioGroups?.refresh();
+            window.ScenarioGroups?.renderBatchBar();
+            const previousQueue = keepSelection ? [...batchQueue] : [];
             batchQueue = [];
             updateBatchButtonState();
+            const allBatchNames = result.scenarios || [];
+            const batchNames = window.ScenarioGroups ? window.ScenarioGroups.filterNames(allBatchNames, window.ScenarioGroups.batchId) : allBatchNames;
 
-            if (result.scenarios && result.scenarios.length > 0) {
+            if (batchNames.length > 0) {
                 batchEmpty.classList.add("hidden");
                 batchTable.classList.remove("hidden");
                 batchList.innerHTML = "";
 
-                result.scenarios.forEach((scenarioName) => {
+                batchNames.forEach((scenarioName) => {
                     const row = document.createElement("tr");
                     row.className = "border-b border-[rgba(255,255,255,0.04)] hover:bg-[#18181b]/40 transition h-12";
                     row.innerHTML = `
@@ -894,6 +919,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         <td class="py-3 px-4 font-mono text-zinc-500 font-semibold batch-order-cell">-</td>
                         <td class="py-3 px-4 font-medium text-white">${escapeHtml(scenarioName)}</td>
                     `;
+                    const groupExtra = window.ScenarioGroups?.batchRowExtra(scenarioName);   // grup seçiliyken ↑ ↓ (grup sırası)
+                    if (groupExtra) row.appendChild(groupExtra);
 
                     const checkbox = row.querySelector(".batch-checkbox");
                     checkbox.addEventListener("click", () => {
@@ -907,8 +934,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     batchList.appendChild(row);
                 });
+                // Grup sırası değişince seçili olanlar yeni (görünen) sırayla kuyruğa dizilir: toplu çalıştırma sırasını grup belirler
+                if (keepSelection) { batchQueue = batchNames.filter(n => previousQueue.includes(n)); updateBatchTableUI(); }
             } else {
                 batchTable.classList.add("hidden");
+                batchEmpty.textContent = allBatchNames.length > 0 ? "Seçili grupta senaryo yok." : "Bu projede sıraya dizilecek senaryo bulunamadı.";
                 batchEmpty.classList.remove("hidden");
             }
         } catch (err) {
@@ -1379,6 +1409,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 stepsContainer.appendChild(createStepRow());
                 reindexSteps();
             }
+            window.ScenarioGroups?.mountFormField(document.getElementById("scenario-groups-field"), null);
             lucide.createIcons();
             if (scenarioModal) scenarioModal.classList.remove("hidden");
         });
@@ -1774,6 +1805,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (res.ok && result.success) {
                     notify(result.message || (isEditMode ? "Senaryo güncellendi!" : "Senaryo kaydedildi!"));
                     globalEditScenarioName = "";
+                    try { await window.ScenarioGroups?.assignAfterSave(scenarioName); }
+                    catch (groupErr) { notify(`Senaryo kaydedildi ancak grup ataması yapılamadı: ${groupErr.message}`); }
                     if (scenarioModal) scenarioModal.classList.add("hidden");
                     await loadScenarios();
                 } else {
@@ -1790,6 +1823,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    // Senaryo grupları: bağlam ve liste yenileme kancaları (arayüz js/group-panel.js)
+    window.ScenarioGroups?.init({
+        getContext: () => ({ project: currentProject, type: currentTestType }),
+        onChange: () => { loadScenarios(); loadBatchScenarios(); },
+        reloadBatch: (keep) => loadBatchScenarios(keep),
+        setBatchSelection: (names) => { batchQueue = [...names]; updateBatchTableUI(); },
+    });
 
     if (projectDropdown) {
         projectDropdown.addEventListener("change", (e) => {
@@ -2364,7 +2405,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const CONFIDENCE_TR = { dusuk: "düşük", orta: "orta", yuksek: "yüksek" };
 
     // Yapay zeka yorum kartı: analysis yoksa gizli; bekliyorsa "hazırlanıyor" + yoklama; metinler yalnızca textContent ile yazılır.
-    function renderAiCard(analysis, refresh, token) {
+    function renderAiCard(analysis, refresh, token, retry) {
         const card = document.getElementById("modal-report-ai-card");
         const chip = document.getElementById("modal-report-ai-chip");
         const summary = document.getElementById("modal-report-ai-summary");
@@ -2372,23 +2413,60 @@ document.addEventListener("DOMContentLoaded", () => {
         const stepEl = document.getElementById("modal-report-ai-step");
         const msgEl = document.getElementById("modal-report-ai-msg");
         const tips = document.getElementById("modal-report-ai-tips");
+        const actions = document.getElementById("modal-report-ai-actions");
         if (!card) return;
         clearTimeout(aiPollTimer);
         chip.classList.add("hidden"); cause.classList.add("hidden"); tips.classList.add("hidden"); stepEl.classList.add("hidden"); msgEl.classList.add("hidden");
-        if (!analysis) { card.classList.add("hidden"); return; }
+        if (actions) actions.innerHTML = "";
+        // Belirsiz / üretilemeyen / hiç olmayan yorum için "Yeniden yorumlat" (kesin sonuçlarda sunucu zaten reddeder)
+        const addRetryButton = () => {
+            if (!retry || !actions) return;
+            const btn = document.createElement("button");
+            btn.type = "button"; btn.id = "modal-report-ai-retry";
+            btn.className = "text-[11px] font-medium px-3 py-1.5 rounded-lg border border-indigo-400/40 text-indigo-200 hover:bg-indigo-500/20 transition disabled:opacity-50";
+            btn.textContent = "Yeniden yorumlat";
+            btn.addEventListener("click", async () => {
+                btn.disabled = true; btn.textContent = "İstek gönderiliyor…";
+                try {
+                    const pending = await retry();
+                    token.tries = 0; token.reloadList = true;
+                    renderAiCard(pending, refresh, token, retry);
+                } catch (err) {
+                    notify(err.message || "Yeniden yorumlatma başarısız.");
+                    btn.disabled = false; btn.textContent = "Yeniden yorumlat";
+                }
+            });
+            actions.appendChild(btn);
+        };
+        if (!analysis) {
+            if (!retry) { card.classList.add("hidden"); return; }
+            card.classList.remove("hidden");
+            summary.textContent = "Bu rapor için yapay zeka yorumu yok.";
+            addRetryButton();
+            return;
+        }
         card.classList.remove("hidden");
         if (analysis.durum === 'bekliyor') {
             summary.textContent = "Yorum hazırlanıyor…";
             if (refresh && token.tries++ < 30) {
                 aiPollTimer = setTimeout(async () => {
                     if (token.closed) return;
-                    try { const a = await refresh(); if (!token.closed) renderAiCard(a, refresh, token); }
-                    catch { if (!token.closed) renderAiCard(analysis, refresh, token); }
+                    try {
+                        const a = await refresh();
+                        if (token.closed) return;
+                        if (token.reloadList && a?.durum !== 'bekliyor') { token.reloadList = false; loadReports(); }   // liste etiketleri de güncellensin
+                        renderAiCard(a, refresh, token, retry);
+                    } catch { if (!token.closed) renderAiCard(analysis, refresh, token, retry); }
                 }, 4000);
             }
             return;
         }
-        if (analysis.durum !== 'hazir') { summary.textContent = "Yorum üretilemedi."; return; }
+        if (analysis.durum !== 'hazir') {
+            summary.textContent = "Yorum üretilemedi.";
+            if (analysis.neden) { cause.textContent = `Neden: ${analysis.neden}`; cause.classList.remove("hidden"); }
+            addRetryButton();
+            return;
+        }
         summary.textContent = analysis.ozet || "";
         const chipInfo = AI_CHIPS[analysis.degerlendirme];
         if (chipInfo) {
@@ -2401,6 +2479,8 @@ document.addEventListener("DOMContentLoaded", () => {
         tips.innerHTML = "";
         (analysis.oneriler || []).forEach(t => { const li = document.createElement("li"); li.textContent = t; tips.appendChild(li); });
         if (tips.children.length) tips.classList.remove("hidden");
+        // senaryo sonucu belirsiz kaldıysa (güvenlik testlerinde sonucu sistem belirlediği için gösterilmez)
+        if (!["basarili", "basarisiz"].includes(analysis.senaryoSonucu) && token.getScenario?.()?.kaynak !== "beklenen_sonuc") addRetryButton();
     }
 
     // Rapor penceresi başlığı: ikon = SENARYO SONUCU (yoksa adım durumu); iki etiket: Adımlar ve Senaryo.
@@ -2425,11 +2505,11 @@ document.addEventListener("DOMContentLoaded", () => {
     function openReportModal(scenarioName, formattedDate, isSuccess, rawLogContent, parsedSteps, extra = {}) {
         if (aiPollTimer) clearTimeout(aiPollTimer);
         if (openReportModal.token) openReportModal.token.closed = true;
-        const aiToken = openReportModal.token = { tries: 0, closed: false };
+        const aiToken = openReportModal.token = { tries: 0, closed: false, getScenario: () => (extra.getScenario?.() || extra.scenario) };
         // Yorum hazır olunca (yoklama) senaryo sonucu da güncellenir
         const refreshWithHeader = extra.refresh && (async () => { const a = await extra.refresh(); renderReportHeader(isSuccess, extra.getScenario?.()); return a; });
         document.querySelectorAll("#close-report-modal-btn, #close-report-modal-footer-btn").forEach(b => b.addEventListener("click", () => { aiToken.closed = true; clearTimeout(aiPollTimer); }, { once: true }));
-        renderAiCard(extra.analysis, refreshWithHeader, aiToken);
+        renderAiCard(extra.analysis, refreshWithHeader, aiToken, extra.reanalyze);
         const modal = document.getElementById("report-detail-modal");
         const titleEl = document.getElementById("modal-report-title");
         const dateEl = document.getElementById("modal-report-date");

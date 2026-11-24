@@ -160,11 +160,13 @@
                             <i data-lucide="plus" class="w-4 h-4"></i> Yeni Senaryo
                         </button>
                     </div>
+                    <div id="scenario-group-toolbar" class="flex flex-wrap items-center gap-2"></div>
                     <div class="bg-[#09090b] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden min-h-[200px] flex flex-col justify-center items-center p-8">
                         <div id="scenarios-empty" class="text-xs text-zinc-500 font-medium">Bu projeye ait henüz senaryo bulunamadı.</div>
                         <table id="scenarios-table" class="w-full text-left border-collapse hidden">
                             <thead>
                                 <tr class="border-b border-[rgba(255,255,255,0.06)] text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                                    <th class="py-3 px-3 w-10"><span class="sr-only">Seç</span></th>
                                     <th class="py-3 px-4 w-12">#</th>
                                     <th class="py-3 px-4">Senaryo Adı</th>
                                     <th class="py-3 px-4">Hedef URL</th>
@@ -184,12 +186,13 @@
                                 <span id="batch-title-text">Sıralı Toplu Test Pipeline Yapısı</span>
                                 <span id="batch-badge-type" class="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">UI</span>
                             </h2>
-                            <p class="text-xs text-zinc-500 mt-0.5"><span id="selected-batch-count">0</span> test seçildi · Sıralama tıklama sıranıza göre belirlenir</p>
+                            <p class="text-xs text-zinc-500 mt-0.5"><span id="selected-batch-count">0</span> test seçildi · Sıralama tıklama sıranıza göre belirlenir (grup seçiliyse "Görünenleri seç" grup sırasını kullanır)</p>
                         </div>
                         <button id="start-batch-btn" disabled class="bg-[#18181b] text-zinc-500 border border-[rgba(255,255,255,0.08)] text-xs font-medium px-4 py-2 rounded-lg transition flex items-center gap-1.5 cursor-not-allowed">
                             Seçilen Test Kuyruğunu Başlat (0)
                         </button>
                     </div>
+                    <div id="batch-group-bar" class="flex flex-wrap items-center gap-2"></div>
                     <div class="bg-[#09090b] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden min-h-[200px] flex flex-col justify-center items-center p-8">
                         <div id="batch-empty" class="text-xs text-zinc-500 font-medium">Bu projede sıraya dizilecek senaryo bulunamadı.</div>
                         <table id="batch-table" class="w-full text-left border-collapse hidden">
@@ -198,6 +201,7 @@
                                     <th class="py-3 px-4 w-16">Seç</th>
                                     <th class="py-3 px-4 w-20">Sıra No</th>
                                     <th class="py-3 px-4">Senaryo Adı</th>
+                                    <th id="sg-batch-th" class="py-3 px-4" hidden>Grup sırası</th>
                                 </tr>
                             </thead>
                             <tbody id="batch-list" class="text-xs text-zinc-300 divide-y divide-[rgba(255,255,255,0.04)]"></tbody>
@@ -501,6 +505,8 @@
                                class="w-full p-2.5 bg-[#27272a] border border-[rgba(255,255,255,0.08)] rounded-lg text-xs text-white outline-none focus:border-[#3b82f6] transition">
                     </div>
 
+                    <div id="scenario-groups-field" class="col-span-2"></div>
+
                     <!-- Siber Güvenlik Beklenen Sonuç Seçimi -->
                     <div id="expected-outcome-container" class="col-span-2 hidden bg-[#27272a]/30 p-3 rounded-lg border border-amber-500/20">
                         <label class="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
@@ -576,6 +582,7 @@
     <script src="js/lib/jobs-panel.js"></script>
     <script src="js/browser-panel.js"></script>
     <script src="js/test-data-editor.js"></script>
+    <script src="js/group-panel.js"></script>
     <script src="js/app.js"></script>
 
     <!-- Rapor Detay Pop-Up Modalı -->
@@ -613,6 +620,7 @@
                 <p id="modal-report-ai-step" class="hidden text-xs leading-relaxed select-text mt-2"></p>
                 <pre id="modal-report-ai-msg" class="hidden text-[11px] font-mono whitespace-pre-wrap leading-relaxed select-text mt-2 p-2 rounded-lg bg-black/30 border border-indigo-500/20 text-indigo-100 max-h-24 overflow-y-auto"></pre>
                 <p id="modal-report-ai-cause" class="hidden text-xs leading-relaxed select-text mt-2 text-zinc-300"></p>
+                <div id="modal-report-ai-actions" class="mt-2"></div>
                 <ul id="modal-report-ai-tips" class="hidden list-disc pl-5 mt-2 text-xs leading-relaxed select-text text-zinc-300 space-y-0.5"></ul>
                 <p class="text-[10px] text-zinc-500 mt-2">Bu yorum otomatik üretilir. Adım durumunu değiştirmez; UI testlerinde senaryo sonucu bu değerlendirmeye göre belirlenir, güvenlik testlerinde yalnızca tavsiyedir.</p>
             </div>
