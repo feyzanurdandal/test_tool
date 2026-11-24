@@ -2,6 +2,7 @@ import express from 'express';
 import browserRouter from './browser.js';
 import projectsRouter from './projects.js';
 import scenariosRouter from './scenarios.js';
+import groupsRouter from './groups.js';
 import runsRouter from './runs.js';
 import reportsRouter from './reports.js';
 import settingsRouter from './settings.js';
@@ -14,6 +15,7 @@ const router = express.Router();
 
 router.use(browserRouter);
 router.use(projectsRouter);
+router.use(groupsRouter);
 router.use(scenariosRouter);
 router.use(runsRouter);
 router.use(reportsRouter);

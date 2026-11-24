@@ -92,6 +92,7 @@ router.post('/projects/delete', requireAuth, requireAdmin, validate(deleteProjec
         const cleanups = [
             ['senaryolar', { project_id: { eq: project.id } }],
             ['raporlar', { project_id: { eq: project.id } }],
+            ['senaryo_gruplari', { project_id: { eq: String(project.id) } }],
             ['kullanici_projeleri', { proje_adi: { eq: projectName } }],
         ];
         for (const [table, filter] of cleanups) {

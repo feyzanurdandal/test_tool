@@ -16,6 +16,7 @@ import {
 import { getProjectByName, getScenario } from '../services/projectService.js';
 import { z } from 'zod';
 import { invalidateReports } from '../services/reportService.js';
+import { removeScenarioEverywhere } from '../services/scenarioGroups.js';
 
 // Kullanıcının düzeltebileceği çeviri/veri hataları (eksik [[FORM:..]] anahtarı, geçersiz test verisi vb.)
 // 500 yerine anlaşılır 400 olarak döner; böylece kayıt yarım kalmaz.
@@ -60,10 +61,9 @@ router.get('/list', requireAuth, validate(listScenariosSchema), requireProjectAc
         const scenariosRes = await dpu.selectWhere('senaryolar', { project_id: { eq: project.id } });
         if (!scenariosRes.success || !scenariosRes.data) return res.json({ scenarios: [] });
 
-        const scenarios = scenariosRes.data
-            .filter(s => (s.test_tipi || 'UI').toUpperCase() === testType)
-            .map(s => s.senaryo_adi);
-        return res.json({ scenarios });
+        const filtered = scenariosRes.data.filter(s => (s.test_tipi || 'UI').toUpperCase() === testType);
+        // scenarios: ad listesi (eski istemciler için aynen); items: aynı sırada {id, name} (grup üyeliği kimlikle tutulur)
+        return res.json({ scenarios: filtered.map(s => s.senaryo_adi), items: filtered.map(s => ({ id: String(s.id), name: s.senaryo_adi })) });
     } catch (error) {
         next(error);
     }
@@ -238,7 +238,10 @@ router.post('/delete', requireAuth, validate(deleteScenarioSchema), requireProje
         if (!scenario) return res.status(404).json({ error: 'Silinecek senaryo bulunamadı.' });
 
         const deleteResult = await dpu.delete('senaryolar', scenario.id);
-        if (deleteResult.success) return res.json({ success: true, message: 'Senaryo başarıyla silindi!' });
+        if (deleteResult.success) {
+            await removeScenarioEverywhere(project.id, scenario.id);   // silinen senaryo tüm gruplardan çıkarılır
+            return res.json({ success: true, message: 'Senaryo başarıyla silindi!' });
+        }
         return res.status(500).json({ error: 'Senaryo silinirken veritabanı hatası oluştu.' });
     } catch (error) {
         next(error);
